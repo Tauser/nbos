@@ -52,6 +52,13 @@ bool step_display() {
     static ncos::drivers::display::DisplayDriver display;
     ctx->ok = display.init();
     if (ctx->ok) {
+      // Recupera o ST7789 em warm boot quando o painel manteve estado interno.
+      display.writeCommand(0x01);  // SWRESET
+      vTaskDelay(pdMS_TO_TICKS(150));
+      display.writeCommand(0x11);  // SLPOUT
+      vTaskDelay(pdMS_TO_TICKS(150));
+      display.writeCommand(0x29);  // DISPON
+      vTaskDelay(pdMS_TO_TICKS(50));
       display.setRotation(0);
       // Smoke visual: confirma que painel/backlight estao respondendo.
       display.fillScreen(TFT_RED);
@@ -205,5 +212,6 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+
 
 
