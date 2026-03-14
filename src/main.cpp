@@ -1,5 +1,5 @@
 #include "config/system_config.hpp"
-#include "drivers/st7789/st7789_display.hpp"
+#include "drivers/display/display_driver.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -8,7 +8,7 @@
 namespace {
 constexpr const char* kTag = "NCOS";
 
-void run_display_smoke_test(ncos::drivers::display::St7789Display& display) {
+void run_display_smoke_test(ncos::drivers::display::DisplayDriver& display) {
   if (!display.init()) {
     ESP_LOGE(kTag, "ST7789 init failed");
     return;
@@ -44,10 +44,11 @@ extern "C" void app_main(void) {
     ESP_LOGE(kTag, "Invalid build profile configuration");
   }
 
-  ncos::drivers::display::St7789Display display;
+  ncos::drivers::display::DisplayDriver display;
   run_display_smoke_test(display);
 
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
+

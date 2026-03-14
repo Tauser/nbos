@@ -1,10 +1,10 @@
-#include "drivers/st7789/st7789_display.hpp"
+#include "drivers/display/display_driver.hpp"
 
 #include "config/pins/board_freenove_esp32s3_cam.hpp"
 
 namespace ncos::drivers::display {
 
-St7789Display::St7789Display() {
+DisplayDriver::DisplayDriver() {
   {
     auto cfg = bus_.config();
     cfg.spi_host = SPI2_HOST;

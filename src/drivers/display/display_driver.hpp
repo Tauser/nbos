@@ -4,9 +4,9 @@
 
 namespace ncos::drivers::display {
 
-class St7789Display final : public lgfx::LGFX_Device {
+class DisplayDriver final : public lgfx::LGFX_Device {
  public:
-  St7789Display();
+  DisplayDriver();
 
  private:
   lgfx::Panel_ST7789 panel_;
