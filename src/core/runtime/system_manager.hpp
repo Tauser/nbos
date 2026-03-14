@@ -4,6 +4,7 @@
 
 #include "app/lifecycle/system_lifecycle.hpp"
 #include "config/system_config.hpp"
+#include "core/messaging/event_bus_v2.hpp"
 #include "core/runtime/diagnostics.hpp"
 #include "core/runtime/fault_history.hpp"
 #include "core/runtime/health.hpp"
@@ -19,6 +20,9 @@ struct RuntimeStatus {
   bool safe_mode = false;
   uint32_t fault_count = 0;
   uint64_t last_tick_ms = 0;
+  uint32_t bus_published_total = 0;
+  uint32_t bus_dispatched_total = 0;
+  uint32_t bus_dropped_total = 0;
 };
 
 class SystemManager final {
@@ -41,6 +45,7 @@ class SystemManager final {
   const ncos::app::lifecycle::SystemLifecycle* lifecycle_ = nullptr;
   const ncos::config::GlobalConfig* config_ = nullptr;
   SchedulerBase scheduler_{};
+  ncos::core::messaging::EventBusV2 event_bus_{};
   HealthMonitor health_{};
   FaultHistory fault_history_{};
   SafeModeController safe_mode_{};

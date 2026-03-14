@@ -1,9 +1,11 @@
 #include "core/runtime/system_manager.hpp"
 
+#include "core/contracts/interaction_taxonomy.hpp"
 #include "esp_log.h"
 
 namespace {
 constexpr const char* kTag = "NCOS_SYSMGR";
+constexpr uint16_t kBusDrainPerLane = 4;
 }
 
 namespace ncos::core::runtime {
@@ -54,6 +56,15 @@ void SystemManager::start(uint64_t now_ms) {
     }
   }
 
+  ncos::core::contracts::EventMessage runtime_started{};
+  runtime_started.header.kind = ncos::core::contracts::SignalKind::kEvent;
+  runtime_started.header.trace_id = static_cast<uint32_t>(now_ms & 0xFFFFFFFFULL);
+  runtime_started.header.timestamp_ms = now_ms;
+  runtime_started.topic = ncos::core::contracts::EventTopic::kSystemObservation;
+  runtime_started.source_service = 1;
+  (void)event_bus_.publish_event(runtime_started);
+  event_bus_.drain(kBusDrainPerLane);
+
   started_ = true;
   refresh_health(now_ms);
   ESP_LOGI(kTag, "SystemManager iniciado com %u tarefa(s)", static_cast<unsigned>(scheduler_.task_count()));
@@ -66,6 +77,7 @@ void SystemManager::tick(uint64_t now_ms) {
 
   last_tick_ms_ = now_ms;
   scheduler_.tick(now_ms);
+  event_bus_.drain(kBusDrainPerLane);
   refresh_health(now_ms);
 }
 
@@ -77,6 +89,14 @@ RuntimeStatus SystemManager::status() const {
   out.safe_mode = safe_mode_.active();
   out.fault_count = fault_history_.count();
   out.last_tick_ms = last_tick_ms_;
+
+  const ncos::core::messaging::EventBusStats bus_stats = event_bus_.stats();
+  out.bus_published_total = bus_stats.published_events + bus_stats.published_commands +
+                            bus_stats.published_intents + bus_stats.published_reactions;
+  out.bus_dispatched_total = bus_stats.dispatched_events + bus_stats.dispatched_commands +
+                             bus_stats.dispatched_intents + bus_stats.dispatched_reactions;
+  out.bus_dropped_total = bus_stats.dropped_events + bus_stats.dropped_commands +
+                          bus_stats.dropped_intents + bus_stats.dropped_reactions;
   return out;
 }
 
