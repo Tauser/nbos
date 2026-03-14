@@ -3,7 +3,7 @@
 #include "config/system_config.hpp"
 #include "drivers/audio/audio_bringup.hpp"
 #include "drivers/camera/camera_bringup.hpp"
-#include "drivers/display/display_driver.hpp"
+#include "drivers/display/display_runtime.hpp"
 #include "drivers/imu/mpu6050_bringup.hpp"
 #include "drivers/storage/sd_bringup.hpp"
 #include "drivers/touch/touch_bringup.hpp"
@@ -48,18 +48,17 @@ bool step_display() {
   auto display_task = [](void* arg) {
     auto* ctx = static_cast<DisplayTaskContext*>(arg);
 
-    // LovyanGFX pode exigir stack maior durante init.
-    static ncos::drivers::display::DisplayDriver display;
-    ctx->ok = display.init();
+    ncos::drivers::display::DisplayDriver* display = ncos::drivers::display::acquire_shared_display();
+    ctx->ok = display != nullptr;
     if (ctx->ok) {
-      display.setRotation(0);
-      display.setTextSize(2);
-      display.setTextColor(TFT_WHITE, TFT_BLACK);
-      display.fillScreen(TFT_BLACK);
-      display.setCursor(12, 20);
-      display.printf("NC-OS");
-      display.setCursor(12, 52);
-      display.printf("BOOT");
+      display->setRotation(0);
+      display->setTextSize(2);
+      display->setTextColor(TFT_WHITE, TFT_BLACK);
+      display->fillScreen(TFT_BLACK);
+      display->setCursor(12, 20);
+      display->printf("NC-OS");
+      display->setCursor(12, 52);
+      display->printf("BOOT");
     }
 
     xTaskNotifyGive(ctx->caller);

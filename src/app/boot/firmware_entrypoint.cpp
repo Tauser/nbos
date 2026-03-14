@@ -50,7 +50,12 @@ void FirmwareEntrypoint::run() {
     return;
   }
 
-  system_manager_.start(monotonic_ms());
+  const uint64_t now = monotonic_ms();
+  system_manager_.start(now);
+
+  if (!face_service_.initialize(now)) {
+    ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
+  }
 
   const ncos::core::runtime::RuntimeReadinessReport readiness =
       ncos::core::runtime::evaluate_runtime_readiness(ncos::config::kGlobalConfig, lifecycle_,
@@ -66,7 +71,9 @@ void FirmwareEntrypoint::run() {
 }
 
 void FirmwareEntrypoint::tick() {
-  system_manager_.tick(monotonic_ms());
+  const uint64_t now = monotonic_ms();
+  system_manager_.tick(now);
+  face_service_.tick(now);
 }
 
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {
@@ -74,3 +81,4 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
