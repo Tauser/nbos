@@ -1,6 +1,7 @@
 #include "config/system_config.hpp"
 #include "drivers/audio/audio_bringup.hpp"
 #include "drivers/display/display_driver.hpp"
+#include "drivers/touch/touch_bringup.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -57,6 +58,30 @@ void run_audio_smoke_test(ncos::drivers::audio::AudioBringup& audio) {
              capture_ok ? "OK" : "FAIL", static_cast<unsigned>(samples), static_cast<long>(peak));
   }
 }
+
+void run_touch_smoke_test(ncos::drivers::touch::TouchBringup& touch) {
+  const bool init_ok = touch.init();
+  ESP_LOGI(kTag, "Touch init: %s", init_ok ? "OK" : "FAIL");
+  if (!init_ok) {
+    return;
+  }
+
+  uint32_t raw = 0;
+  if (touch.read_raw(&raw)) {
+    ESP_LOGI(kTag, "Touch raw (single): %lu", static_cast<unsigned long>(raw));
+  }
+
+  ncos::drivers::touch::TouchStats stats{};
+  const bool stats_ok = touch.sample_idle_stats(30, 20, &stats);
+  ESP_LOGI(kTag,
+           "Touch idle stats: %s (min=%lu max=%lu avg=%lu noise=%lu suggest_delta=%lu)",
+           stats_ok ? "OK" : "FAIL",
+           static_cast<unsigned long>(stats.min_raw),
+           static_cast<unsigned long>(stats.max_raw),
+           static_cast<unsigned long>(stats.avg_raw),
+           static_cast<unsigned long>(stats.noise_span),
+           static_cast<unsigned long>(stats.suggested_delta));
+}
 }  // namespace
 
 extern "C" void app_main(void) {
@@ -73,6 +98,9 @@ extern "C" void app_main(void) {
 
   ncos::drivers::audio::AudioBringup audio;
   run_audio_smoke_test(audio);
+
+  ncos::drivers::touch::TouchBringup touch;
+  run_touch_smoke_test(touch);
 
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(1000));
