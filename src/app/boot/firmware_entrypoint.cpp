@@ -4,6 +4,7 @@
 
 #include "app/boot/boot_flow.hpp"
 #include "config/system_config.hpp"
+#include "core/contracts/interaction_taxonomy.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 
 #include "esp_log.h"
@@ -33,6 +34,7 @@ void FirmwareEntrypoint::run() {
            ncos::config::build_profile_name(), ncos::config::kGlobalConfig.board.board_name,
            ncos::config::kGlobalConfig.board.touch, ncos::config::kGlobalConfig.board.imu_sda,
            ncos::config::kGlobalConfig.board.imu_scl);
+  ESP_LOGI(kTag, "Taxonomia semantica v%u", ncos::core::contracts::kSemanticTaxonomyVersion);
 
   lifecycle_.start_boot();
 
