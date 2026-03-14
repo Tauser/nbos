@@ -65,6 +65,18 @@ bool TtlinkerBringup::init() {
   return true;
 }
 
+bool TtlinkerBringup::send_frame(const uint8_t* frame, size_t len, size_t* out_written) const {
+  if (!ready_ || frame == nullptr || len == 0) {
+    return false;
+  }
+
+  const int written = uart_write_bytes(kUartPort, frame, len);
+  if (out_written != nullptr) {
+    *out_written = written > 0 ? static_cast<size_t>(written) : 0;
+  }
+  return written == static_cast<int>(len);
+}
+
 bool TtlinkerBringup::run_probe(int read_window_ms, TtlinkerProbeResult* out_result) const {
   if (!ready_ || out_result == nullptr || read_window_ms < 0) {
     return false;
@@ -72,9 +84,8 @@ bool TtlinkerBringup::run_probe(int read_window_ms, TtlinkerProbeResult* out_res
 
   TtlinkerProbeResult result{};
   const uint8_t probe_frame[] = {0xAA, 0x55, 0x00, 0xFF};
-  const int written = uart_write_bytes(kUartPort, probe_frame, sizeof(probe_frame));
-  result.tx_ok = written == static_cast<int>(sizeof(probe_frame));
-  result.bytes_written = written > 0 ? static_cast<size_t>(written) : 0;
+  (void)send_frame(probe_frame, sizeof(probe_frame), &result.bytes_written);
+  result.tx_ok = result.bytes_written == sizeof(probe_frame);
 
   if (read_window_ms > 0) {
     vTaskDelay(pdMS_TO_TICKS(read_window_ms));

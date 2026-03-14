@@ -16,6 +16,7 @@ class TtlinkerBringup final {
  public:
   bool can_run_probe_with_console() const;
   bool init();
+  bool send_frame(const uint8_t* frame, size_t len, size_t* out_written) const;
   bool run_probe(int read_window_ms, TtlinkerProbeResult* out_result) const;
   void deinit();
 

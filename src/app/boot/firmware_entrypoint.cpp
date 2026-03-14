@@ -9,6 +9,7 @@
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
+#include "drivers/ttlinker/ttlinker_motion_port.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -71,6 +72,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(kTag, "ImuService iniciou em estado degradado");
   }
 
+  motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
+  if (!motion_service_.initialize(now)) {
+    ESP_LOGW(kTag, "MotionService iniciou em estado degradado");
+  }
+
   if (!face_service_.initialize(now)) {
     ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
   }
@@ -94,6 +100,7 @@ void FirmwareEntrypoint::tick() {
   audio_service_.tick(now);
   touch_service_.tick(now);
   imu_service_.tick(now);
+  motion_service_.tick(now);
   face_service_.tick(now);
 }
 

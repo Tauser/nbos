@@ -7,7 +7,7 @@
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/storage/sd_bringup.hpp"
 #include "drivers/touch/touch_local_port.hpp"
-#include "drivers/ttlinker/ttlinker_bringup.hpp"
+#include "drivers/ttlinker/ttlinker_motion_port.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -175,10 +175,28 @@ bool step_sd() {
 
 bool step_ttlinker() {
   ESP_LOGI(kTag, "[8/8] TTLinker bring-up");
-  ncos::drivers::ttlinker::TtlinkerBringup ttlinker;
-  ESP_LOGW(kTag, "TTLinker adiado: pinos 43/44 compartilhados com console no perfil atual");
-  (void)ttlinker;
-  return false;
+  ncos::interfaces::motion::MotionPort* motion = ncos::drivers::ttlinker::acquire_shared_motion_port();
+  if (motion == nullptr) {
+    ESP_LOGW(kTag, "TTLinker backend indisponivel");
+    return false;
+  }
+
+  if (motion->has_console_pin_conflict()) {
+    ESP_LOGW(kTag, "TTLinker adiado: pinos 43/44 compartilhados com console no perfil atual");
+    return false;
+  }
+
+  if (!motion->ensure_ready()) {
+    ESP_LOGW(kTag, "TTLinker init falhou");
+    return false;
+  }
+
+  const ncos::core::contracts::MotionPoseCommand neutral = ncos::core::contracts::make_neutral_pose();
+  size_t bytes = 0;
+  const bool applied = motion->apply_pose(neutral, &bytes);
+  ESP_LOGI(kTag, "TTLinker neutral_pose=%s tx_bytes=%u", applied ? "OK" : "FAIL",
+           static_cast<unsigned>(bytes));
+  return applied;
 }
 
 }  // namespace
@@ -201,4 +219,3 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
-
