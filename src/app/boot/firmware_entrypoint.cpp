@@ -1,11 +1,18 @@
 #include "app/boot/firmware_entrypoint.hpp"
 
+#include <stdint.h>
+
 #include "app/boot/boot_flow.hpp"
 
 #include "esp_log.h"
+#include "esp_timer.h"
 
 namespace {
 constexpr const char* kTag = "NCOS_ENTRY";
+
+uint64_t monotonic_ms() {
+  return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
+}
 }
 
 namespace ncos::app::boot {
@@ -19,12 +26,18 @@ void FirmwareEntrypoint::run() {
 
   lifecycle_.finish_boot(report.has_required_failures, report.has_warnings);
   ESP_LOGI(kTag, "Lifecycle apos boot: %s", lifecycle_.state_name());
+
+  if (!system_manager_.initialize(&lifecycle_)) {
+    ESP_LOGE(kTag, "Falha ao inicializar SystemManager");
+    lifecycle_.mark_fault();
+    return;
+  }
+
+  system_manager_.start(monotonic_ms());
 }
 
 void FirmwareEntrypoint::tick() {
-  if (lifecycle_.state() == ncos::app::lifecycle::SystemState::kFaulted) {
-    ESP_LOGW(kTag, "Sistema em faulted; aguardando recuperacao manual");
-  }
+  system_manager_.tick(monotonic_ms());
 }
 
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {
