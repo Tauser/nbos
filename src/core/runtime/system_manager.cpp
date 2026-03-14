@@ -65,8 +65,18 @@ void SystemManager::start(uint64_t now_ms) {
   (void)event_bus_.publish_event(runtime_started);
   event_bus_.drain(kBusDrainPerLane);
 
+  if (!companion_initialized_) {
+    ncos::core::contracts::CompanionStructuralState structural{};
+    structural.offline_first = true;
+    structural.semantic_taxonomy_version = ncos::core::contracts::kSemanticTaxonomyVersion;
+    structural.board_name = config_->board.board_name;
+    companion_state_.initialize(structural, now_ms);
+    companion_initialized_ = true;
+  }
+
   started_ = true;
   refresh_health(now_ms);
+  sync_companion_state(now_ms);
   ESP_LOGI(kTag, "SystemManager iniciado com %u tarefa(s)", static_cast<unsigned>(scheduler_.task_count()));
 }
 
@@ -79,6 +89,7 @@ void SystemManager::tick(uint64_t now_ms) {
   scheduler_.tick(now_ms);
   event_bus_.drain(kBusDrainPerLane);
   refresh_health(now_ms);
+  sync_companion_state(now_ms);
 }
 
 RuntimeStatus SystemManager::status() const {
@@ -102,6 +113,7 @@ RuntimeStatus SystemManager::status() const {
   out.governance_allowed_total = governance_stats.allowed;
   out.governance_preempted_total = governance_stats.preempted;
   out.governance_rejected_total = governance_stats.rejected;
+  out.companion_state_revision = companion_state_.snapshot().revision;
   return out;
 }
 
@@ -146,6 +158,22 @@ void SystemManager::handle_lifecycle_fault() {
 void SystemManager::refresh_health(uint64_t now_ms) {
   health_.update(now_ms, static_cast<uint32_t>(scheduler_.task_count()), fault_history_.count(),
                  safe_mode_.active());
+}
+
+void SystemManager::sync_companion_state(uint64_t now_ms) {
+  ncos::core::contracts::CompanionRuntimeSignal signal{};
+  signal.initialized = initialized_;
+  signal.started = started_;
+  signal.safe_mode = safe_mode_.active();
+  signal.scheduler_tasks = static_cast<uint32_t>(scheduler_.task_count());
+  signal.fault_count = fault_history_.count();
+
+  const ncos::core::governance::ActionGovernanceStats governance_stats = action_governor_.stats();
+  signal.governance_allowed_total = governance_stats.allowed;
+  signal.governance_preempted_total = governance_stats.preempted;
+  signal.governance_rejected_total = governance_stats.rejected;
+
+  companion_state_.ingest_runtime(signal, now_ms);
 }
 
 }  // namespace ncos::core::runtime

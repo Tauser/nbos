@@ -11,6 +11,7 @@
 #include "core/runtime/health.hpp"
 #include "core/runtime/safe_mode.hpp"
 #include "core/runtime/scheduler_base.hpp"
+#include "core/state/companion_state_store.hpp"
 
 namespace ncos::core::runtime {
 
@@ -27,6 +28,7 @@ struct RuntimeStatus {
   uint32_t governance_allowed_total = 0;
   uint32_t governance_preempted_total = 0;
   uint32_t governance_rejected_total = 0;
+  uint32_t companion_state_revision = 0;
 };
 
 class SystemManager final {
@@ -45,18 +47,21 @@ class SystemManager final {
 
   void handle_lifecycle_fault();
   void refresh_health(uint64_t now_ms);
+  void sync_companion_state(uint64_t now_ms);
 
   const ncos::app::lifecycle::SystemLifecycle* lifecycle_ = nullptr;
   const ncos::config::GlobalConfig* config_ = nullptr;
   SchedulerBase scheduler_{};
   ncos::core::messaging::EventBusV2 event_bus_{};
   ncos::core::governance::ActionGovernor action_governor_{};
+  ncos::core::state::CompanionStateStore companion_state_{};
   HealthMonitor health_{};
   FaultHistory fault_history_{};
   SafeModeController safe_mode_{};
   Diagnostics diagnostics_{};
   uint64_t last_tick_ms_ = 0;
   bool lifecycle_fault_latched_ = false;
+  bool companion_initialized_ = false;
   bool initialized_ = false;
   bool started_ = false;
 };

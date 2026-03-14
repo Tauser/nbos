@@ -8,5 +8,6 @@ Arquivos desta pasta congelam as decisoes tecnicas de base antes de implementaca
 - `0004-taxonomia-semantica.md`
 - `0005-eventbus-v2-semantico.md`
 - `0006-action-governance-ownership-prioridades.md`
+- `0007-companion-state-central.md`
 
 Regra: mudancas estruturais relevantes devem gerar novo ADR.
