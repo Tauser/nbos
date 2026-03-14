@@ -60,15 +60,10 @@ bool step_display() {
       display.writeCommand(0x29);  // DISPON
       vTaskDelay(pdMS_TO_TICKS(50));
       display.setRotation(0);
-      // Smoke visual: confirma que painel/backlight estao respondendo.
-      display.fillScreen(TFT_RED);
-      vTaskDelay(pdMS_TO_TICKS(120));
-      display.fillScreen(TFT_GREEN);
-      vTaskDelay(pdMS_TO_TICKS(120));
-      display.fillScreen(TFT_BLUE);
-      vTaskDelay(pdMS_TO_TICKS(120));
-      display.fillScreen(TFT_WHITE);
-      vTaskDelay(pdMS_TO_TICKS(120));
+      display.fillScreen(TFT_BLACK);
+      vTaskDelay(pdMS_TO_TICKS(40));
+      display.fillScreen(TFT_BLACK);
+      vTaskDelay(pdMS_TO_TICKS(40));
       display.setTextSize(2);
       display.setTextColor(TFT_WHITE, TFT_BLACK);
       display.fillScreen(TFT_BLACK);
@@ -212,6 +207,8 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+
+
 
 
 
