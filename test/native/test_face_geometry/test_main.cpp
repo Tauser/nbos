@@ -5,6 +5,7 @@
 
 // Native tests run with test_build_src = no.
 #include "core/contracts/face_render_state_contracts.cpp"
+#include "services/face/face_geometry.cpp"
 #include "services/face/face_frame_composer.cpp"
 
 extern "C" void setUp(void) {}
@@ -58,6 +59,8 @@ void test_face_geometry_changes_silhouette_without_renderer_semantics() {
 
   TEST_ASSERT_TRUE(wide_eye_span > tall_eye_span);
   TEST_ASSERT_TRUE(wide_frame.mouth_w > tall_frame.mouth_w);
+  TEST_ASSERT_TRUE(wide_frame.head_w > tall_frame.head_w);
+  TEST_ASSERT_TRUE(tall_frame.head_h > wide_frame.head_h);
 }
 
 int main() {
@@ -67,4 +70,3 @@ int main() {
   RUN_TEST(test_face_geometry_changes_silhouette_without_renderer_semantics);
   return UNITY_END();
 }
-
