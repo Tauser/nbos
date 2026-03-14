@@ -40,26 +40,60 @@ bool step_config_gate() {
 bool step_display() {
   ESP_LOGI(kTag, "[2/8] Display bring-up");
 
-  // DisplayDriver (LovyanGFX) e grande para stack da task main.
-  // Mantemos instancia estatica para evitar stack overflow no boot.
-  static ncos::drivers::display::DisplayDriver display;
+  struct DisplayTaskContext {
+    TaskHandle_t caller;
+    bool ok;
+  };
 
-  if (!display.init()) {
-    ESP_LOGE(kTag, "Display init falhou");
+  auto display_task = [](void* arg) {
+    auto* ctx = static_cast<DisplayTaskContext*>(arg);
+
+    // LovyanGFX pode exigir stack maior durante init.
+    static ncos::drivers::display::DisplayDriver display;
+    ctx->ok = display.init();
+    if (ctx->ok) {
+      display.setRotation(0);
+      display.setTextSize(2);
+      display.setTextColor(TFT_WHITE, TFT_BLACK);
+      display.fillScreen(TFT_BLACK);
+      display.setCursor(12, 20);
+      display.printf("NC-OS");
+      display.setCursor(12, 52);
+      display.printf("BOOT");
+    }
+
+    xTaskNotifyGive(ctx->caller);
+    vTaskDelete(nullptr);
+  };
+
+  DisplayTaskContext ctx{
+      .caller = xTaskGetCurrentTaskHandle(),
+      .ok = false,
+  };
+
+  constexpr uint32_t kDisplayTaskStackBytes = 12 * 1024;
+  const BaseType_t created = xTaskCreate(display_task,
+                                         "ncos_disp_boot",
+                                         kDisplayTaskStackBytes,
+                                         &ctx,
+                                         tskIDLE_PRIORITY + 1,
+                                         nullptr);
+  if (created != pdPASS) {
+    ESP_LOGE(kTag, "Falha ao criar task de bring-up do display");
     return false;
   }
 
-  display.setRotation(0);
-  display.setTextSize(2);
-  display.setTextColor(TFT_WHITE, TFT_BLACK);
-  display.fillScreen(TFT_BLACK);
-  display.setCursor(12, 20);
-  display.printf("NC-OS");
-  display.setCursor(12, 52);
-  display.printf("BOOT");
-  return true;
-}
+  const uint32_t notified = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(4000));
+  if (notified == 0) {
+    ESP_LOGE(kTag, "Timeout no bring-up do display");
+    return false;
+  }
 
+  if (!ctx.ok) {
+    ESP_LOGE(kTag, "Display init falhou");
+  }
+  return ctx.ok;
+}
 bool step_audio() {
   ESP_LOGI(kTag, "[3/8] Audio bring-up");
   ncos::drivers::audio::AudioBringup audio;
@@ -162,4 +196,5 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+
 
