@@ -9,5 +9,6 @@ Arquivos desta pasta congelam as decisoes tecnicas de base antes de implementaca
 - `0005-eventbus-v2-semantico.md`
 - `0006-action-governance-ownership-prioridades.md`
 - `0007-companion-state-central.md`
+- `0008-companion-state-dominios-emocional-atencional-energetico-interacional.md`
 
 Regra: mudancas estruturais relevantes devem gerar novo ADR.

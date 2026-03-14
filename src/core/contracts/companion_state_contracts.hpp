@@ -18,6 +18,53 @@ enum class GovernanceHealth : uint8_t {
   kContended = 3,
 };
 
+enum class EmotionalTone : uint8_t {
+  kNeutral = 1,
+  kCurious = 2,
+  kAffiliative = 3,
+  kAlert = 4,
+};
+
+enum class EmotionalArousal : uint8_t {
+  kLow = 1,
+  kMedium = 2,
+  kHigh = 3,
+};
+
+enum class AttentionTarget : uint8_t {
+  kNone = 1,
+  kUser = 2,
+  kStimulus = 3,
+  kInternalTask = 4,
+};
+
+enum class AttentionChannel : uint8_t {
+  kVisual = 1,
+  kAuditory = 2,
+  kTouch = 3,
+  kMultimodal = 4,
+};
+
+enum class EnergyMode : uint8_t {
+  kNominal = 1,
+  kConstrained = 2,
+  kCritical = 3,
+  kCharging = 4,
+};
+
+enum class InteractionPhase : uint8_t {
+  kIdle = 1,
+  kListening = 2,
+  kResponding = 3,
+  kActing = 4,
+};
+
+enum class TurnOwner : uint8_t {
+  kNone = 1,
+  kUser = 2,
+  kCompanion = 3,
+};
+
 struct CompanionStructuralState {
   bool offline_first = true;
   uint16_t semantic_taxonomy_version = 0;
@@ -48,10 +95,42 @@ struct CompanionGovernanceState {
   GovernanceHealth health = GovernanceHealth::kUnknown;
 };
 
+struct CompanionEmotionalState {
+  EmotionalTone tone = EmotionalTone::kNeutral;
+  EmotionalArousal arousal = EmotionalArousal::kLow;
+  uint8_t intensity_percent = 0;
+  uint8_t stability_percent = 100;
+};
+
+struct CompanionAttentionalState {
+  AttentionTarget target = AttentionTarget::kNone;
+  AttentionChannel channel = AttentionChannel::kVisual;
+  uint8_t focus_confidence_percent = 0;
+  bool lock_active = false;
+};
+
+struct CompanionEnergeticState {
+  EnergyMode mode = EnergyMode::kNominal;
+  uint8_t battery_percent = 100;
+  uint8_t thermal_load_percent = 0;
+  bool external_power = false;
+};
+
+struct CompanionInteractionState {
+  InteractionPhase phase = InteractionPhase::kIdle;
+  TurnOwner turn_owner = TurnOwner::kNone;
+  bool session_active = false;
+  bool response_pending = false;
+};
+
 struct CompanionSnapshot {
   CompanionStructuralState structural{};
   CompanionRuntimeState runtime{};
   CompanionGovernanceState governance{};
+  CompanionEmotionalState emotional{};
+  CompanionAttentionalState attentional{};
+  CompanionEnergeticState energetic{};
+  CompanionInteractionState interactional{};
   CompanionTransientState transient{};
   uint32_t revision = 0;
   uint64_t captured_at_ms = 0;
@@ -66,6 +145,34 @@ struct CompanionRuntimeSignal {
   uint32_t governance_allowed_total = 0;
   uint32_t governance_preempted_total = 0;
   uint32_t governance_rejected_total = 0;
+};
+
+struct CompanionEmotionalSignal {
+  EmotionalTone tone = EmotionalTone::kNeutral;
+  EmotionalArousal arousal = EmotionalArousal::kLow;
+  uint8_t intensity_percent = 0;
+  uint8_t stability_percent = 100;
+};
+
+struct CompanionAttentionalSignal {
+  AttentionTarget target = AttentionTarget::kNone;
+  AttentionChannel channel = AttentionChannel::kVisual;
+  uint8_t focus_confidence_percent = 0;
+  bool lock_active = false;
+};
+
+struct CompanionEnergeticSignal {
+  EnergyMode mode = EnergyMode::kNominal;
+  uint8_t battery_percent = 100;
+  uint8_t thermal_load_percent = 0;
+  bool external_power = false;
+};
+
+struct CompanionInteractionSignal {
+  InteractionPhase phase = InteractionPhase::kIdle;
+  TurnOwner turn_owner = TurnOwner::kNone;
+  bool session_active = false;
+  bool response_pending = false;
 };
 
 GovernanceHealth evaluate_governance_health(uint32_t allowed_total, uint32_t preempted_total,

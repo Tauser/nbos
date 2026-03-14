@@ -28,41 +28,91 @@ void test_companion_state_keeps_structural_source_of_truth() {
   TEST_ASSERT_EQUAL_STRING("esp32s3_dev", snap.structural.board_name);
 }
 
-void test_companion_state_updates_runtime_and_governance_snapshot() {
+void test_companion_state_updates_emotional_domain() {
   ncos::core::state::CompanionStateStore store;
+  store.initialize({}, 1000);
 
-  ncos::core::contracts::CompanionStructuralState structural{};
-  structural.semantic_taxonomy_version = 1;
-  structural.board_name = "esp32s3_dev";
-  store.initialize(structural, 1000);
+  ncos::core::contracts::CompanionEmotionalSignal emotional{};
+  emotional.tone = ncos::core::contracts::EmotionalTone::kCurious;
+  emotional.arousal = ncos::core::contracts::EmotionalArousal::kMedium;
+  emotional.intensity_percent = 62;
+  emotional.stability_percent = 74;
+
+  store.ingest_emotional(emotional, 1100);
+  const auto snap = store.snapshot();
+
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalTone::kCurious),
+                        static_cast<int>(snap.emotional.tone));
+  TEST_ASSERT_EQUAL_UINT8(62, snap.emotional.intensity_percent);
+}
+
+void test_companion_state_updates_attentional_and_interactional_link() {
+  ncos::core::state::CompanionStateStore store;
+  store.initialize({}, 1000);
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kMultimodal;
+  attentional.focus_confidence_percent = 85;
+  attentional.lock_active = true;
+
+  store.ingest_attentional(attentional, 1110);
+  const auto snap = store.snapshot();
+
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(snap.attentional.target));
+  TEST_ASSERT_TRUE(snap.interactional.session_active);
+}
+
+void test_companion_state_updates_energetic_domain() {
+  ncos::core::state::CompanionStateStore store;
+  store.initialize({}, 1000);
+
+  ncos::core::contracts::CompanionEnergeticSignal energetic{};
+  energetic.mode = ncos::core::contracts::EnergyMode::kConstrained;
+  energetic.battery_percent = 28;
+  energetic.thermal_load_percent = 66;
+  energetic.external_power = false;
+
+  store.ingest_energetic(energetic, 1120);
+  const auto snap = store.snapshot();
+
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EnergyMode::kConstrained),
+                        static_cast<int>(snap.energetic.mode));
+  TEST_ASSERT_EQUAL_UINT8(28, snap.energetic.battery_percent);
+}
+
+void test_companion_state_runtime_safe_mode_constrains_interaction_and_energy() {
+  ncos::core::state::CompanionStateStore store;
+  store.initialize({}, 1000);
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  interaction.session_active = true;
+  interaction.response_pending = true;
+  store.ingest_interactional(interaction, 1130);
 
   ncos::core::contracts::CompanionRuntimeSignal runtime{};
   runtime.initialized = true;
   runtime.started = true;
+  runtime.safe_mode = true;
   runtime.scheduler_tasks = 2;
-  runtime.safe_mode = false;
-  runtime.fault_count = 0;
-  runtime.governance_allowed_total = 2;
-  runtime.governance_preempted_total = 0;
-  runtime.governance_rejected_total = 0;
+  runtime.governance_rejected_total = 4;
 
-  store.ingest_runtime(runtime, 1050);
+  store.ingest_runtime(runtime, 1140);
   const auto snap = store.snapshot();
 
-  TEST_ASSERT_TRUE(snap.runtime.started);
-  TEST_ASSERT_EQUAL_UINT32(2, snap.runtime.scheduler_tasks);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionPresenceMode::kAttending),
-                        static_cast<int>(snap.runtime.presence_mode));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceHealth::kStable),
-                        static_cast<int>(snap.governance.health));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EnergyMode::kCritical),
+                        static_cast<int>(snap.energetic.mode));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kIdle),
+                        static_cast<int>(snap.interactional.phase));
+  TEST_ASSERT_FALSE(snap.interactional.response_pending);
 }
 
 void test_companion_state_tracks_transient_governance_transition() {
   ncos::core::state::CompanionStateStore store;
-
-  ncos::core::contracts::CompanionStructuralState structural{};
-  structural.semantic_taxonomy_version = 1;
-  store.initialize(structural, 1000);
+  store.initialize({}, 1000);
 
   ncos::core::contracts::GovernanceDecision decision{};
   decision.kind = ncos::core::contracts::GovernanceDecisionKind::kPreemptAndAllow;
@@ -70,7 +120,7 @@ void test_companion_state_tracks_transient_governance_transition() {
   decision.domain = ncos::core::contracts::ActionDomain::kMotion;
   decision.owner_service = 42;
 
-  store.ingest_governance_decision(decision, 1100);
+  store.ingest_governance_decision(decision, 1150);
   const auto snap = store.snapshot();
 
   TEST_ASSERT_TRUE(snap.transient.has_active_trace);
@@ -83,7 +133,10 @@ void test_companion_state_tracks_transient_governance_transition() {
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_companion_state_keeps_structural_source_of_truth);
-  RUN_TEST(test_companion_state_updates_runtime_and_governance_snapshot);
+  RUN_TEST(test_companion_state_updates_emotional_domain);
+  RUN_TEST(test_companion_state_updates_attentional_and_interactional_link);
+  RUN_TEST(test_companion_state_updates_energetic_domain);
+  RUN_TEST(test_companion_state_runtime_safe_mode_constrains_interaction_and_energy);
   RUN_TEST(test_companion_state_tracks_transient_governance_transition);
   return UNITY_END();
 }
