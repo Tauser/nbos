@@ -1,7 +1,11 @@
 #include "config/system_config.hpp"
 #include "drivers/audio/audio_bringup.hpp"
+#include "drivers/camera/camera_bringup.hpp"
 #include "drivers/display/display_driver.hpp"
+#include "drivers/imu/mpu6050_bringup.hpp"
+#include "drivers/storage/sd_bringup.hpp"
 #include "drivers/touch/touch_bringup.hpp"
+#include "drivers/ttlinker/ttlinker_bringup.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -82,6 +86,80 @@ void run_touch_smoke_test(ncos::drivers::touch::TouchBringup& touch) {
            static_cast<unsigned long>(stats.noise_span),
            static_cast<unsigned long>(stats.suggested_delta));
 }
+
+void run_imu_smoke_test(ncos::drivers::imu::Mpu6050Bringup& imu) {
+  const bool init_ok = imu.init();
+  ESP_LOGI(kTag, "IMU init: %s", init_ok ? "OK" : "FAIL");
+  if (!init_ok) {
+    return;
+  }
+
+  ncos::drivers::imu::ImuSample sample{};
+  if (imu.read_sample(&sample)) {
+    ESP_LOGI(kTag, "IMU sample ax=%d ay=%d az=%d gx=%d gy=%d gz=%d",
+             sample.ax, sample.ay, sample.az, sample.gx, sample.gy, sample.gz);
+  }
+
+  ncos::drivers::imu::ImuWindowStats stats{};
+  const bool noise_ok = imu.sample_window(40, 20, &stats);
+  const int ax_span = static_cast<int>(stats.ax_max) - static_cast<int>(stats.ax_min);
+  const int ay_span = static_cast<int>(stats.ay_max) - static_cast<int>(stats.ay_min);
+  const int az_span = static_cast<int>(stats.az_max) - static_cast<int>(stats.az_min);
+  const int gx_span = static_cast<int>(stats.gx_max) - static_cast<int>(stats.gx_min);
+  const int gy_span = static_cast<int>(stats.gy_max) - static_cast<int>(stats.gy_min);
+  const int gz_span = static_cast<int>(stats.gz_max) - static_cast<int>(stats.gz_min);
+  ESP_LOGI(kTag,
+           "IMU noise window: %s (ax[%d,%d] ay[%d,%d] az[%d,%d] gx[%d,%d] gy[%d,%d] gz[%d,%d])",
+           noise_ok ? "OK" : "FAIL",
+           stats.ax_min, stats.ax_max,
+           stats.ay_min, stats.ay_max,
+           stats.az_min, stats.az_max,
+           stats.gx_min, stats.gx_max,
+           stats.gy_min, stats.gy_max,
+           stats.gz_min, stats.gz_max);
+  ESP_LOGI(kTag,
+           "IMU noise spans: ax=%d ay=%d az=%d gx=%d gy=%d gz=%d; avg ax=%ld ay=%ld az=%ld gx=%ld gy=%ld gz=%ld",
+           ax_span, ay_span, az_span, gx_span, gy_span, gz_span,
+           static_cast<long>(stats.ax_avg), static_cast<long>(stats.ay_avg), static_cast<long>(stats.az_avg),
+           static_cast<long>(stats.gx_avg), static_cast<long>(stats.gy_avg), static_cast<long>(stats.gz_avg));
+
+  int16_t peak_delta = 0;
+  const bool resp_ok = imu.measure_response_peak(40, 20, &peak_delta);
+  ESP_LOGI(kTag, "IMU response peak delta: %s (%d)", resp_ok ? "OK" : "FAIL", peak_delta);
+
+  imu.deinit();
+}
+
+void run_ttlinker_smoke_test(ncos::drivers::ttlinker::TtlinkerBringup& ttlinker) {
+  (void)ttlinker;
+  ESP_LOGW(kTag,
+           "TTLinker probe adiado: pinos 43/44 compartilhados com console na configuracao atual");
+}
+
+void run_camera_smoke_test(ncos::drivers::camera::CameraBringup& camera) {
+  ncos::drivers::camera::CameraProbeResult probe{};
+  const bool probe_ok = camera.run_probe(&probe);
+  ESP_LOGI(kTag,
+           "Camera probe: %s (component=%s init=%s frame=%s size=%dx%d len=%d)",
+           probe_ok ? "OK" : "FAIL",
+           probe.camera_component_available ? "true" : "false",
+           probe.init_ok ? "true" : "false",
+           probe.frame_ok ? "true" : "false",
+           probe.frame_width,
+           probe.frame_height,
+           probe.frame_len);
+}
+
+void run_sd_smoke_test(ncos::drivers::storage::SdBringup& sd) {
+  ncos::drivers::storage::SdProbeResult probe{};
+  const bool probe_ok = sd.run_probe(&probe);
+  ESP_LOGI(kTag,
+           "SD probe: %s (interface=%s card_init=%s card_mb=%d)",
+           probe_ok ? "OK" : "FAIL",
+           probe.interface_ok ? "true" : "false",
+           probe.card_init_ok ? "true" : "false",
+           probe.card_size_mb);
+}
 }  // namespace
 
 extern "C" void app_main(void) {
@@ -101,6 +179,20 @@ extern "C" void app_main(void) {
 
   ncos::drivers::touch::TouchBringup touch;
   run_touch_smoke_test(touch);
+
+  ncos::drivers::imu::Mpu6050Bringup imu;
+  run_imu_smoke_test(imu);
+
+  ncos::drivers::camera::CameraBringup camera;
+  run_camera_smoke_test(camera);
+
+  ncos::drivers::storage::SdBringup sd;
+  run_sd_smoke_test(sd);
+
+  // TTLinker usa pinos sensiveis que tambem podem ser usados pelo console em bring-up.
+  // Rodamos por ultimo para nao perder logs dos outros subsistemas.
+  ncos::drivers::ttlinker::TtlinkerBringup ttlinker;
+  run_ttlinker_smoke_test(ttlinker);
 
   while (true) {
     vTaskDelay(pdMS_TO_TICKS(1000));

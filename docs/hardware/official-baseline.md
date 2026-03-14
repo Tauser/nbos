@@ -40,6 +40,12 @@ Mudancas de pinagem exigem justificativa explicita e registro arquitetural.
 - SDA -> GPIO0
 - SCL -> GPIO19
 
+### Camera OV2640 (onboard)
+- Pinagem onboard oficial da Freenove (sem remapeamento local nesta baseline)
+
+### SD (onboard)
+- Interface onboard oficial da Freenove (baseline inicial em SDMMC 1-bit)
+
 ## Trilhos de alimentacao (baseline)
 - Bateria Li-ion nominal: 3.7V (maximo 4.2V)
 - Rail principal de potencia: 5V (gerenciado pelo SW6106 PD18W)
@@ -51,6 +57,16 @@ Mudancas de pinagem exigem justificativa explicita e registro arquitetural.
 - GPIO3: pode afetar cenarios de debug/serial conforme configuracao de placa e firmware.
 - GPIO46: entrada apenas no ESP32-S3; uso atual no SD do INMP441 esta alinhado.
 
+## Estado de validacao em bancada (kickoff)
+- Display ST7789: bring-up concluido.
+- Audio INMP441 + MAX98357A: bring-up concluido.
+- Touch capacitivo: bring-up concluido.
+- IMU MPU6050: leitura minima ainda instavel nesta rodada (init FAIL), manter como provisoria.
+- TTLinker: probe ativo adiado devido compartilhamento de GPIO43/44 com console no perfil atual.
+- Camera OV2640 onboard: componente de camera indisponivel no build atual (`esp_camera.h` ausente), sem captura real nesta etapa.
+- SD onboard: interface SDMMC validada (`interface=true`), card init/filesystem adiado para etapa dedicada de storage.
+
 ## Regra executiva
 - Nao alterar pinagem congelada sem justificativa tecnica explicita.
 - Qualquer remapeamento de pino sensivel requer nota de trade-off e registro em ADR.
+
