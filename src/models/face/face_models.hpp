@@ -14,6 +14,13 @@ enum class FacePresetId : uint8_t {
   kLowPowerCalm = 4,
 };
 
+enum class FaceShapeProfile : uint8_t {
+  kCompanionBalanced = 1,
+  kHeroicWide = 2,
+  kCuriousTall = 3,
+  kPlayfulRound = 4,
+};
+
 enum class GazeAnchor : uint8_t {
   kCenter = 1,
   kUser = 2,

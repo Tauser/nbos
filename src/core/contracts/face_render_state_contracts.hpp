@@ -8,6 +8,7 @@ namespace ncos::core::contracts {
 
 enum class FaceRenderStateVersion : uint8_t {
   kV1 = 1,
+  kV2 = 2,
 };
 
 enum class FaceCompositionMode : uint8_t {
@@ -27,6 +28,19 @@ enum class FaceLayerOwnerRole : uint8_t {
   kModulationOwner = 4,
   kTransientOwner = 5,
   kClipOwner = 6,
+};
+
+struct FaceShapeGeometry {
+  ncos::models::face::FaceShapeProfile profile =
+      ncos::models::face::FaceShapeProfile::kCompanionBalanced;
+  uint8_t eye_size_percent = 50;
+  uint8_t eye_spacing_percent = 50;
+  uint8_t eye_line_height_percent = 50;
+  uint8_t brow_height_percent = 50;
+  uint8_t mouth_width_percent = 50;
+  uint8_t mouth_height_percent = 50;
+  uint8_t jaw_width_percent = 50;
+  uint8_t silhouette_roundness_percent = 50;
 };
 
 struct FaceLayerPolicy {
@@ -50,12 +64,14 @@ struct FaceCompositionState {
 };
 
 struct FaceRenderState {
-  FaceRenderStateVersion version = FaceRenderStateVersion::kV1;
+  FaceRenderStateVersion version = FaceRenderStateVersion::kV2;
   uint32_t revision = 0;
   uint64_t updated_at_ms = 0;
 
   FaceRenderSafetyMode safety_mode = FaceRenderSafetyMode::kNominal;
   ncos::models::face::FacePresetId preset = ncos::models::face::FacePresetId::kNeutralBaseline;
+
+  FaceShapeGeometry geometry{};
 
   ncos::models::face::EyePose eyes{};
   ncos::models::face::EyelidPose lids{};
@@ -76,6 +92,7 @@ struct FaceLayerClaim {
   uint32_t source_clip_id = 0;
 };
 
+FaceShapeGeometry make_shape_geometry_profile(ncos::models::face::FaceShapeProfile profile);
 FaceRenderState make_face_render_state_baseline();
 FaceLayerPolicy face_layer_policy(ncos::models::face::FaceLayer layer);
 bool is_valid(const FaceRenderState& state);

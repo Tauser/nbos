@@ -6,9 +6,70 @@ bool percent_in_range(uint8_t value) {
   return value <= 100;
 }
 
+bool geometry_is_valid(const ncos::core::contracts::FaceShapeGeometry& geometry) {
+  return percent_in_range(geometry.eye_size_percent) && percent_in_range(geometry.eye_spacing_percent) &&
+         percent_in_range(geometry.eye_line_height_percent) &&
+         percent_in_range(geometry.brow_height_percent) &&
+         percent_in_range(geometry.mouth_width_percent) && percent_in_range(geometry.mouth_height_percent) &&
+         percent_in_range(geometry.jaw_width_percent) &&
+         percent_in_range(geometry.silhouette_roundness_percent);
+}
+
 }  // namespace
 
 namespace ncos::core::contracts {
+
+FaceShapeGeometry make_shape_geometry_profile(ncos::models::face::FaceShapeProfile profile) {
+  FaceShapeGeometry geometry{};
+  geometry.profile = profile;
+
+  switch (profile) {
+    case ncos::models::face::FaceShapeProfile::kCompanionBalanced:
+      geometry.eye_size_percent = 52;
+      geometry.eye_spacing_percent = 50;
+      geometry.eye_line_height_percent = 50;
+      geometry.brow_height_percent = 54;
+      geometry.mouth_width_percent = 50;
+      geometry.mouth_height_percent = 50;
+      geometry.jaw_width_percent = 48;
+      geometry.silhouette_roundness_percent = 58;
+      break;
+    case ncos::models::face::FaceShapeProfile::kHeroicWide:
+      geometry.eye_size_percent = 48;
+      geometry.eye_spacing_percent = 64;
+      geometry.eye_line_height_percent = 48;
+      geometry.brow_height_percent = 50;
+      geometry.mouth_width_percent = 62;
+      geometry.mouth_height_percent = 46;
+      geometry.jaw_width_percent = 68;
+      geometry.silhouette_roundness_percent = 36;
+      break;
+    case ncos::models::face::FaceShapeProfile::kCuriousTall:
+      geometry.eye_size_percent = 56;
+      geometry.eye_spacing_percent = 44;
+      geometry.eye_line_height_percent = 42;
+      geometry.brow_height_percent = 62;
+      geometry.mouth_width_percent = 44;
+      geometry.mouth_height_percent = 54;
+      geometry.jaw_width_percent = 38;
+      geometry.silhouette_roundness_percent = 52;
+      break;
+    case ncos::models::face::FaceShapeProfile::kPlayfulRound:
+      geometry.eye_size_percent = 62;
+      geometry.eye_spacing_percent = 48;
+      geometry.eye_line_height_percent = 52;
+      geometry.brow_height_percent = 56;
+      geometry.mouth_width_percent = 56;
+      geometry.mouth_height_percent = 58;
+      geometry.jaw_width_percent = 52;
+      geometry.silhouette_roundness_percent = 76;
+      break;
+    default:
+      break;
+  }
+
+  return geometry;
+}
 
 FaceLayerPolicy face_layer_policy(ncos::models::face::FaceLayer layer) {
   switch (layer) {
@@ -31,11 +92,12 @@ FaceLayerPolicy face_layer_policy(ncos::models::face::FaceLayer layer) {
 
 FaceRenderState make_face_render_state_baseline() {
   FaceRenderState baseline{};
-  baseline.version = FaceRenderStateVersion::kV1;
+  baseline.version = FaceRenderStateVersion::kV2;
   baseline.revision = 1;
   baseline.updated_at_ms = 0;
   baseline.safety_mode = FaceRenderSafetyMode::kSafeFallback;
   baseline.preset = ncos::models::face::FacePresetId::kNeutralBaseline;
+  baseline.geometry = make_shape_geometry_profile(ncos::models::face::FaceShapeProfile::kCompanionBalanced);
 
   baseline.eyes.anchor = ncos::models::face::GazeAnchor::kCenter;
   baseline.eyes.direction = ncos::models::face::GazeDirection::kCenter;
@@ -71,13 +133,17 @@ FaceRenderState make_face_render_state_baseline() {
 }
 
 bool is_valid(const FaceRenderState& state) {
-  if (state.version != FaceRenderStateVersion::kV1) {
+  if (state.version != FaceRenderStateVersion::kV1 && state.version != FaceRenderStateVersion::kV2) {
     return false;
   }
 
   if (!percent_in_range(state.eyes.focus_percent) || !percent_in_range(state.lids.openness_percent) ||
       !percent_in_range(state.mouth.openness_percent) ||
       !percent_in_range(state.brows.intensity_percent)) {
+    return false;
+  }
+
+  if (!geometry_is_valid(state.geometry)) {
     return false;
   }
 
