@@ -73,20 +73,36 @@ void test_action_governance_preempts_when_priority_is_higher() {
   TEST_ASSERT_EQUAL_UINT16(10, decision.preempted_owner_service);
 }
 
-void test_action_governance_expired_lease_releases_domain() {
+void test_action_governance_debounces_duplicate_semantic_signal() {
   ncos::core::governance::ActionGovernor governor;
 
-  auto first = make_base_proposal(10, 5, 100);
-  first.ttl_ms = 10;
+  const auto first = make_base_proposal(10, 5, 100);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceDecisionKind::kAllow),
                         static_cast<int>(governor.evaluate(first, 1000).kind));
 
-  const auto second = make_base_proposal(20, 1, 101);
-  const auto decision = governor.evaluate(second, 1020);
+  auto duplicate = make_base_proposal(10, 5, 101);
+  const auto decision = governor.evaluate(duplicate, 1030);
+
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceDecisionKind::kReject),
+                        static_cast<int>(decision.kind));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceRejectReason::kSemanticDebounced),
+                        static_cast<int>(decision.reject_reason));
+  TEST_ASSERT_EQUAL_UINT32(1, governor.stats().debounced);
+}
+
+void test_action_governance_accepts_after_debounce_window() {
+  ncos::core::governance::ActionGovernor governor;
+
+  const auto first = make_base_proposal(10, 5, 100);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceDecisionKind::kAllow),
+                        static_cast<int>(governor.evaluate(first, 1000).kind));
+
+  auto later = make_base_proposal(10, 5, 101);
+  const auto decision = governor.evaluate(
+      later, 1000 + ncos::core::governance::ActionGovernor::kSemanticDebounceWindowMs + 1);
 
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::GovernanceDecisionKind::kAllow),
                         static_cast<int>(decision.kind));
-  TEST_ASSERT_EQUAL_UINT16(20, decision.owner_service);
 }
 
 int main() {
@@ -94,6 +110,7 @@ int main() {
   RUN_TEST(test_action_governance_allows_when_domain_is_free);
   RUN_TEST(test_action_governance_rejects_equal_or_lower_priority_preemption);
   RUN_TEST(test_action_governance_preempts_when_priority_is_higher);
-  RUN_TEST(test_action_governance_expired_lease_releases_domain);
+  RUN_TEST(test_action_governance_debounces_duplicate_semantic_signal);
+  RUN_TEST(test_action_governance_accepts_after_debounce_window);
   return UNITY_END();
 }

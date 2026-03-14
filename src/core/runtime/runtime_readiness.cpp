@@ -12,6 +12,11 @@ bool is_lifecycle_state_acceptable(ncos::app::lifecycle::SystemState state) {
          state == ncos::app::lifecycle::SystemState::kDegraded;
 }
 
+bool is_governance_stable(const ncos::core::runtime::RuntimeStatus& status) {
+  const uint32_t accepted = status.governance_allowed_total + status.governance_preempted_total;
+  return !(status.governance_rejected_total >= 3 && accepted == 0);
+}
+
 }  // namespace
 
 namespace ncos::core::runtime {
@@ -40,6 +45,7 @@ RuntimeReadinessReport evaluate_runtime_readiness(const ncos::config::GlobalConf
   report.scheduler_has_minimum_tasks = runtime_status.scheduler_tasks >= 1;
   report.safe_mode_inactive = !runtime_status.safe_mode;
   report.no_faults_recorded = runtime_status.fault_count == 0;
+  report.governance_stable = is_governance_stable(runtime_status);
 
   const bool core_gate = report.config_valid && report.board_profile_bound && report.lifecycle_allows_runtime &&
                          report.runtime_initialized && report.runtime_started &&
@@ -50,7 +56,7 @@ RuntimeReadinessReport evaluate_runtime_readiness(const ncos::config::GlobalConf
     return report;
   }
 
-  if (report.safe_mode_inactive && report.no_faults_recorded) {
+  if (report.safe_mode_inactive && report.no_faults_recorded && report.governance_stable) {
     report.level = RuntimeReadinessLevel::kReady;
     return report;
   }

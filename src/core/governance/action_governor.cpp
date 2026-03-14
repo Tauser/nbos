@@ -21,13 +21,22 @@ namespace ncos::core::governance {
 
 ncos::core::contracts::GovernanceDecision ActionGovernor::evaluate(
     const ncos::core::contracts::ActionProposal& proposal, uint64_t now_ms) {
+  const size_t idx = domain_index(proposal.domain);
+
   if (!ncos::core::contracts::is_valid(proposal)) {
     ++stats_.rejected;
     return make_reject(proposal, ncos::core::contracts::GovernanceRejectReason::kInvalidProposal,
                        "invalid_proposal");
   }
 
-  const size_t idx = domain_index(proposal.domain);
+  if (is_semantically_debounced(idx, proposal, now_ms)) {
+    ++stats_.rejected;
+    ++stats_.debounced;
+    return make_reject(proposal, ncos::core::contracts::GovernanceRejectReason::kSemanticDebounced,
+                       "semantic_debounced");
+  }
+
+  remember_signal(idx, proposal, now_ms);
   expire_lease_if_needed(idx, now_ms);
 
   ncos::core::contracts::DomainLease& current = leases_[idx];
@@ -161,6 +170,37 @@ void ActionGovernor::expire_lease_if_needed(size_t domain_idx, uint64_t now_ms) 
     lease.proposal_trace_id = 0;
     lease.expires_at_ms = 0;
   }
+}
+
+bool ActionGovernor::is_semantically_debounced(
+    size_t domain_idx, const ncos::core::contracts::ActionProposal& proposal, uint64_t now_ms) const {
+  const SemanticSignal& last = last_signals_[domain_idx];
+  if (!last.initialized) {
+    return false;
+  }
+
+  const bool same_semantics = last.origin == proposal.origin &&
+                              last.requester_service == proposal.requester_service &&
+                              last.action == proposal.action &&
+                              last.intent_context == proposal.intent_context;
+  if (!same_semantics) {
+    return false;
+  }
+
+  return now_ms >= last.timestamp_ms &&
+         (now_ms - last.timestamp_ms) <= kSemanticDebounceWindowMs;
+}
+
+void ActionGovernor::remember_signal(size_t domain_idx,
+                                     const ncos::core::contracts::ActionProposal& proposal,
+                                     uint64_t now_ms) {
+  SemanticSignal& last = last_signals_[domain_idx];
+  last.initialized = true;
+  last.origin = proposal.origin;
+  last.requester_service = proposal.requester_service;
+  last.action = proposal.action;
+  last.intent_context = proposal.intent_context;
+  last.timestamp_ms = now_ms;
 }
 
 }  // namespace ncos::core::governance

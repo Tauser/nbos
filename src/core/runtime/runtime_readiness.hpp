@@ -21,6 +21,7 @@ struct RuntimeReadinessReport {
   bool scheduler_has_minimum_tasks = false;
   bool safe_mode_inactive = false;
   bool no_faults_recorded = false;
+  bool governance_stable = false;
   RuntimeReadinessLevel level = RuntimeReadinessLevel::kNotReady;
 
   const char* level_name() const;

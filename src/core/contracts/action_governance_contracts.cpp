@@ -44,6 +44,8 @@ const char* governance_reject_reason_name(GovernanceRejectReason reason) {
       return "domain_owned_by_other";
     case GovernanceRejectReason::kInsufficientPriority:
       return "insufficient_priority";
+    case GovernanceRejectReason::kSemanticDebounced:
+      return "semantic_debounced";
     default:
       return "unknown";
   }

@@ -50,6 +50,7 @@ enum class GovernanceRejectReason : uint8_t {
   kInvalidProposal = 1,
   kDomainOwnedByOther = 2,
   kInsufficientPriority = 3,
+  kSemanticDebounced = 4,
 };
 
 struct DomainLease {
