@@ -6,6 +6,7 @@
 #include "config/system_config.hpp"
 #include "core/governance/action_governor.hpp"
 #include "core/messaging/event_bus_v2.hpp"
+#include "core/runtime/companion_state_axis.hpp"
 #include "core/runtime/diagnostics.hpp"
 #include "core/runtime/fault_history.hpp"
 #include "core/runtime/health.hpp"
@@ -55,6 +56,7 @@ class SystemManager final {
   ncos::core::messaging::EventBusV2 event_bus_{};
   ncos::core::governance::ActionGovernor action_governor_{};
   ncos::core::state::CompanionStateStore companion_state_{};
+  CompanionStateAxis companion_axis_{};
   HealthMonitor health_{};
   FaultHistory fault_history_{};
   SafeModeController safe_mode_{};

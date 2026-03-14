@@ -11,5 +11,6 @@ Arquivos desta pasta congelam as decisoes tecnicas de base antes de implementaca
 - `0007-companion-state-central.md`
 - `0008-companion-state-dominios-emocional-atencional-energetico-interacional.md`
 - `0009-companion-state-contratos-acesso-ownership.md`
+- `0010-integracao-companion-eventbus-governance.md`
 
 Regra: mudancas estruturais relevantes devem gerar novo ADR.
