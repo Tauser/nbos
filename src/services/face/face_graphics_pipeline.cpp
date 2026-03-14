@@ -26,7 +26,18 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
     return false;
   }
 
+  ncos::core::contracts::FaceLayerClaim gaze_claim{};
+  gaze_claim.layer = ncos::models::face::FaceLayer::kGaze;
+  gaze_claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kGazeOwner;
+  gaze_claim.requester_service = kFaceServiceId;
+  gaze_claim.priority = 5;
+
+  if (!ncos::core::contracts::apply_layer_claim(&state_, gaze_claim, now_ms)) {
+    return false;
+  }
+
   next_render_ms_ = now_ms;
+  next_gaze_target_ms_ = now_ms;
   initialized_ = true;
   return true;
 }
@@ -36,10 +47,22 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms) {
     return;
   }
 
-  // Minimal animation validates end-to-end flow face->frame->display.
-  gaze_left_ = !gaze_left_;
-  state_.eyes.direction = gaze_left_ ? ncos::models::face::GazeDirection::kLeft
-                                     : ncos::models::face::GazeDirection::kRight;
+  if (now_ms >= next_gaze_target_ms_) {
+    ncos::models::face::FaceGazeTarget target{};
+    target.anchor = ncos::models::face::GazeAnchor::kUser;
+    target.direction = gaze_left_ ? ncos::models::face::GazeDirection::kLeft
+                                  : ncos::models::face::GazeDirection::kRight;
+    target.focus_percent = 48;
+    target.salience_percent = 30;
+    target.hold_ms = 360;
+    target.origin = ncos::models::face::FaceGazeTargetOrigin::kSystem;
+
+    (void)gaze_controller_.set_target(target, now_ms);
+    gaze_left_ = !gaze_left_;
+    next_gaze_target_ms_ = now_ms + 360;
+  }
+
+  (void)gaze_controller_.tick(now_ms, &state_);
 
   FaceFrame frame{};
   if (composer_.compose(state_, &frame)) {
