@@ -50,7 +50,7 @@ bool step_display() {
 
     // LovyanGFX pode exigir stack maior durante init.
     static ncos::drivers::display::DisplayDriver display;
-    ctx->ok = display.init();
+    ctx->ok = display.begin();
     if (ctx->ok) {
       display.setRotation(0);
       display.setTextSize(2);
@@ -196,5 +196,3 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
-
-
