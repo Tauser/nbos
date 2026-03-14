@@ -11,8 +11,9 @@ namespace {
 constexpr const char* kTag = "NCOS_IMU";
 
 constexpr i2c_port_num_t kI2cPort = I2C_NUM_0;
-constexpr uint8_t kMpuAddr = 0x68;
-constexpr uint32_t kI2cHz = 400000;
+constexpr uint8_t kMpuAddrPrimary = 0x68;
+constexpr uint8_t kMpuAddrSecondary = 0x69;
+constexpr uint32_t kI2cHz = 100000;
 
 constexpr uint8_t kRegSmplrtDiv = 0x19;
 constexpr uint8_t kRegConfig = 0x1A;
@@ -45,9 +46,25 @@ bool Mpu6050Bringup::init() {
     return false;
   }
 
+  uint8_t selected_addr = 0;
+  if (i2c_master_probe(bus_, kMpuAddrPrimary, 100) == ESP_OK) {
+    selected_addr = kMpuAddrPrimary;
+  } else if (i2c_master_probe(bus_, kMpuAddrSecondary, 100) == ESP_OK) {
+    selected_addr = kMpuAddrSecondary;
+  } else {
+    ESP_LOGE(kTag,
+             "MPU6050 nao encontrado no I2C (SDA=%d SCL=%d, candidatos: 0x%02X/0x%02X)",
+             ncos::config::pins::kImuSda,
+             ncos::config::pins::kImuScl,
+             kMpuAddrPrimary,
+             kMpuAddrSecondary);
+    deinit();
+    return false;
+  }
+
   i2c_device_config_t dev_cfg{};
   dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-  dev_cfg.device_address = kMpuAddr;
+  dev_cfg.device_address = selected_addr;
   dev_cfg.scl_speed_hz = kI2cHz;
   dev_cfg.scl_wait_us = 0;
 
@@ -60,16 +77,18 @@ bool Mpu6050Bringup::init() {
 
   uint8_t who = 0;
   if (!read_regs(kRegWhoAmI, &who, 1)) {
-    ESP_LOGE(kTag, "MPU6050 WHO_AM_I read failed");
+    ESP_LOGE(kTag, "MPU6050 WHO_AM_I read failed (addr=0x%02X)", selected_addr);
     deinit();
     return false;
   }
 
-  if (who != kMpuAddr) {
-    ESP_LOGE(kTag, "Unexpected WHO_AM_I: 0x%02X", who);
+  if (who != 0x68 && who != 0x69) {
+    ESP_LOGE(kTag, "Unexpected WHO_AM_I: 0x%02X (addr=0x%02X)", who, selected_addr);
     deinit();
     return false;
   }
+
+  ESP_LOGI(kTag, "MPU6050 detectado addr=0x%02X who=0x%02X", selected_addr, who);
 
   if (!write_reg(kRegPwrMgmt1, 0x00) || !write_reg(kRegSmplrtDiv, 0x07) ||
       !write_reg(kRegConfig, 0x03) || !write_reg(kRegGyroConfig, 0x00) ||
@@ -83,7 +102,6 @@ bool Mpu6050Bringup::init() {
   ready_ = true;
   return true;
 }
-
 bool Mpu6050Bringup::read_sample(ImuSample* out_sample) const {
   if (!ready_ || out_sample == nullptr) {
     return false;
@@ -250,4 +268,3 @@ bool Mpu6050Bringup::read_regs(uint8_t start_reg, uint8_t* out_data, size_t len)
 }
 
 }  // namespace ncos::drivers::imu
-
