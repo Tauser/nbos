@@ -3,6 +3,9 @@
 #include "config/build_profile.hpp"
 #include "config/pins/board_freenove_esp32s3_cam.hpp"
 
+extern "C" void setUp(void) {}
+extern "C" void tearDown(void) {}
+
 void test_build_profile_is_known() {
   TEST_ASSERT_TRUE(ncos::config::is_build_profile_valid());
   TEST_ASSERT_EQUAL_STRING("dev", ncos::config::build_profile_name());
