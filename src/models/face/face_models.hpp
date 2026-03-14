@@ -5,7 +5,7 @@
 
 namespace ncos::models::face {
 
-inline constexpr size_t kFaceLayerCount = 5;
+inline constexpr size_t kFaceLayerCount = 6;
 
 enum class FacePresetId : uint8_t {
   kNeutralBaseline = 1,
@@ -56,24 +56,27 @@ enum class BrowExpression : uint8_t {
 
 enum class FaceLayer : uint8_t {
   kBase = 1,
-  kEyes = 2,
-  kLids = 3,
-  kMouth = 4,
-  kAccent = 5,
+  kBlink = 2,
+  kGaze = 3,
+  kModulation = 4,
+  kTransient = 5,
+  kClip = 6,
 };
 
 inline constexpr size_t face_layer_index(FaceLayer layer) {
   switch (layer) {
     case FaceLayer::kBase:
       return 0;
-    case FaceLayer::kEyes:
+    case FaceLayer::kBlink:
       return 1;
-    case FaceLayer::kLids:
+    case FaceLayer::kGaze:
       return 2;
-    case FaceLayer::kMouth:
+    case FaceLayer::kModulation:
       return 3;
-    case FaceLayer::kAccent:
+    case FaceLayer::kTransient:
       return 4;
+    case FaceLayer::kClip:
+      return 5;
     default:
       return 0;
   }

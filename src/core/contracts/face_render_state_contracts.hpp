@@ -20,8 +20,24 @@ enum class FaceRenderSafetyMode : uint8_t {
   kSafeFallback = 2,
 };
 
+enum class FaceLayerOwnerRole : uint8_t {
+  kBaseOwner = 1,
+  kBlinkOwner = 2,
+  kGazeOwner = 3,
+  kModulationOwner = 4,
+  kTransientOwner = 5,
+  kClipOwner = 6,
+};
+
+struct FaceLayerPolicy {
+  ncos::models::face::FaceLayer layer = ncos::models::face::FaceLayer::kBase;
+  FaceLayerOwnerRole required_owner_role = FaceLayerOwnerRole::kBaseOwner;
+  uint8_t default_priority = 0;
+};
+
 struct FaceLayerOwnership {
   ncos::models::face::FaceLayer layer = ncos::models::face::FaceLayer::kBase;
+  FaceLayerOwnerRole owner_role = FaceLayerOwnerRole::kBaseOwner;
   uint16_t owner_service = 0;
   uint8_t priority = 0;
   uint32_t source_clip_id = 0;
@@ -54,12 +70,14 @@ struct FaceRenderState {
 
 struct FaceLayerClaim {
   ncos::models::face::FaceLayer layer = ncos::models::face::FaceLayer::kBase;
+  FaceLayerOwnerRole requester_role = FaceLayerOwnerRole::kBaseOwner;
   uint16_t requester_service = 0;
   uint8_t priority = 0;
   uint32_t source_clip_id = 0;
 };
 
 FaceRenderState make_face_render_state_baseline();
+FaceLayerPolicy face_layer_policy(ncos::models::face::FaceLayer layer);
 bool is_valid(const FaceRenderState& state);
 bool can_apply_layer_claim(const FaceRenderState& state, const FaceLayerClaim& claim);
 bool apply_layer_claim(FaceRenderState* state, const FaceLayerClaim& claim, uint64_t now_ms);
