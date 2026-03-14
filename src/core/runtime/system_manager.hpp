@@ -4,6 +4,7 @@
 
 #include "app/lifecycle/system_lifecycle.hpp"
 #include "config/system_config.hpp"
+#include "core/governance/action_governor.hpp"
 #include "core/messaging/event_bus_v2.hpp"
 #include "core/runtime/diagnostics.hpp"
 #include "core/runtime/fault_history.hpp"
@@ -23,6 +24,9 @@ struct RuntimeStatus {
   uint32_t bus_published_total = 0;
   uint32_t bus_dispatched_total = 0;
   uint32_t bus_dropped_total = 0;
+  uint32_t governance_allowed_total = 0;
+  uint32_t governance_preempted_total = 0;
+  uint32_t governance_rejected_total = 0;
 };
 
 class SystemManager final {
@@ -46,6 +50,7 @@ class SystemManager final {
   const ncos::config::GlobalConfig* config_ = nullptr;
   SchedulerBase scheduler_{};
   ncos::core::messaging::EventBusV2 event_bus_{};
+  ncos::core::governance::ActionGovernor action_governor_{};
   HealthMonitor health_{};
   FaultHistory fault_history_{};
   SafeModeController safe_mode_{};

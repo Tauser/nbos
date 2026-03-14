@@ -97,6 +97,11 @@ RuntimeStatus SystemManager::status() const {
                              bus_stats.dispatched_intents + bus_stats.dispatched_reactions;
   out.bus_dropped_total = bus_stats.dropped_events + bus_stats.dropped_commands +
                           bus_stats.dropped_intents + bus_stats.dropped_reactions;
+
+  const ncos::core::governance::ActionGovernanceStats governance_stats = action_governor_.stats();
+  out.governance_allowed_total = governance_stats.allowed;
+  out.governance_preempted_total = governance_stats.preempted;
+  out.governance_rejected_total = governance_stats.rejected;
   return out;
 }
 
