@@ -2,6 +2,11 @@
 .pio/
 .sconsign.dblite
 
+# ESP-IDF local config snapshots
+sdkconfig
+sdkconfig.*
+!sdkconfig.defaults
+
 # Build artifacts
 build/
 dist/
