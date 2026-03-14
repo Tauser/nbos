@@ -52,18 +52,7 @@ bool step_display() {
     static ncos::drivers::display::DisplayDriver display;
     ctx->ok = display.init();
     if (ctx->ok) {
-      // Recupera o ST7789 em warm boot quando o painel manteve estado interno.
-      display.writeCommand(0x01);  // SWRESET
-      vTaskDelay(pdMS_TO_TICKS(150));
-      display.writeCommand(0x11);  // SLPOUT
-      vTaskDelay(pdMS_TO_TICKS(150));
-      display.writeCommand(0x29);  // DISPON
-      vTaskDelay(pdMS_TO_TICKS(50));
       display.setRotation(0);
-      display.fillScreen(TFT_BLACK);
-      vTaskDelay(pdMS_TO_TICKS(40));
-      display.fillScreen(TFT_BLACK);
-      vTaskDelay(pdMS_TO_TICKS(40));
       display.setTextSize(2);
       display.setTextColor(TFT_WHITE, TFT_BLACK);
       display.fillScreen(TFT_BLACK);
@@ -105,6 +94,7 @@ bool step_display() {
   }
   return ctx.ok;
 }
+
 bool step_audio() {
   ESP_LOGI(kTag, "[3/8] Audio bring-up");
   ncos::drivers::audio::AudioBringup audio;
@@ -207,8 +197,3 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
-
-
-
-
-
