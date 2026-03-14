@@ -10,25 +10,36 @@ namespace ncos::core::state {
 
 class CompanionStateStore final : public ncos::interfaces::state::CompanionStatePort {
  public:
-  void initialize(const ncos::core::contracts::CompanionStructuralState& structural,
+  bool initialize(const ncos::core::contracts::CompanionStructuralState& structural,
+                  ncos::core::contracts::CompanionStateWriter writer,
                   uint64_t now_ms) override;
-  void ingest_runtime(const ncos::core::contracts::CompanionRuntimeSignal& runtime,
+  bool ingest_runtime(const ncos::core::contracts::CompanionRuntimeSignal& runtime,
+                      ncos::core::contracts::CompanionStateWriter writer,
                       uint64_t now_ms) override;
-  void ingest_emotional(const ncos::core::contracts::CompanionEmotionalSignal& emotional,
+  bool ingest_emotional(const ncos::core::contracts::CompanionEmotionalSignal& emotional,
+                        ncos::core::contracts::CompanionStateWriter writer,
                         uint64_t now_ms) override;
-  void ingest_attentional(const ncos::core::contracts::CompanionAttentionalSignal& attentional,
+  bool ingest_attentional(const ncos::core::contracts::CompanionAttentionalSignal& attentional,
+                          ncos::core::contracts::CompanionStateWriter writer,
                           uint64_t now_ms) override;
-  void ingest_energetic(const ncos::core::contracts::CompanionEnergeticSignal& energetic,
+  bool ingest_energetic(const ncos::core::contracts::CompanionEnergeticSignal& energetic,
+                        ncos::core::contracts::CompanionStateWriter writer,
                         uint64_t now_ms) override;
-  void ingest_interactional(const ncos::core::contracts::CompanionInteractionSignal& interactional,
+  bool ingest_interactional(const ncos::core::contracts::CompanionInteractionSignal& interactional,
+                            ncos::core::contracts::CompanionStateWriter writer,
                             uint64_t now_ms) override;
-  void ingest_governance_decision(const ncos::core::contracts::GovernanceDecision& decision,
+  bool ingest_governance_decision(const ncos::core::contracts::GovernanceDecision& decision,
+                                  ncos::core::contracts::CompanionStateWriter writer,
                                   uint64_t now_ms) override;
-  ncos::core::contracts::CompanionSnapshot snapshot() const override;
+  ncos::core::contracts::CompanionSnapshot snapshot_for(
+      ncos::core::contracts::CompanionStateReader reader) const override;
 
  private:
   static ncos::core::contracts::CompanionPresenceMode presence_from_runtime(
       const ncos::core::contracts::CompanionRuntimeSignal& runtime);
+
+  bool authorize_write(ncos::core::contracts::CompanionStateWriter writer,
+                       ncos::core::contracts::CompanionStateDomain domain) const;
 
   ncos::core::contracts::CompanionSnapshot snapshot_{};
 };

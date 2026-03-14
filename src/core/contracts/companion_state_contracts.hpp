@@ -65,6 +65,38 @@ enum class TurnOwner : uint8_t {
   kCompanion = 3,
 };
 
+enum class CompanionStateDomain : uint8_t {
+  kStructural = 1,
+  kRuntime = 2,
+  kGovernance = 3,
+  kEmotional = 4,
+  kAttentional = 5,
+  kEnergetic = 6,
+  kInteractional = 7,
+  kTransient = 8,
+};
+
+enum class CompanionStateWriter : uint8_t {
+  kBootstrap = 1,
+  kRuntimeCore = 2,
+  kGovernanceCore = 3,
+  kEmotionService = 4,
+  kAttentionService = 5,
+  kPowerService = 6,
+  kInteractionService = 7,
+};
+
+enum class CompanionStateReader : uint8_t {
+  kRuntimeCore = 1,
+  kBehaviorService = 2,
+  kFaceService = 3,
+  kMotionService = 4,
+  kVoiceService = 5,
+  kPowerService = 6,
+  kDiagnostics = 7,
+  kCloudBridge = 8,
+};
+
 struct CompanionStructuralState {
   bool offline_first = true;
   uint16_t semantic_taxonomy_version = 0;
@@ -177,5 +209,9 @@ struct CompanionInteractionSignal {
 
 GovernanceHealth evaluate_governance_health(uint32_t allowed_total, uint32_t preempted_total,
                                             uint32_t rejected_total);
+bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain domain);
+bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain domain);
+CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
+                                             CompanionStateReader reader);
 
 }  // namespace ncos::core::contracts

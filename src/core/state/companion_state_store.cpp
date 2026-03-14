@@ -2,15 +2,27 @@
 
 namespace ncos::core::state {
 
-void CompanionStateStore::initialize(const ncos::core::contracts::CompanionStructuralState& structural,
+bool CompanionStateStore::initialize(const ncos::core::contracts::CompanionStructuralState& structural,
+                                     ncos::core::contracts::CompanionStateWriter writer,
                                      uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kStructural)) {
+    return false;
+  }
+
   snapshot_.structural = structural;
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionRuntimeSignal& runtime,
+bool CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionRuntimeSignal& runtime,
+                                         ncos::core::contracts::CompanionStateWriter writer,
                                          uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kRuntime) ||
+      !authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kGovernance)) {
+    return false;
+  }
+
   snapshot_.runtime.initialized = runtime.initialized;
   snapshot_.runtime.started = runtime.started;
   snapshot_.runtime.safe_mode = runtime.safe_mode;
@@ -40,10 +52,16 @@ void CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionR
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_emotional(
-    const ncos::core::contracts::CompanionEmotionalSignal& emotional, uint64_t now_ms) {
+bool CompanionStateStore::ingest_emotional(
+    const ncos::core::contracts::CompanionEmotionalSignal& emotional,
+    ncos::core::contracts::CompanionStateWriter writer, uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kEmotional)) {
+    return false;
+  }
+
   snapshot_.emotional.tone = emotional.tone;
   snapshot_.emotional.arousal = emotional.arousal;
   snapshot_.emotional.intensity_percent = emotional.intensity_percent;
@@ -51,10 +69,16 @@ void CompanionStateStore::ingest_emotional(
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_attentional(
-    const ncos::core::contracts::CompanionAttentionalSignal& attentional, uint64_t now_ms) {
+bool CompanionStateStore::ingest_attentional(
+    const ncos::core::contracts::CompanionAttentionalSignal& attentional,
+    ncos::core::contracts::CompanionStateWriter writer, uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kAttentional)) {
+    return false;
+  }
+
   snapshot_.attentional.target = attentional.target;
   snapshot_.attentional.channel = attentional.channel;
   snapshot_.attentional.focus_confidence_percent = attentional.focus_confidence_percent;
@@ -67,10 +91,16 @@ void CompanionStateStore::ingest_attentional(
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_energetic(
-    const ncos::core::contracts::CompanionEnergeticSignal& energetic, uint64_t now_ms) {
+bool CompanionStateStore::ingest_energetic(
+    const ncos::core::contracts::CompanionEnergeticSignal& energetic,
+    ncos::core::contracts::CompanionStateWriter writer, uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kEnergetic)) {
+    return false;
+  }
+
   snapshot_.energetic.mode = energetic.mode;
   snapshot_.energetic.battery_percent = energetic.battery_percent;
   snapshot_.energetic.thermal_load_percent = energetic.thermal_load_percent;
@@ -78,10 +108,16 @@ void CompanionStateStore::ingest_energetic(
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_interactional(
-    const ncos::core::contracts::CompanionInteractionSignal& interactional, uint64_t now_ms) {
+bool CompanionStateStore::ingest_interactional(
+    const ncos::core::contracts::CompanionInteractionSignal& interactional,
+    ncos::core::contracts::CompanionStateWriter writer, uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kInteractional)) {
+    return false;
+  }
+
   snapshot_.interactional.phase = interactional.phase;
   snapshot_.interactional.turn_owner = interactional.turn_owner;
   snapshot_.interactional.session_active = interactional.session_active;
@@ -89,10 +125,16 @@ void CompanionStateStore::ingest_interactional(
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-void CompanionStateStore::ingest_governance_decision(
-    const ncos::core::contracts::GovernanceDecision& decision, uint64_t now_ms) {
+bool CompanionStateStore::ingest_governance_decision(
+    const ncos::core::contracts::GovernanceDecision& decision,
+    ncos::core::contracts::CompanionStateWriter writer, uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kTransient)) {
+    return false;
+  }
+
   if (decision.kind == ncos::core::contracts::GovernanceDecisionKind::kAllow ||
       decision.kind == ncos::core::contracts::GovernanceDecisionKind::kPreemptAndAllow) {
     snapshot_.transient.has_active_trace = true;
@@ -109,10 +151,12 @@ void CompanionStateStore::ingest_governance_decision(
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
+  return true;
 }
 
-ncos::core::contracts::CompanionSnapshot CompanionStateStore::snapshot() const {
-  return snapshot_;
+ncos::core::contracts::CompanionSnapshot CompanionStateStore::snapshot_for(
+    ncos::core::contracts::CompanionStateReader reader) const {
+  return ncos::core::contracts::redact_snapshot_for_reader(snapshot_, reader);
 }
 
 ncos::core::contracts::CompanionPresenceMode CompanionStateStore::presence_from_runtime(
@@ -126,6 +170,11 @@ ncos::core::contracts::CompanionPresenceMode CompanionStateStore::presence_from_
   }
 
   return ncos::core::contracts::CompanionPresenceMode::kIdle;
+}
+
+bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateWriter writer,
+                                          ncos::core::contracts::CompanionStateDomain domain) const {
+  return ncos::core::contracts::can_writer_mutate_domain(writer, domain);
 }
 
 }  // namespace ncos::core::state

@@ -10,5 +10,6 @@ Arquivos desta pasta congelam as decisoes tecnicas de base antes de implementaca
 - `0006-action-governance-ownership-prioridades.md`
 - `0007-companion-state-central.md`
 - `0008-companion-state-dominios-emocional-atencional-energetico-interacional.md`
+- `0009-companion-state-contratos-acesso-ownership.md`
 
 Regra: mudancas estruturais relevantes devem gerar novo ADR.

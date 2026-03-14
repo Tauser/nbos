@@ -70,7 +70,7 @@ void SystemManager::start(uint64_t now_ms) {
     structural.offline_first = true;
     structural.semantic_taxonomy_version = ncos::core::contracts::kSemanticTaxonomyVersion;
     structural.board_name = config_->board.board_name;
-    companion_state_.initialize(structural, now_ms);
+    (void)companion_state_.initialize(structural, ncos::core::contracts::CompanionStateWriter::kBootstrap, now_ms);
     companion_initialized_ = true;
   }
 
@@ -113,7 +113,7 @@ RuntimeStatus SystemManager::status() const {
   out.governance_allowed_total = governance_stats.allowed;
   out.governance_preempted_total = governance_stats.preempted;
   out.governance_rejected_total = governance_stats.rejected;
-  out.companion_state_revision = companion_state_.snapshot().revision;
+  out.companion_state_revision = companion_state_.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore).revision;
   return out;
 }
 
@@ -173,7 +173,8 @@ void SystemManager::sync_companion_state(uint64_t now_ms) {
   signal.governance_preempted_total = governance_stats.preempted;
   signal.governance_rejected_total = governance_stats.rejected;
 
-  companion_state_.ingest_runtime(signal, now_ms);
+  (void)companion_state_.ingest_runtime(signal, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, now_ms);
 }
 
 }  // namespace ncos::core::runtime
+
