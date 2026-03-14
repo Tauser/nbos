@@ -69,6 +69,17 @@ void SystemManager::tick(uint64_t now_ms) {
   refresh_health(now_ms);
 }
 
+RuntimeStatus SystemManager::status() const {
+  RuntimeStatus out{};
+  out.initialized = initialized_;
+  out.started = started_;
+  out.scheduler_tasks = static_cast<uint32_t>(scheduler_.task_count());
+  out.safe_mode = safe_mode_.active();
+  out.fault_count = fault_history_.count();
+  out.last_tick_ms = last_tick_ms_;
+  return out;
+}
+
 void SystemManager::lifecycle_watchdog_task(void* context) {
   if (context == nullptr) {
     return;

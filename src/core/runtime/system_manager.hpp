@@ -12,6 +12,15 @@
 
 namespace ncos::core::runtime {
 
+struct RuntimeStatus {
+  bool initialized = false;
+  bool started = false;
+  uint32_t scheduler_tasks = 0;
+  bool safe_mode = false;
+  uint32_t fault_count = 0;
+  uint64_t last_tick_ms = 0;
+};
+
 class SystemManager final {
  public:
   SystemManager() = default;
@@ -20,6 +29,7 @@ class SystemManager final {
                   const ncos::config::GlobalConfig* config);
   void start(uint64_t now_ms);
   void tick(uint64_t now_ms);
+  RuntimeStatus status() const;
 
  private:
   static void lifecycle_watchdog_task(void* context);

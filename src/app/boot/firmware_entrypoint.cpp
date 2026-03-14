@@ -4,6 +4,7 @@
 
 #include "app/boot/boot_flow.hpp"
 #include "config/system_config.hpp"
+#include "core/runtime/runtime_readiness.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -48,6 +49,18 @@ void FirmwareEntrypoint::run() {
   }
 
   system_manager_.start(monotonic_ms());
+
+  const ncos::core::runtime::RuntimeReadinessReport readiness =
+      ncos::core::runtime::evaluate_runtime_readiness(ncos::config::kGlobalConfig, lifecycle_,
+                                                      system_manager_.status());
+
+  ESP_LOGI(kTag,
+           "Runtime readiness=%s cfg=%d board=%d lifecycle=%d init=%d started=%d tasks=%d safe=%d faults=%d",
+           readiness.level_name(), readiness.config_valid ? 1 : 0,
+           readiness.board_profile_bound ? 1 : 0, readiness.lifecycle_allows_runtime ? 1 : 0,
+           readiness.runtime_initialized ? 1 : 0, readiness.runtime_started ? 1 : 0,
+           readiness.scheduler_has_minimum_tasks ? 1 : 0, readiness.safe_mode_inactive ? 1 : 0,
+           readiness.no_faults_recorded ? 1 : 0);
 }
 
 void FirmwareEntrypoint::tick() {
