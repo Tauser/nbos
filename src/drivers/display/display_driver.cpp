@@ -1,6 +1,6 @@
 #include "drivers/display/display_driver.hpp"
 
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 
 namespace ncos::drivers::display {
 
@@ -52,3 +52,4 @@ DisplayDriver::DisplayDriver() {
 }
 
 }  // namespace ncos::drivers::display
+

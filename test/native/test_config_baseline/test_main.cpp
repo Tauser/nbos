@@ -1,7 +1,7 @@
 #include <unity.h>
 
 #include "config/build_profile.hpp"
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
@@ -42,3 +42,4 @@ int main() {
   RUN_TEST(test_sensitive_pin_flags_are_set);
   return UNITY_END();
 }
+

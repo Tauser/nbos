@@ -4,7 +4,7 @@
 #include "core/contracts/companion_state_contracts.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
 #include "core/governance/action_governor.hpp"
-#include "core/messaging/event_bus_v2.hpp"
+#include "core/messaging/event_bus.hpp"
 #include "core/runtime/companion_state_axis.hpp"
 #include "core/state/companion_state_store.hpp"
 
@@ -13,7 +13,7 @@
 #include "core/contracts/companion_state_contracts.cpp"
 #include "core/contracts/interaction_taxonomy.cpp"
 #include "core/governance/action_governor.cpp"
-#include "core/messaging/event_bus_v2.cpp"
+#include "core/messaging/event_bus.cpp"
 #include "core/runtime/companion_state_axis.cpp"
 #include "core/state/companion_state_store.cpp"
 
@@ -105,3 +105,4 @@ int main() {
   RUN_TEST(test_companion_axis_maps_reaction_to_emotional_state);
   return UNITY_END();
 }
+

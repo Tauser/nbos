@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "config/build_profile.hpp"
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 
 namespace ncos::config {
 
@@ -81,3 +81,4 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+

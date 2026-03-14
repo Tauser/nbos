@@ -1,6 +1,6 @@
 #include "drivers/touch/touch_bringup.hpp"
 
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 #include "driver/touch_sensor.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -122,4 +122,5 @@ void TouchBringup::deinit() {
 }
 
 }  // namespace ncos::drivers::touch
+
 

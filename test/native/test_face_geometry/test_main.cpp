@@ -10,7 +10,7 @@
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
 
-void test_face_geometry_v2_profiles_are_semantic_and_valid() {
+void test_face_geometry_profiles_are_semantic_and_valid() {
   const auto balanced =
       ncos::core::contracts::make_shape_geometry_profile(ncos::models::face::FaceShapeProfile::kCompanionBalanced);
   const auto heroic =
@@ -24,7 +24,7 @@ void test_face_geometry_v2_profiles_are_semantic_and_valid() {
   TEST_ASSERT_TRUE(playful.silhouette_roundness_percent > heroic.silhouette_roundness_percent);
 }
 
-void test_face_geometry_v2_keeps_incremental_compatibility_with_render_state() {
+void test_face_geometry_keeps_incremental_compatibility_with_render_state() {
   auto state = ncos::core::contracts::make_face_render_state_baseline();
   state.version = ncos::core::contracts::FaceRenderStateVersion::kV1;
 
@@ -37,7 +37,7 @@ void test_face_geometry_v2_keeps_incremental_compatibility_with_render_state() {
   TEST_ASSERT_TRUE(ncos::core::contracts::is_valid(state));
 }
 
-void test_face_geometry_v2_changes_silhouette_without_renderer_semantics() {
+void test_face_geometry_changes_silhouette_without_renderer_semantics() {
   auto wide_state = ncos::core::contracts::make_face_render_state_baseline();
   wide_state.geometry =
       ncos::core::contracts::make_shape_geometry_profile(ncos::models::face::FaceShapeProfile::kHeroicWide);
@@ -62,8 +62,9 @@ void test_face_geometry_v2_changes_silhouette_without_renderer_semantics() {
 
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(test_face_geometry_v2_profiles_are_semantic_and_valid);
-  RUN_TEST(test_face_geometry_v2_keeps_incremental_compatibility_with_render_state);
-  RUN_TEST(test_face_geometry_v2_changes_silhouette_without_renderer_semantics);
+  RUN_TEST(test_face_geometry_profiles_are_semantic_and_valid);
+  RUN_TEST(test_face_geometry_keeps_incremental_compatibility_with_render_state);
+  RUN_TEST(test_face_geometry_changes_silhouette_without_renderer_semantics);
   return UNITY_END();
 }
+

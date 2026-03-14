@@ -2,7 +2,7 @@
 
 #include <limits.h>
 
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -268,3 +268,4 @@ bool Mpu6050Bringup::read_regs(uint8_t start_reg, uint8_t* out_data, size_t len)
 }
 
 }  // namespace ncos::drivers::imu
+

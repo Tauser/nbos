@@ -1,11 +1,11 @@
 #include <unity.h>
 
 #include "core/contracts/interaction_taxonomy.hpp"
-#include "core/messaging/event_bus_v2.hpp"
+#include "core/messaging/event_bus.hpp"
 
 // Native tests run with test_build_src = no.
 #include "core/contracts/interaction_taxonomy.cpp"
-#include "core/messaging/event_bus_v2.cpp"
+#include "core/messaging/event_bus.cpp"
 
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
@@ -27,7 +27,7 @@ void on_command(const ncos::core::contracts::CommandMessage& message, void*) {
 
 }  // namespace
 
-void test_event_bus_v2_delivers_semantic_event_lane() {
+void test_event_bus_delivers_semantic_event_lane() {
   ncos::core::messaging::EventBusV2 bus;
   g_event_counter = 0;
 
@@ -45,7 +45,7 @@ void test_event_bus_v2_delivers_semantic_event_lane() {
   TEST_ASSERT_EQUAL_UINT32(1, g_event_counter);
 }
 
-void test_event_bus_v2_sorts_commands_by_priority() {
+void test_event_bus_sorts_commands_by_priority() {
   ncos::core::messaging::EventBusV2 bus;
   g_command_counter = 0;
   g_last_command_priority = 0;
@@ -72,7 +72,7 @@ void test_event_bus_v2_sorts_commands_by_priority() {
   TEST_ASSERT_EQUAL_UINT8(9, g_last_command_priority);
 }
 
-void test_event_bus_v2_rejects_invalid_message_kind() {
+void test_event_bus_rejects_invalid_message_kind() {
   ncos::core::messaging::EventBusV2 bus;
 
   ncos::core::contracts::EventMessage invalid{};
@@ -84,8 +84,9 @@ void test_event_bus_v2_rejects_invalid_message_kind() {
 
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(test_event_bus_v2_delivers_semantic_event_lane);
-  RUN_TEST(test_event_bus_v2_sorts_commands_by_priority);
-  RUN_TEST(test_event_bus_v2_rejects_invalid_message_kind);
+  RUN_TEST(test_event_bus_delivers_semantic_event_lane);
+  RUN_TEST(test_event_bus_sorts_commands_by_priority);
+  RUN_TEST(test_event_bus_rejects_invalid_message_kind);
   return UNITY_END();
 }
+

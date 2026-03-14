@@ -5,7 +5,7 @@
 #include "app/lifecycle/system_lifecycle.hpp"
 #include "config/system_config.hpp"
 #include "core/governance/action_governor.hpp"
-#include "core/messaging/event_bus_v2.hpp"
+#include "core/messaging/event_bus.hpp"
 #include "core/runtime/companion_state_axis.hpp"
 #include "core/runtime/diagnostics.hpp"
 #include "core/runtime/fault_history.hpp"
@@ -69,3 +69,4 @@ class SystemManager final {
 };
 
 }  // namespace ncos::core::runtime
+

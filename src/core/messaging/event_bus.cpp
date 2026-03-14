@@ -1,4 +1,4 @@
-#include "core/messaging/event_bus_v2.hpp"
+#include "core/messaging/event_bus.hpp"
 
 namespace {
 
@@ -308,3 +308,4 @@ bool EventBusV2::register_reaction_subscriber(ncos::interfaces::messaging::React
 }
 
 }  // namespace ncos::core::messaging
+

@@ -1,6 +1,6 @@
 #include "drivers/ttlinker/ttlinker_bringup.hpp"
 
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -112,3 +112,4 @@ void TtlinkerBringup::deinit() {
 }
 
 }  // namespace ncos::drivers::ttlinker
+

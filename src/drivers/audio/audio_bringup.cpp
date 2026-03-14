@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#include "config/pins/board_freenove_esp32s3_cam.hpp"
+#include "config/pins/board_pins.hpp"
 #include "driver/i2s.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -187,4 +187,5 @@ void AudioBringup::deinit() {
 }
 
 }  // namespace ncos::drivers::audio
+
 
