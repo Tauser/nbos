@@ -114,6 +114,80 @@ void test_modulation_cannot_overwrite_base_layer() {
   TEST_ASSERT_EQUAL_UINT16(11, state.composition.layers[base_idx].owner_service);
 }
 
+void test_face_claim_requires_explicit_service_identity() {
+  ncos::core::contracts::FaceRenderState state =
+      ncos::core::contracts::make_face_render_state_baseline();
+
+  ncos::core::contracts::FaceLayerClaim missing_service{};
+  missing_service.layer = ncos::models::face::FaceLayer::kBlink;
+  missing_service.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBlinkOwner;
+  missing_service.requester_service = 0;
+  missing_service.priority = 8;
+
+  TEST_ASSERT_FALSE(ncos::core::contracts::can_apply_layer_claim(state, missing_service));
+  TEST_ASSERT_FALSE(ncos::core::contracts::apply_layer_claim(&state, missing_service, 1000));
+}
+
+void test_face_composition_lock_blocks_foreign_takeover() {
+  ncos::core::contracts::FaceRenderState state =
+      ncos::core::contracts::make_face_render_state_baseline();
+
+  ncos::core::contracts::FaceLayerClaim owner_claim{};
+  owner_claim.layer = ncos::models::face::FaceLayer::kClip;
+  owner_claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kClipOwner;
+  owner_claim.requester_service = 90;
+  owner_claim.priority = 8;
+  owner_claim.source_clip_id = 123;
+
+  TEST_ASSERT_TRUE(ncos::core::contracts::apply_layer_claim(&state, owner_claim, 1000));
+  state.composition.composition_locked = true;
+
+  ncos::core::contracts::FaceLayerClaim foreign_claim = owner_claim;
+  foreign_claim.requester_service = 91;
+  foreign_claim.priority = 9;
+
+  TEST_ASSERT_FALSE(ncos::core::contracts::can_apply_layer_claim(state, foreign_claim));
+  TEST_ASSERT_FALSE(ncos::core::contracts::apply_layer_claim(&state, foreign_claim, 1010));
+
+  const size_t clip_idx = ncos::models::face::face_layer_index(ncos::models::face::FaceLayer::kClip);
+  TEST_ASSERT_EQUAL_UINT16(90, state.composition.layers[clip_idx].owner_service);
+}
+
+void test_face_claim_rejects_invalid_state_preventing_renderer_semantic_drift() {
+  ncos::core::contracts::FaceRenderState state =
+      ncos::core::contracts::make_face_render_state_baseline();
+
+  const size_t blink_idx = ncos::models::face::face_layer_index(ncos::models::face::FaceLayer::kBlink);
+  state.composition.layers[blink_idx].owner_role = ncos::core::contracts::FaceLayerOwnerRole::kClipOwner;
+
+  ncos::core::contracts::FaceLayerClaim blink_claim{};
+  blink_claim.layer = ncos::models::face::FaceLayer::kBlink;
+  blink_claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBlinkOwner;
+  blink_claim.requester_service = 22;
+  blink_claim.priority = 6;
+
+  TEST_ASSERT_FALSE(ncos::core::contracts::is_valid(state));
+  TEST_ASSERT_FALSE(ncos::core::contracts::apply_layer_claim(&state, blink_claim, 1000));
+}
+
+void test_face_claim_updates_revision_and_timestamp() {
+  ncos::core::contracts::FaceRenderState state =
+      ncos::core::contracts::make_face_render_state_baseline();
+
+  const uint32_t prev_revision = state.revision;
+
+  ncos::core::contracts::FaceLayerClaim gaze_claim{};
+  gaze_claim.layer = ncos::models::face::FaceLayer::kGaze;
+  gaze_claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kGazeOwner;
+  gaze_claim.requester_service = 31;
+  gaze_claim.priority = 5;
+
+  TEST_ASSERT_TRUE(ncos::core::contracts::apply_layer_claim(&state, gaze_claim, 4242));
+  TEST_ASSERT_EQUAL_UINT32(prev_revision + 1, state.revision);
+  TEST_ASSERT_EQUAL_UINT64(4242, state.updated_at_ms);
+  TEST_ASSERT_EQUAL_UINT16(31, state.owner_service);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_render_state_baseline_is_valid_and_safe);
@@ -121,5 +195,9 @@ int main() {
   RUN_TEST(test_blink_and_clip_cannot_claim_each_other_layers);
   RUN_TEST(test_gaze_and_transient_do_not_conflict_by_layer_ownership);
   RUN_TEST(test_modulation_cannot_overwrite_base_layer);
+  RUN_TEST(test_face_claim_requires_explicit_service_identity);
+  RUN_TEST(test_face_composition_lock_blocks_foreign_takeover);
+  RUN_TEST(test_face_claim_rejects_invalid_state_preventing_renderer_semantic_drift);
+  RUN_TEST(test_face_claim_updates_revision_and_timestamp);
   return UNITY_END();
 }
