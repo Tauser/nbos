@@ -7,7 +7,6 @@ namespace ncos::drivers::display {
 class DisplayDriver final : public lgfx::LGFX_Device {
  public:
   DisplayDriver();
-  bool begin();
 
  private:
   lgfx::Panel_ST7789 panel_;

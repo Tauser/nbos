@@ -1,9 +1,6 @@
 #include "drivers/display/display_driver.hpp"
 
 #include "config/pins/board_freenove_esp32s3_cam.hpp"
-#include "driver/gpio.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 namespace ncos::drivers::display {
 
@@ -52,30 +49,6 @@ DisplayDriver::DisplayDriver() {
   }
 
   setPanel(&panel_);
-}
-
-bool DisplayDriver::begin() {
-  if (ncos::config::pins::kDisplayRst >= 0) {
-    const gpio_num_t rst_pin = static_cast<gpio_num_t>(ncos::config::pins::kDisplayRst);
-
-    gpio_config_t io_cfg{};
-    io_cfg.pin_bit_mask = (1ULL << static_cast<uint32_t>(rst_pin));
-    io_cfg.mode = GPIO_MODE_OUTPUT;
-    io_cfg.pull_up_en = GPIO_PULLUP_DISABLE;
-    io_cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_cfg.intr_type = GPIO_INTR_DISABLE;
-    gpio_config(&io_cfg);
-
-    // Pulso de reset fisico para reiniciar o ST7789 mesmo sem corte de energia.
-    gpio_set_level(rst_pin, 1);
-    vTaskDelay(pdMS_TO_TICKS(5));
-    gpio_set_level(rst_pin, 0);
-    vTaskDelay(pdMS_TO_TICKS(20));
-    gpio_set_level(rst_pin, 1);
-    vTaskDelay(pdMS_TO_TICKS(120));
-  }
-
-  return init();
 }
 
 }  // namespace ncos::drivers::display
