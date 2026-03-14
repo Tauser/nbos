@@ -4,24 +4,24 @@
 
 namespace {
 constexpr const char* kTag = "NCOS_SYSMGR";
-constexpr uint32_t kLifecycleWatchdogMs = 1000;
-constexpr uint32_t kDiagnosticsHeartbeatMs = 3000;
 }
 
 namespace ncos::core::runtime {
 
-bool SystemManager::initialize(const ncos::app::lifecycle::SystemLifecycle* lifecycle) {
-  if (lifecycle == nullptr) {
+bool SystemManager::initialize(const ncos::app::lifecycle::SystemLifecycle* lifecycle,
+                               const ncos::config::GlobalConfig* config) {
+  if (lifecycle == nullptr || config == nullptr || !config->config_ready) {
     return false;
   }
 
   lifecycle_ = lifecycle;
+  config_ = config;
   initialized_ = true;
   return true;
 }
 
 void SystemManager::start(uint64_t now_ms) {
-  if (!initialized_ || started_) {
+  if (!initialized_ || started_ || config_ == nullptr) {
     return;
   }
 
@@ -29,8 +29,9 @@ void SystemManager::start(uint64_t now_ms) {
   health_.reset(now_ms);
   refresh_health(now_ms);
 
-  const bool lifecycle_added = scheduler_.register_task("lifecycle_watchdog", kLifecycleWatchdogMs,
-                                                        &SystemManager::lifecycle_watchdog_task, this, now_ms);
+  const bool lifecycle_added = scheduler_.register_task(
+      "lifecycle_watchdog", config_->runtime.lifecycle_watchdog_ms,
+      &SystemManager::lifecycle_watchdog_task, this, now_ms);
   if (!lifecycle_added) {
     fault_history_.push(FaultCode::kLifecycleWatchdogRegistrationFailed, now_ms,
                         "watchdog task registration failed");
@@ -40,14 +41,17 @@ void SystemManager::start(uint64_t now_ms) {
     return;
   }
 
-  const bool diagnostics_added = scheduler_.register_task(
-      "diagnostics_heartbeat", kDiagnosticsHeartbeatMs, &SystemManager::diagnostics_heartbeat_task, this, now_ms);
-  if (!diagnostics_added) {
-    fault_history_.push(FaultCode::kDiagnosticsTaskRegistrationFailed, now_ms,
-                        "diagnostics task registration failed");
-    safe_mode_.enter("diagnostics_task_registration_failed");
-    refresh_health(now_ms);
-    ESP_LOGW(kTag, "Falha ao registrar diagnostics_heartbeat; runtime segue em modo seguro");
+  if (config_->runtime.diagnostics_enabled) {
+    const bool diagnostics_added = scheduler_.register_task(
+        "diagnostics_heartbeat", config_->runtime.diagnostics_heartbeat_ms,
+        &SystemManager::diagnostics_heartbeat_task, this, now_ms);
+    if (!diagnostics_added) {
+      fault_history_.push(FaultCode::kDiagnosticsTaskRegistrationFailed, now_ms,
+                          "diagnostics task registration failed");
+      safe_mode_.enter("diagnostics_task_registration_failed");
+      refresh_health(now_ms);
+      ESP_LOGW(kTag, "Falha ao registrar diagnostics_heartbeat; runtime segue em modo seguro");
+    }
   }
 
   started_ = true;

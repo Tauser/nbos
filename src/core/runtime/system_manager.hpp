@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "app/lifecycle/system_lifecycle.hpp"
+#include "config/system_config.hpp"
 #include "core/runtime/diagnostics.hpp"
 #include "core/runtime/fault_history.hpp"
 #include "core/runtime/health.hpp"
@@ -15,7 +16,8 @@ class SystemManager final {
  public:
   SystemManager() = default;
 
-  bool initialize(const ncos::app::lifecycle::SystemLifecycle* lifecycle);
+  bool initialize(const ncos::app::lifecycle::SystemLifecycle* lifecycle,
+                  const ncos::config::GlobalConfig* config);
   void start(uint64_t now_ms);
   void tick(uint64_t now_ms);
 
@@ -27,6 +29,7 @@ class SystemManager final {
   void refresh_health(uint64_t now_ms);
 
   const ncos::app::lifecycle::SystemLifecycle* lifecycle_ = nullptr;
+  const ncos::config::GlobalConfig* config_ = nullptr;
   SchedulerBase scheduler_{};
   HealthMonitor health_{};
   FaultHistory fault_history_{};
