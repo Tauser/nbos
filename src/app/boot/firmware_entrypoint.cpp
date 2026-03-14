@@ -8,6 +8,7 @@
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
+#include "drivers/led/led_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
 
@@ -77,6 +78,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(kTag, "MotionService iniciou em estado degradado");
   }
 
+  led_service_.bind_port(ncos::drivers::led::acquire_shared_led_port());
+  if (!led_service_.initialize(now)) {
+    ESP_LOGW(kTag, "LedService iniciou em estado degradado");
+  }
+
   if (!face_service_.initialize(now)) {
     ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
   }
@@ -101,6 +107,7 @@ void FirmwareEntrypoint::tick() {
   touch_service_.tick(now);
   imu_service_.tick(now);
   motion_service_.tick(now);
+  led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
   face_service_.tick(now);
 }
 
