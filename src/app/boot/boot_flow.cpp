@@ -39,7 +39,11 @@ bool step_config_gate() {
 
 bool step_display() {
   ESP_LOGI(kTag, "[2/8] Display bring-up");
-  ncos::drivers::display::DisplayDriver display;
+
+  // DisplayDriver (LovyanGFX) e grande para stack da task main.
+  // Mantemos instancia estatica para evitar stack overflow no boot.
+  static ncos::drivers::display::DisplayDriver display;
+
   if (!display.init()) {
     ESP_LOGE(kTag, "Display init falhou");
     return false;
@@ -158,3 +162,4 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+
