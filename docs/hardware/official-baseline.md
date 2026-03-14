@@ -47,6 +47,7 @@ Mudancas de pinagem exigem justificativa explicita e registro arquitetural.
 
 ## Pinos sensiveis e provisoes
 - GPIO0: sensivel a boot strap; uso atual no SDA do MPU e provisoriamente aceito.
+- GPIO1/GPIO3: podem interagir com console/serial dependendo da configuracao de debug.
 - GPIO3: pode afetar cenarios de debug/serial conforme configuracao de placa e firmware.
 - GPIO46: entrada apenas no ESP32-S3; uso atual no SD do INMP441 esta alinhado.
 
