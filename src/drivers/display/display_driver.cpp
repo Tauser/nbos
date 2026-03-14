@@ -25,7 +25,7 @@ DisplayDriver::DisplayDriver() {
   {
     auto cfg = panel_.config();
     cfg.pin_cs = ncos::config::pins::kDisplayCs;
-    cfg.pin_rst = ncos::config::pins::kDisplayRst;
+    cfg.pin_rst = -1;
     cfg.pin_busy = -1;
 
     cfg.memory_width = 240;
