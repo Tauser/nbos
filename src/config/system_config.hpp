@@ -12,6 +12,8 @@ struct RuntimeConfig {
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
   uint32_t audio_probe_interval_ms = 1500;
+  uint32_t touch_probe_interval_ms = 120;
+  uint32_t imu_probe_interval_ms = 100;
 };
 
 struct BoardProfile {
@@ -40,6 +42,9 @@ constexpr RuntimeConfig make_runtime_config() {
 
   if (detect_build_profile() == BuildProfile::kProd) {
     cfg.diagnostics_heartbeat_ms = 5000;
+    cfg.audio_probe_interval_ms = 2000;
+    cfg.touch_probe_interval_ms = 160;
+    cfg.imu_probe_interval_ms = 140;
   }
 
   return cfg;

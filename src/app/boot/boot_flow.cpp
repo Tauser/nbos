@@ -4,9 +4,9 @@
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/camera/camera_bringup.hpp"
 #include "drivers/display/display_runtime.hpp"
-#include "drivers/imu/mpu6050_bringup.hpp"
+#include "drivers/imu/imu_local_port.hpp"
 #include "drivers/storage/sd_bringup.hpp"
-#include "drivers/touch/touch_bringup.hpp"
+#include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_bringup.hpp"
 
 #include "esp_log.h"
@@ -110,14 +110,16 @@ bool step_audio() {
 
 bool step_touch() {
   ESP_LOGI(kTag, "[4/8] Touch bring-up");
-  ncos::drivers::touch::TouchBringup touch;
-  if (!touch.init()) {
+  ncos::interfaces::sensing::TouchPort* touch = ncos::drivers::touch::acquire_shared_touch_port();
+  if (touch == nullptr || !touch->ensure_ready()) {
     ESP_LOGE(kTag, "Touch init falhou");
     return false;
   }
 
+  (void)touch->calibrate_idle();
+
   uint32_t raw = 0;
-  if (touch.read_raw(&raw)) {
+  if (touch->read_raw(&raw)) {
     ESP_LOGI(kTag, "Touch raw=%lu", static_cast<unsigned long>(raw));
   }
   return true;
@@ -125,19 +127,17 @@ bool step_touch() {
 
 bool step_imu() {
   ESP_LOGI(kTag, "[5/8] IMU bring-up");
-  ncos::drivers::imu::Mpu6050Bringup imu;
-  const bool init_ok = imu.init();
-  if (!init_ok) {
+  ncos::interfaces::sensing::ImuPort* imu = ncos::drivers::imu::acquire_shared_imu_port();
+  if (imu == nullptr || !imu->ensure_ready()) {
     ESP_LOGW(kTag, "IMU init falhou");
     return false;
   }
 
-  ncos::drivers::imu::ImuSample sample{};
-  const bool sample_ok = imu.read_sample(&sample);
+  ncos::interfaces::sensing::ImuSampleRaw sample{};
+  const bool sample_ok = imu->read_sample(&sample);
   if (sample_ok) {
     ESP_LOGI(kTag, "IMU sample ax=%d ay=%d az=%d", sample.ax, sample.ay, sample.az);
   }
-  imu.deinit();
   return sample_ok;
 }
 
@@ -201,3 +201,4 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+

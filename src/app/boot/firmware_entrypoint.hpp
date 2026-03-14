@@ -4,6 +4,8 @@
 #include "core/runtime/system_manager.hpp"
 #include "services/audio/audio_service.hpp"
 #include "services/face/face_service.hpp"
+#include "services/sensing/imu_service.hpp"
+#include "services/sensing/touch_service.hpp"
 
 namespace ncos::app::boot {
 
@@ -19,6 +21,8 @@ class FirmwareEntrypoint final {
   ncos::app::lifecycle::SystemLifecycle lifecycle_{};
   ncos::core::runtime::SystemManager system_manager_{};
   ncos::services::audio::AudioService audio_service_{};
+  ncos::services::sensing::TouchService touch_service_{};
+  ncos::services::sensing::ImuService imu_service_{};
   ncos::services::face::FaceService face_service_{};
 };
 

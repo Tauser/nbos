@@ -7,6 +7,8 @@
 #include "core/contracts/interaction_taxonomy.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
+#include "drivers/imu/imu_local_port.hpp"
+#include "drivers/touch/touch_local_port.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -59,6 +61,16 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(kTag, "AudioService iniciou em estado degradado");
   }
 
+  touch_service_.bind_port(ncos::drivers::touch::acquire_shared_touch_port());
+  if (!touch_service_.initialize(now)) {
+    ESP_LOGW(kTag, "TouchService iniciou em estado degradado");
+  }
+
+  imu_service_.bind_port(ncos::drivers::imu::acquire_shared_imu_port());
+  if (!imu_service_.initialize(now)) {
+    ESP_LOGW(kTag, "ImuService iniciou em estado degradado");
+  }
+
   if (!face_service_.initialize(now)) {
     ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
   }
@@ -80,6 +92,8 @@ void FirmwareEntrypoint::tick() {
   const uint64_t now = monotonic_ms();
   system_manager_.tick(now);
   audio_service_.tick(now);
+  touch_service_.tick(now);
+  imu_service_.tick(now);
   face_service_.tick(now);
 }
 
