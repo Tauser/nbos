@@ -11,6 +11,7 @@ struct RuntimeConfig {
   uint32_t lifecycle_watchdog_ms = 1000;
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
+  uint32_t audio_probe_interval_ms = 1500;
 };
 
 struct BoardProfile {

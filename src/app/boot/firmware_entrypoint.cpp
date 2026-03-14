@@ -6,6 +6,7 @@
 #include "config/system_config.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
 #include "core/runtime/runtime_readiness.hpp"
+#include "drivers/audio/audio_local_port.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -53,6 +54,11 @@ void FirmwareEntrypoint::run() {
   const uint64_t now = monotonic_ms();
   system_manager_.start(now);
 
+  audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
+  if (!audio_service_.initialize(now)) {
+    ESP_LOGW(kTag, "AudioService iniciou em estado degradado");
+  }
+
   if (!face_service_.initialize(now)) {
     ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
   }
@@ -73,6 +79,7 @@ void FirmwareEntrypoint::run() {
 void FirmwareEntrypoint::tick() {
   const uint64_t now = monotonic_ms();
   system_manager_.tick(now);
+  audio_service_.tick(now);
   face_service_.tick(now);
 }
 
@@ -81,4 +88,3 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
-

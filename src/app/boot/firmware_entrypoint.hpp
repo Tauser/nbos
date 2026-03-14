@@ -2,6 +2,7 @@
 
 #include "app/lifecycle/system_lifecycle.hpp"
 #include "core/runtime/system_manager.hpp"
+#include "services/audio/audio_service.hpp"
 #include "services/face/face_service.hpp"
 
 namespace ncos::app::boot {
@@ -17,8 +18,8 @@ class FirmwareEntrypoint final {
  private:
   ncos::app::lifecycle::SystemLifecycle lifecycle_{};
   ncos::core::runtime::SystemManager system_manager_{};
+  ncos::services::audio::AudioService audio_service_{};
   ncos::services::face::FaceService face_service_{};
 };
 
 }  // namespace ncos::app::boot
-

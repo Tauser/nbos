@@ -1,7 +1,7 @@
 #include "app/boot/boot_flow.hpp"
 
 #include "config/system_config.hpp"
-#include "drivers/audio/audio_bringup.hpp"
+#include "drivers/audio/audio_local_port.hpp"
 #include "drivers/camera/camera_bringup.hpp"
 #include "drivers/display/display_runtime.hpp"
 #include "drivers/imu/mpu6050_bringup.hpp"
@@ -96,9 +96,14 @@ bool step_display() {
 
 bool step_audio() {
   ESP_LOGI(kTag, "[3/8] Audio bring-up");
-  ncos::drivers::audio::AudioBringup audio;
-  const bool tx_ok = audio.init_output();
-  const bool rx_ok = audio.init_input();
+  ncos::interfaces::audio::LocalAudioPort* audio = ncos::drivers::audio::acquire_shared_local_audio_port();
+  if (audio == nullptr) {
+    ESP_LOGE(kTag, "Audio backend nao disponivel");
+    return false;
+  }
+
+  const bool tx_ok = audio->ensure_output();
+  const bool rx_ok = audio->ensure_input();
   ESP_LOGI(kTag, "Audio tx=%s rx=%s", tx_ok ? "OK" : "FAIL", rx_ok ? "OK" : "FAIL");
   return tx_ok && rx_ok;
 }
