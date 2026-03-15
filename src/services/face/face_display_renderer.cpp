@@ -2,6 +2,8 @@
 
 namespace {
 
+constexpr uint16_t kOrientationDotColor = 0xF800;
+
 bool requires_full_redraw(const ncos::services::face::FaceFrame& prev,
                           const ncos::services::face::FaceFrame& next) {
   return prev.background != next.background || prev.face_color != next.face_color ||
@@ -63,9 +65,14 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
   display_->fillRoundRect(right_eye_x, right_eye_y, frame.eye_w, frame.eye_h, frame.eye_corner,
                           frame.eye_color);
 
+  const int16_t orientation_x = static_cast<int16_t>(display_->width() / 2);
+  const int16_t orientation_y = static_cast<int16_t>(display_->height() - 8);
+  display_->fillCircle(orientation_x, orientation_y, 3, kOrientationDotColor);
+
   previous_frame_ = frame;
   has_previous_frame_ = true;
   return true;
 }
 
 }  // namespace ncos::services::face
+
