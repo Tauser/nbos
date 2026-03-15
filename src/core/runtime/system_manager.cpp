@@ -91,6 +91,7 @@ void SystemManager::tick(uint64_t now_ms) {
     return;
   }
 
+  check_tick_watchdog(now_ms);
   last_tick_ms_ = now_ms;
   scheduler_.tick(now_ms);
   event_bus_.drain(kBusDrainPerLane);
@@ -165,6 +166,19 @@ bool SystemManager::ingest_energetic_signal(
                                            now_ms);
 }
 
+void SystemManager::report_runtime_fault(FaultCode code,
+                                         const char* message,
+                                         uint64_t now_ms,
+                                         bool force_safe_mode) {
+  fault_history_.push(code, now_ms, message);
+  if (force_safe_mode) {
+    safe_mode_.enter(message);
+  }
+
+  refresh_health(now_ms);
+  sync_companion_state(now_ms);
+}
+
 void SystemManager::lifecycle_watchdog_task(void* context) {
   if (context == nullptr) {
     return;
@@ -201,6 +215,26 @@ void SystemManager::handle_lifecycle_fault() {
   safe_mode_.enter("lifecycle_faulted");
   refresh_health(last_tick_ms_);
   ESP_LOGW(kTag, "Lifecycle em faulted; safe mode ativado");
+}
+
+void SystemManager::check_tick_watchdog(uint64_t now_ms) {
+  if (config_ == nullptr || runtime_tick_fault_latched_ || last_tick_ms_ == 0) {
+    return;
+  }
+
+  const uint64_t elapsed = now_ms >= last_tick_ms_ ? (now_ms - last_tick_ms_) : 0;
+  if (elapsed <= config_->runtime.runtime_tick_watchdog_ms) {
+    return;
+  }
+
+  runtime_tick_fault_latched_ = true;
+  fault_history_.push(FaultCode::kRuntimeTickStallDetected,
+                      now_ms,
+                      "runtime tick watchdog stall detected");
+  safe_mode_.enter("runtime_tick_stall_detected");
+  refresh_health(now_ms);
+  ESP_LOGW(kTag, "Watchdog de tick detectou estagnacao: elapsed=%llu ms",
+           static_cast<unsigned long long>(elapsed));
 }
 
 void SystemManager::refresh_health(uint64_t now_ms) {

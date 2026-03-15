@@ -54,12 +54,14 @@ class SystemManager final {
                                    uint64_t now_ms);
   bool ingest_energetic_signal(const ncos::core::contracts::CompanionEnergeticSignal& signal,
                                uint64_t now_ms);
+  void report_runtime_fault(FaultCode code, const char* message, uint64_t now_ms, bool force_safe_mode);
 
  private:
   static void lifecycle_watchdog_task(void* context);
   static void diagnostics_heartbeat_task(void* context);
 
   void handle_lifecycle_fault();
+  void check_tick_watchdog(uint64_t now_ms);
   void refresh_health(uint64_t now_ms);
   void sync_companion_state(uint64_t now_ms);
 
@@ -76,6 +78,7 @@ class SystemManager final {
   Diagnostics diagnostics_{};
   uint64_t last_tick_ms_ = 0;
   bool lifecycle_fault_latched_ = false;
+  bool runtime_tick_fault_latched_ = false;
   bool companion_initialized_ = false;
   bool initialized_ = false;
   bool started_ = false;

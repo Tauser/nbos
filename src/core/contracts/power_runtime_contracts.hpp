@@ -12,6 +12,11 @@ struct PowerRuntimeState {
   bool sensor_backed = false;
   bool external_power = false;
 
+  bool electrical_guard_active = false;
+  bool thermal_guard_active = false;
+  bool electrical_guard_latched = false;
+  bool thermal_guard_latched = false;
+
   uint16_t battery_mv = 0;
   uint8_t battery_percent = 0;
   uint8_t thermal_load_percent = 0;
@@ -20,6 +25,8 @@ struct PowerRuntimeState {
   uint64_t last_update_ms = 0;
   uint32_t sample_success_total = 0;
   uint32_t sample_failure_total = 0;
+  uint8_t consecutive_sample_failures = 0;
+  uint32_t guard_trip_total = 0;
 };
 
 constexpr PowerRuntimeState make_power_runtime_baseline() {

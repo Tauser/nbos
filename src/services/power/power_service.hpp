@@ -22,7 +22,10 @@ class PowerService final {
  private:
   static ncos::core::contracts::EnergyMode choose_mode(const ncos::interfaces::power::PowerSampleRaw& sample,
                                                        uint8_t battery_percent,
-                                                       bool runtime_safe_mode);
+                                                       bool runtime_safe_mode,
+                                                       bool electrical_guard,
+                                                       bool thermal_guard,
+                                                       bool thermal_critical_guard);
 
   static constexpr uint16_t BatteryMinMv = 3300;
   static constexpr uint16_t BatteryMaxMv = 4200;

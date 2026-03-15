@@ -37,9 +37,7 @@ bool step_config_gate() {
   return true;
 }
 
-bool step_display() {
-  ESP_LOGI(kTag, "[2/8] Display bring-up");
-
+bool try_display_once() {
   struct DisplayTaskContext {
     TaskHandle_t caller;
     bool ok;
@@ -88,10 +86,39 @@ bool step_display() {
     return false;
   }
 
-  if (!ctx.ok) {
-    ESP_LOGE(kTag, "Display init falhou");
-  }
   return ctx.ok;
+}
+
+bool step_display() {
+  ESP_LOGI(kTag, "[2/8] Display bring-up");
+
+  uint8_t attempts = ncos::config::kGlobalConfig.runtime.boot_display_attempts;
+  if (attempts < 1) {
+    attempts = 1;
+  }
+  if (attempts > 3) {
+    attempts = 3;
+  }
+
+  for (uint8_t attempt = 1; attempt <= attempts; ++attempt) {
+    const bool ok = try_display_once();
+    if (ok) {
+      if (attempt > 1) {
+        ESP_LOGW(kTag, "Display estabilizou apos retry %u/%u", static_cast<unsigned>(attempt),
+                 static_cast<unsigned>(attempts));
+      }
+      return true;
+    }
+
+    ESP_LOGW(kTag, "Display falhou na tentativa %u/%u", static_cast<unsigned>(attempt),
+             static_cast<unsigned>(attempts));
+    if (attempt < attempts) {
+      vTaskDelay(pdMS_TO_TICKS(120));
+    }
+  }
+
+  ESP_LOGE(kTag, "Display esgotou retries de boot");
+  return false;
 }
 
 bool step_audio() {

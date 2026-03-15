@@ -12,8 +12,8 @@
 #include "core/contracts/routine_runtime_contracts.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
-#include "drivers/imu/imu_local_port.hpp"
 #include "drivers/camera/camera_local_port.hpp"
+#include "drivers/imu/imu_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
 #include "drivers/power/power_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
@@ -155,6 +155,11 @@ void FirmwareEntrypoint::run() {
 
   lifecycle_.finish_boot(report.has_required_failures, report.has_warnings);
   ESP_LOGI(Tag, "Lifecycle apos boot: %s", lifecycle_.state_name());
+
+  if (report.has_required_failures) {
+    ESP_LOGE(Tag, "Boot com falha obrigatoria; runtime nao sera iniciado");
+    return;
+  }
 
   if (!system_manager_.initialize(&lifecycle_, &ncos::config::kGlobalConfig)) {
     ESP_LOGE(Tag, "Falha ao inicializar SystemManager");
@@ -305,6 +310,25 @@ void FirmwareEntrypoint::tick() {
     (void)system_manager_.ingest_energetic_signal(energetic_signal, now);
   }
 
+  const ncos::core::contracts::PowerRuntimeState& power_state = power_service_.state();
+  if (power_state.electrical_guard_latched && !power_electrical_fault_reported_) {
+    power_electrical_fault_reported_ = true;
+    system_manager_.report_runtime_fault(ncos::core::runtime::FaultCode::kPowerElectricalGuardTripped,
+                                         "power_electrical_guard_tripped",
+                                         now,
+                                         true);
+  }
+
+  if (power_state.thermal_guard_latched && !power_thermal_fault_reported_) {
+    power_thermal_fault_reported_ = true;
+    const bool thermal_is_critical =
+        power_state.mode == ncos::core::contracts::EnergyMode::kCritical;
+    system_manager_.report_runtime_fault(ncos::core::runtime::FaultCode::kPowerThermalGuardTripped,
+                                         "power_thermal_guard_tripped",
+                                         now,
+                                         thermal_is_critical);
+  }
+
   const ncos::core::contracts::CompanionSnapshot face_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kFaceService);
   const ncos::core::contracts::FaceMultimodalInput face_multimodal =
@@ -322,6 +346,7 @@ void FirmwareEntrypoint::tick() {
 
   led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
 }
+
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {
   return lifecycle_;
 }

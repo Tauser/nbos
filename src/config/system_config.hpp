@@ -9,13 +9,19 @@ namespace ncos::config {
 
 struct RuntimeConfig {
   uint32_t lifecycle_watchdog_ms = 1000;
+  uint32_t runtime_tick_watchdog_ms = 2600;
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
+  uint8_t boot_display_attempts = 2;
   uint32_t audio_probe_interval_ms = 1500;
   uint32_t touch_probe_interval_ms = 120;
   uint32_t imu_probe_interval_ms = 100;
   uint32_t camera_probe_interval_ms = 700;
   uint32_t power_probe_interval_ms = 1800;
+  uint16_t power_guard_brownout_mv = 3380;
+  uint8_t power_guard_thermal_constrained_percent = 75;
+  uint8_t power_guard_thermal_critical_percent = 90;
+  uint8_t power_guard_sample_failure_limit = 3;
   uint32_t led_refresh_interval_ms = 120;
 };
 
@@ -44,12 +50,18 @@ constexpr RuntimeConfig make_runtime_config() {
   RuntimeConfig cfg{};
 
   if (detect_build_profile() == BuildProfile::kProd) {
+    cfg.runtime_tick_watchdog_ms = 3200;
     cfg.diagnostics_heartbeat_ms = 5000;
+    cfg.boot_display_attempts = 3;
     cfg.audio_probe_interval_ms = 2000;
     cfg.touch_probe_interval_ms = 160;
     cfg.imu_probe_interval_ms = 140;
     cfg.camera_probe_interval_ms = 1000;
     cfg.power_probe_interval_ms = 2600;
+    cfg.power_guard_brownout_mv = 3360;
+    cfg.power_guard_thermal_constrained_percent = 78;
+    cfg.power_guard_thermal_critical_percent = 92;
+    cfg.power_guard_sample_failure_limit = 4;
     cfg.led_refresh_interval_ms = 180;
   }
 

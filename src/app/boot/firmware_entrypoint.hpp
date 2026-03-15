@@ -42,6 +42,8 @@ class FirmwareEntrypoint final {
   ncos::services::motion::MotionService motion_service_{};
   ncos::services::led::LedService led_service_{};
   ncos::services::face::FaceService face_service_{};
+  bool power_electrical_fault_reported_ = false;
+  bool power_thermal_fault_reported_ = false;
 };
 
 }  // namespace ncos::app::boot

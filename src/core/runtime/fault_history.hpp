@@ -10,6 +10,9 @@ enum class FaultCode : uint8_t {
   kLifecycleFaulted = 1,
   kLifecycleWatchdogRegistrationFailed = 2,
   kDiagnosticsTaskRegistrationFailed = 3,
+  kRuntimeTickStallDetected = 4,
+  kPowerElectricalGuardTripped = 5,
+  kPowerThermalGuardTripped = 6,
 };
 
 struct FaultEvent {
