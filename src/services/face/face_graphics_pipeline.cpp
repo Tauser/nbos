@@ -52,7 +52,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
     return false;
   }
 
-  if (!apply_face_preset(exploratory_preset_, &state_, now_ms)) {
+  if (!apply_official_face_preset(official_preset_, &state_, now_ms)) {
     return false;
   }
 
@@ -131,3 +131,4 @@ bool FaceGraphicsPipeline::initialized() const {
 }
 
 }  // namespace ncos::services::face
+

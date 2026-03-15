@@ -7,6 +7,8 @@ using ncos::models::face::FaceShapeProfile;
 using ncos::models::face::GazeAnchor;
 using ncos::models::face::GazeDirection;
 using ncos::services::face::FaceExploratoryPresetId;
+using ncos::services::face::FaceOfficialPresetId;
+using ncos::services::face::FaceOfficialPresetSpec;
 using ncos::services::face::FacePresetSpec;
 using ncos::services::face::FaceReadabilityTier;
 
@@ -141,7 +143,51 @@ constexpr FacePresetSpec kPresetLibrary[] = {
     },
 };
 
+constexpr FaceOfficialPresetSpec kOfficialPresetLibrary[] = {
+    {
+        FaceOfficialPresetId::kCoreNeutral,
+        FaceExploratoryPresetId::kClarityNeutral,
+        "core_neutral",
+        FaceReadabilityTier::kTierAImmediate,
+        true,
+        "frozen after stable baseline behavior with compositor ownership and clip recovery",
+    },
+    {
+        FaceOfficialPresetId::kCoreAttend,
+        FaceExploratoryPresetId::kFocusedAttend,
+        "core_attend",
+        FaceReadabilityTier::kTierAImmediate,
+        true,
+        "frozen for strong attentional signal under gaze/clip coexistence",
+    },
+    {
+        FaceOfficialPresetId::kCoreCalm,
+        FaceExploratoryPresetId::kCalmLowPower,
+        "core_calm",
+        FaceReadabilityTier::kTierBBalanced,
+        true,
+        "frozen for low-energy readability without destabilizing clip or transient space",
+    },
+    {
+        FaceOfficialPresetId::kCoreCurious,
+        FaceExploratoryPresetId::kCuriousObserve,
+        "core_curious",
+        FaceReadabilityTier::kTierBBalanced,
+        true,
+        "frozen for curiosity signature preserving compositional legibility",
+    },
+    {
+        FaceOfficialPresetId::kCoreLock,
+        FaceExploratoryPresetId::kAttentiveLock,
+        "core_lock",
+        FaceReadabilityTier::kTierCNuanced,
+        true,
+        "frozen as high-intent state validated against clip preemption and recovery",
+    },
+};
+
 constexpr size_t kPresetCount = sizeof(kPresetLibrary) / sizeof(kPresetLibrary[0]);
+constexpr size_t kOfficialPresetCount = sizeof(kOfficialPresetLibrary) / sizeof(kOfficialPresetLibrary[0]);
 
 uint8_t clamp_percent(uint8_t value) {
   return value > 100 ? 100 : value;
@@ -199,6 +245,34 @@ bool apply_face_preset(FaceExploratoryPresetId id,
   ++state->revision;
 
   return ncos::core::contracts::is_valid(*state);
+}
+
+size_t face_official_preset_library_count() {
+  return kOfficialPresetCount;
+}
+
+const FaceOfficialPresetSpec* face_official_preset_library_items() {
+  return kOfficialPresetLibrary;
+}
+
+const FaceOfficialPresetSpec* find_official_face_preset(FaceOfficialPresetId id) {
+  for (size_t i = 0; i < kOfficialPresetCount; ++i) {
+    if (kOfficialPresetLibrary[i].id == id) {
+      return &kOfficialPresetLibrary[i];
+    }
+  }
+  return nullptr;
+}
+
+bool apply_official_face_preset(FaceOfficialPresetId id,
+                                ncos::core::contracts::FaceRenderState* state,
+                                uint64_t now_ms) {
+  const FaceOfficialPresetSpec* spec = find_official_face_preset(id);
+  if (spec == nullptr || !spec->frozen_for_release) {
+    return false;
+  }
+
+  return apply_face_preset(spec->source, state, now_ms);
 }
 
 }  // namespace ncos::services::face

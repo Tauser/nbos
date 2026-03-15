@@ -92,6 +92,48 @@ void test_face_preset_library_supports_new_exploratory_entries() {
                         static_cast<int>(idle->readability_tier));
 }
 
+void test_face_official_preset_library_is_frozen_and_tiered() {
+  const size_t count = ncos::services::face::face_official_preset_library_count();
+  TEST_ASSERT_TRUE(count >= 5);
+
+  bool tier_a = false;
+  bool tier_b = false;
+  bool tier_c = false;
+
+  const auto* items = ncos::services::face::face_official_preset_library_items();
+  TEST_ASSERT_NOT_NULL(items);
+
+  for (size_t i = 0; i < count; ++i) {
+    TEST_ASSERT_TRUE(items[i].frozen_for_release);
+    TEST_ASSERT_TRUE(items[i].name != nullptr && items[i].name[0] != '\0');
+    TEST_ASSERT_TRUE(items[i].freeze_reason != nullptr && items[i].freeze_reason[0] != '\0');
+
+    if (items[i].readability_tier == ncos::services::face::FaceReadabilityTier::kTierAImmediate) {
+      tier_a = true;
+    } else if (items[i].readability_tier == ncos::services::face::FaceReadabilityTier::kTierBBalanced) {
+      tier_b = true;
+    } else if (items[i].readability_tier == ncos::services::face::FaceReadabilityTier::kTierCNuanced) {
+      tier_c = true;
+    }
+  }
+
+  TEST_ASSERT_TRUE(tier_a);
+  TEST_ASSERT_TRUE(tier_b);
+  TEST_ASSERT_TRUE(tier_c);
+}
+
+void test_face_official_preset_application_uses_frozen_source() {
+  auto state = ncos::core::contracts::make_face_render_state_baseline();
+
+  TEST_ASSERT_TRUE(ncos::services::face::apply_official_face_preset(
+      ncos::services::face::FaceOfficialPresetId::kCoreLock, &state, 3300));
+
+  TEST_ASSERT_TRUE(ncos::core::contracts::is_valid(state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeAnchor::kUser),
+                        static_cast<int>(state.eyes.anchor));
+  TEST_ASSERT_TRUE(state.eyes.focus_percent >= 80);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_preset_library_has_exploratory_catalog);
@@ -99,5 +141,7 @@ int main() {
   RUN_TEST(test_face_preset_library_applies_preset_to_render_state);
   RUN_TEST(test_face_preset_library_keeps_contrast_between_tiers);
   RUN_TEST(test_face_preset_library_supports_new_exploratory_entries);
+  RUN_TEST(test_face_official_preset_library_is_frozen_and_tiered);
+  RUN_TEST(test_face_official_preset_application_uses_frozen_source);
   return UNITY_END();
 }

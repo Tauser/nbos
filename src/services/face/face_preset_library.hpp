@@ -24,6 +24,14 @@ enum class FaceExploratoryPresetId : uint8_t {
   kIdleDrift = 8,
 };
 
+enum class FaceOfficialPresetId : uint8_t {
+  kCoreNeutral = 1,
+  kCoreAttend = 2,
+  kCoreCalm = 3,
+  kCoreCurious = 4,
+  kCoreLock = 5,
+};
+
 struct FacePresetSpec {
   FaceExploratoryPresetId id = FaceExploratoryPresetId::kClarityNeutral;
   const char* name = "";
@@ -47,11 +55,27 @@ struct FacePresetSpec {
   const char* contrast_note = "";
 };
 
+struct FaceOfficialPresetSpec {
+  FaceOfficialPresetId id = FaceOfficialPresetId::kCoreNeutral;
+  FaceExploratoryPresetId source = FaceExploratoryPresetId::kClarityNeutral;
+  const char* name = "";
+  FaceReadabilityTier readability_tier = FaceReadabilityTier::kTierAImmediate;
+  bool frozen_for_release = true;
+  const char* freeze_reason = "";
+};
+
 size_t face_preset_library_count();
 const FacePresetSpec* face_preset_library_items();
 const FacePresetSpec* find_face_preset(FaceExploratoryPresetId id);
 bool apply_face_preset(FaceExploratoryPresetId id,
                        ncos::core::contracts::FaceRenderState* state,
                        uint64_t now_ms);
+
+size_t face_official_preset_library_count();
+const FaceOfficialPresetSpec* face_official_preset_library_items();
+const FaceOfficialPresetSpec* find_official_face_preset(FaceOfficialPresetId id);
+bool apply_official_face_preset(FaceOfficialPresetId id,
+                                ncos::core::contracts::FaceRenderState* state,
+                                uint64_t now_ms);
 
 }  // namespace ncos::services::face

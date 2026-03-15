@@ -31,7 +31,7 @@ class FaceGraphicsPipeline final {
   bool gaze_left_ = false;
 
   ncos::core::contracts::FaceRenderState state_{};
-  FaceExploratoryPresetId exploratory_preset_ = FaceExploratoryPresetId::kClarityNeutral;
+  FaceOfficialPresetId official_preset_ = FaceOfficialPresetId::kCoreNeutral;
   FaceCompositor compositor_{};
   FaceClipPlayer clip_player_{kClipOwnerServiceId};
   FaceGazeController gaze_controller_{kGazeOwnerServiceId};
@@ -40,3 +40,4 @@ class FaceGraphicsPipeline final {
 };
 
 }  // namespace ncos::services::face
+
