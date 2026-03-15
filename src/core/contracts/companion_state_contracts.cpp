@@ -1,5 +1,55 @@
 #include "core/contracts/companion_state_contracts.hpp"
 
+namespace {
+
+ncos::models::emotion::EmotionVector legacy_vector_from_tone(
+    ncos::core::contracts::EmotionalTone tone,
+    ncos::core::contracts::EmotionalArousal arousal,
+    uint8_t intensity_percent) {
+  ncos::models::emotion::EmotionVector vector{};
+
+  switch (tone) {
+    case ncos::core::contracts::EmotionalTone::kAlert:
+      vector.valence_percent = -20;
+      vector.social_engagement_percent = 35;
+      break;
+    case ncos::core::contracts::EmotionalTone::kAffiliative:
+      vector.valence_percent = 40;
+      vector.social_engagement_percent = 78;
+      break;
+    case ncos::core::contracts::EmotionalTone::kCurious:
+      vector.valence_percent = 10;
+      vector.social_engagement_percent = 58;
+      break;
+    case ncos::core::contracts::EmotionalTone::kNeutral:
+    default:
+      vector.valence_percent = 0;
+      vector.social_engagement_percent = 45;
+      break;
+  }
+
+  switch (arousal) {
+    case ncos::core::contracts::EmotionalArousal::kHigh:
+      vector.arousal_percent = 82;
+      break;
+    case ncos::core::contracts::EmotionalArousal::kMedium:
+      vector.arousal_percent = 52;
+      break;
+    case ncos::core::contracts::EmotionalArousal::kLow:
+    default:
+      vector.arousal_percent = 22;
+      break;
+  }
+
+  const uint8_t weighted_intensity = ncos::models::emotion::clamp_percent(intensity_percent / 3U);
+  vector.arousal_percent = ncos::models::emotion::clamp_percent(
+      static_cast<int16_t>(vector.arousal_percent + weighted_intensity));
+
+  return ncos::models::emotion::normalize_vector(vector);
+}
+
+}  // namespace
+
 namespace ncos::core::contracts {
 
 GovernanceHealth evaluate_governance_health(uint32_t allowed_total, uint32_t preempted_total,
@@ -14,6 +64,59 @@ GovernanceHealth evaluate_governance_health(uint32_t allowed_total, uint32_t pre
   }
 
   return GovernanceHealth::kStable;
+}
+
+EmotionalTone tone_from_emotion_model(const ncos::models::emotion::EmotionModelState& model) {
+  const auto& vector = model.vector;
+
+  if (vector.arousal_percent >= 70 && vector.valence_percent <= 0) {
+    return EmotionalTone::kAlert;
+  }
+
+  if (vector.social_engagement_percent >= 62 && vector.valence_percent >= 15) {
+    return EmotionalTone::kAffiliative;
+  }
+
+  if (vector.arousal_percent >= 34 || (vector.valence_percent > -18 && vector.valence_percent < 18)) {
+    return EmotionalTone::kCurious;
+  }
+
+  return EmotionalTone::kNeutral;
+}
+
+EmotionalArousal arousal_from_emotion_model(const ncos::models::emotion::EmotionModelState& model) {
+  if (model.vector.arousal_percent >= 70) {
+    return EmotionalArousal::kHigh;
+  }
+
+  if (model.vector.arousal_percent >= 35) {
+    return EmotionalArousal::kMedium;
+  }
+
+  return EmotionalArousal::kLow;
+}
+
+CompanionEmotionalSignal normalize_emotional_signal(const CompanionEmotionalSignal& signal) {
+  CompanionEmotionalSignal out = signal;
+
+  ncos::models::emotion::EmotionModelState model{};
+  model.intensity_percent = ncos::models::emotion::clamp_percent(signal.intensity_percent);
+  model.stability_percent = ncos::models::emotion::clamp_percent(signal.stability_percent);
+
+  if (signal.vector_authoritative) {
+    model.vector = ncos::models::emotion::normalize_vector(signal.vector);
+  } else {
+    model.vector = legacy_vector_from_tone(signal.tone, signal.arousal, model.intensity_percent);
+  }
+
+  model = ncos::models::emotion::normalize_model(model);
+
+  out.vector = model.vector;
+  out.tone = tone_from_emotion_model(model);
+  out.arousal = arousal_from_emotion_model(model);
+  out.intensity_percent = model.intensity_percent;
+  out.stability_percent = model.stability_percent;
+  return out;
 }
 
 bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain domain) {

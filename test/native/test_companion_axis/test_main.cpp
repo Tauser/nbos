@@ -96,6 +96,10 @@ void test_companion_axis_maps_reaction_to_emotional_state() {
   const auto snapshot = state.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalTone::kAffiliative),
                         static_cast<int>(snapshot.emotional.tone));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::emotion::EmotionPhase::kEngaged),
+                        static_cast<int>(snapshot.emotional.phase));
+  TEST_ASSERT_EQUAL_INT8(42, snapshot.emotional.vector.valence_percent);
+  TEST_ASSERT_EQUAL_UINT8(76, snapshot.emotional.vector.social_engagement_percent);
 }
 
 int main() {
@@ -105,4 +109,3 @@ int main() {
   RUN_TEST(test_companion_axis_maps_reaction_to_emotional_state);
   return UNITY_END();
 }
-

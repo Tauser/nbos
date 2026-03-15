@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "core/contracts/action_governance_contracts.hpp"
+#include "models/emotion/emotion_model.hpp"
 
 namespace ncos::core::contracts {
 
@@ -130,6 +131,8 @@ struct CompanionGovernanceState {
 struct CompanionEmotionalState {
   EmotionalTone tone = EmotionalTone::kNeutral;
   EmotionalArousal arousal = EmotionalArousal::kLow;
+  ncos::models::emotion::EmotionVector vector{};
+  ncos::models::emotion::EmotionPhase phase = ncos::models::emotion::EmotionPhase::kBaseline;
   uint8_t intensity_percent = 0;
   uint8_t stability_percent = 100;
 };
@@ -182,6 +185,8 @@ struct CompanionRuntimeSignal {
 struct CompanionEmotionalSignal {
   EmotionalTone tone = EmotionalTone::kNeutral;
   EmotionalArousal arousal = EmotionalArousal::kLow;
+  ncos::models::emotion::EmotionVector vector{};
+  bool vector_authoritative = false;
   uint8_t intensity_percent = 0;
   uint8_t stability_percent = 100;
 };
@@ -213,5 +218,9 @@ bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain 
 bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain domain);
 CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
                                              CompanionStateReader reader);
+
+CompanionEmotionalSignal normalize_emotional_signal(const CompanionEmotionalSignal& signal);
+EmotionalTone tone_from_emotion_model(const ncos::models::emotion::EmotionModelState& model);
+EmotionalArousal arousal_from_emotion_model(const ncos::models::emotion::EmotionModelState& model);
 
 }  // namespace ncos::core::contracts

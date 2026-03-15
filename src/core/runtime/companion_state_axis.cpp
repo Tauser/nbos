@@ -148,18 +148,25 @@ void CompanionStateAxis::handle_intent(const ncos::core::contracts::IntentMessag
 
 void CompanionStateAxis::handle_reaction(const ncos::core::contracts::ReactionMessage& message) {
   ncos::core::contracts::CompanionEmotionalSignal emotional{};
+  emotional.vector_authoritative = true;
 
   switch (message.topic) {
     case ncos::core::contracts::ReactionTopic::kLedFeedbackPulse:
       emotional.tone = ncos::core::contracts::EmotionalTone::kAlert;
       emotional.arousal = ncos::core::contracts::EmotionalArousal::kMedium;
       emotional.intensity_percent = 55;
+      emotional.vector.valence_percent = -18;
+      emotional.vector.arousal_percent = 72;
+      emotional.vector.social_engagement_percent = 38;
       emotional.stability_percent = 70;
       break;
     case ncos::core::contracts::ReactionTopic::kEarconChirp:
       emotional.tone = ncos::core::contracts::EmotionalTone::kAffiliative;
       emotional.arousal = ncos::core::contracts::EmotionalArousal::kLow;
       emotional.intensity_percent = 35;
+      emotional.vector.valence_percent = 42;
+      emotional.vector.arousal_percent = 34;
+      emotional.vector.social_engagement_percent = 76;
       emotional.stability_percent = 80;
       break;
     case ncos::core::contracts::ReactionTopic::kBlinkPulse:
@@ -168,6 +175,9 @@ void CompanionStateAxis::handle_reaction(const ncos::core::contracts::ReactionMe
       emotional.tone = ncos::core::contracts::EmotionalTone::kCurious;
       emotional.arousal = ncos::core::contracts::EmotionalArousal::kLow;
       emotional.intensity_percent = 20;
+      emotional.vector.valence_percent = 12;
+      emotional.vector.arousal_percent = 28;
+      emotional.vector.social_engagement_percent = 58;
       emotional.stability_percent = 85;
       break;
   }

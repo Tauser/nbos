@@ -62,10 +62,21 @@ bool CompanionStateStore::ingest_emotional(
     return false;
   }
 
-  snapshot_.emotional.tone = emotional.tone;
-  snapshot_.emotional.arousal = emotional.arousal;
-  snapshot_.emotional.intensity_percent = emotional.intensity_percent;
-  snapshot_.emotional.stability_percent = emotional.stability_percent;
+  const ncos::core::contracts::CompanionEmotionalSignal normalized =
+      ncos::core::contracts::normalize_emotional_signal(emotional);
+
+  ncos::models::emotion::EmotionModelState emotion_model{};
+  emotion_model.vector = normalized.vector;
+  emotion_model.intensity_percent = normalized.intensity_percent;
+  emotion_model.stability_percent = normalized.stability_percent;
+  emotion_model = ncos::models::emotion::normalize_model(emotion_model);
+
+  snapshot_.emotional.tone = normalized.tone;
+  snapshot_.emotional.arousal = normalized.arousal;
+  snapshot_.emotional.vector = emotion_model.vector;
+  snapshot_.emotional.phase = emotion_model.phase;
+  snapshot_.emotional.intensity_percent = emotion_model.intensity_percent;
+  snapshot_.emotional.stability_percent = emotion_model.stability_percent;
 
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
@@ -178,3 +189,4 @@ bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateW
 }
 
 }  // namespace ncos::core::state
+

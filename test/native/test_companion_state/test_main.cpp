@@ -60,8 +60,37 @@ void test_companion_state_updates_emotional_domain() {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalTone::kCurious),
                         static_cast<int>(snap.emotional.tone));
   TEST_ASSERT_EQUAL_UINT8(62, snap.emotional.intensity_percent);
+  TEST_ASSERT_EQUAL_INT8(10, snap.emotional.vector.valence_percent);
+  TEST_ASSERT_EQUAL_UINT8(58, snap.emotional.vector.social_engagement_percent);
 }
 
+void test_companion_state_normalizes_authoritative_emotion_vector() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionEmotionalSignal emotional{};
+  emotional.vector_authoritative = true;
+  emotional.vector.valence_percent = 85;
+  emotional.vector.arousal_percent = 48;
+  emotional.vector.social_engagement_percent = 88;
+  emotional.intensity_percent = 64;
+  emotional.stability_percent = 76;
+
+  TEST_ASSERT_TRUE(
+      store.ingest_emotional(emotional, ncos::core::contracts::CompanionStateWriter::kEmotionService,
+                             1115));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalTone::kAffiliative),
+                        static_cast<int>(snap.emotional.tone));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalArousal::kMedium),
+                        static_cast<int>(snap.emotional.arousal));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::emotion::EmotionPhase::kEngaged),
+                        static_cast<int>(snap.emotional.phase));
+  TEST_ASSERT_EQUAL_INT8(85, snap.emotional.vector.valence_percent);
+  TEST_ASSERT_EQUAL_UINT8(48, snap.emotional.vector.arousal_percent);
+  TEST_ASSERT_EQUAL_UINT8(88, snap.emotional.vector.social_engagement_percent);
+}
 void test_companion_state_updates_attentional_and_interactional_link() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -181,6 +210,7 @@ int main() {
   RUN_TEST(test_companion_state_keeps_structural_source_of_truth);
   RUN_TEST(test_companion_state_rejects_unauthorized_write);
   RUN_TEST(test_companion_state_updates_emotional_domain);
+  RUN_TEST(test_companion_state_normalizes_authoritative_emotion_vector);
   RUN_TEST(test_companion_state_updates_attentional_and_interactional_link);
   RUN_TEST(test_companion_state_updates_energetic_domain);
   RUN_TEST(test_companion_state_runtime_safe_mode_constrains_interaction_and_energy);
@@ -188,3 +218,7 @@ int main() {
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }
+
+
+
+
