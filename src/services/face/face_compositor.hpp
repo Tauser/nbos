@@ -44,6 +44,10 @@ class FaceCompositor final {
   bool bind_state(ncos::core::contracts::FaceRenderState* state);
 
   FaceLayerDecision request_layer(const FaceLayerRequest& request, uint64_t now_ms);
+  bool release_layer(ncos::models::face::FaceLayer layer,
+                     uint16_t requester_service,
+                     uint64_t now_ms,
+                     uint32_t cooldown_ms = 0);
   bool can_write(ncos::models::face::FaceLayer layer, uint16_t requester_service) const;
   void tick(uint64_t now_ms);
 

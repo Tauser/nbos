@@ -120,6 +120,27 @@ void test_face_compositor_rejects_wrong_role_for_layer() {
                         static_cast<int>(decision.reason));
 }
 
+void test_face_compositor_release_layer_applies_self_cooldown() {
+  auto state = ncos::core::contracts::make_face_render_state_baseline();
+  ncos::services::face::FaceCompositor compositor{};
+  TEST_ASSERT_TRUE(compositor.bind_state(&state));
+
+  ncos::services::face::FaceLayerRequest claim{};
+  claim.layer = ncos::models::face::FaceLayer::kClip;
+  claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kClipOwner;
+  claim.requester_service = 33;
+  claim.priority = 8;
+
+  TEST_ASSERT_TRUE(compositor.request_layer(claim, 6000).granted);
+  TEST_ASSERT_TRUE(compositor.release_layer(ncos::models::face::FaceLayer::kClip, 33, 6200, 300));
+  TEST_ASSERT_FALSE(compositor.can_write(ncos::models::face::FaceLayer::kClip, 33));
+
+  const auto immediate = compositor.request_layer(claim, 6300);
+  TEST_ASSERT_FALSE(immediate.granted);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::services::face::FaceComposeRejectReason::kCooldownActive),
+                        static_cast<int>(immediate.reason));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_compositor_grants_initial_ownership_and_hold);
@@ -127,5 +148,6 @@ int main() {
   RUN_TEST(test_face_compositor_preempts_with_higher_priority_and_applies_cooldown);
   RUN_TEST(test_face_compositor_allows_parallel_ownership_across_layers);
   RUN_TEST(test_face_compositor_rejects_wrong_role_for_layer);
+  RUN_TEST(test_face_compositor_release_layer_applies_self_cooldown);
   return UNITY_END();
 }

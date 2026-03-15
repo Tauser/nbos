@@ -107,6 +107,41 @@ FaceLayerDecision FaceCompositor::request_layer(const FaceLayerRequest& request,
   return decision;
 }
 
+bool FaceCompositor::release_layer(ncos::models::face::FaceLayer layer,
+                                   uint16_t requester_service,
+                                   uint64_t now_ms,
+                                   uint32_t cooldown_ms) {
+  if (state_ == nullptr || !ncos::core::contracts::is_valid(*state_) || requester_service == 0) {
+    return false;
+  }
+
+  const size_t idx = ncos::models::face::face_layer_index(layer);
+  auto& current = state_->composition.layers[idx];
+  if (current.owner_service != requester_service) {
+    return false;
+  }
+
+  const auto policy = ncos::core::contracts::face_layer_policy(layer);
+  current.owner_service = 0;
+  current.priority = policy.default_priority;
+  current.source_clip_id = 0;
+
+  auto& runtime = runtime_[idx];
+  runtime.hold_until_ms = 0;
+  if (cooldown_ms > 0) {
+    runtime.cooldown_blocked_service = requester_service;
+    runtime.cooldown_until_ms = now_ms + cooldown_ms;
+  } else {
+    runtime.cooldown_blocked_service = 0;
+    runtime.cooldown_until_ms = 0;
+  }
+
+  state_->updated_at_ms = now_ms;
+  state_->owner_service = requester_service;
+  ++state_->revision;
+  return true;
+}
+
 bool FaceCompositor::can_write(ncos::models::face::FaceLayer layer, uint16_t requester_service) const {
   if (state_ == nullptr || requester_service == 0) {
     return false;
