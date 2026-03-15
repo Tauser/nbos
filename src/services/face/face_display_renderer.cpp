@@ -49,7 +49,6 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
                               frame.head_radius, frame.face_color);
     }
   } else {
-    // Erase only dynamic visual elements to keep frame stable and avoid full-screen flicker.
     erase_eye(display_, frame, previous_frame_.left_eye_x, previous_frame_.left_eye_y);
     erase_eye(display_, frame, previous_frame_.right_eye_x, previous_frame_.right_eye_y);
     display_->fillRoundRect(previous_frame_.mouth_x - 2, previous_frame_.mouth_y - 2,
@@ -67,13 +66,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
   display_->fillRoundRect(right_eye_x, right_eye_y, frame.eye_w, frame.eye_h, frame.eye_corner,
                           frame.eye_color);
 
-  if (frame.pupil_radius > 0) {
-    display_->fillCircle(frame.left_pupil_x, frame.left_pupil_y, frame.pupil_radius,
-                         frame.pupil_color);
-    display_->fillCircle(frame.right_pupil_x, frame.right_pupil_y, frame.pupil_radius,
-                         frame.pupil_color);
-  }
-
+  // EMO-like baseline: no visible pupils in default style.
   display_->fillRoundRect(frame.mouth_x, frame.mouth_y, frame.mouth_w, frame.mouth_h,
                           frame.mouth_corner, frame.mouth_color);
 

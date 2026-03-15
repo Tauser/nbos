@@ -31,10 +31,10 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
 
   FaceFrame frame{};
   frame.background = 0x0000;   // black
-  frame.face_color = 0x0000;   // EMO-inspired mask blends with background
-  frame.eye_color = 0xFFFF;    // white eyes
-  frame.pupil_color = 0x0000;  // black pupils
-  frame.mouth_color = 0xFFFF;  // white mouth
+  frame.face_color = 0x0000;   // hidden mask (EMO-like face window)
+  frame.eye_color = 0x061F;    // cyan
+  frame.pupil_color = 0x0000;  // disabled in this style
+  frame.mouth_color = 0x04FF;  // softer cyan
 
   frame.head_w = layout.head_w;
   frame.head_h = layout.head_h;
@@ -42,25 +42,20 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
   frame.head_x = static_cast<int16_t>(layout.center_x - layout.head_w / 2);
   frame.head_y = static_cast<int16_t>(layout.center_y - layout.head_h / 2);
 
-  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2);
-  frame.left_eye_y = layout.eye_line_y;
-  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2);
-  frame.right_eye_y = layout.eye_line_y;
+  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2 + layout.gaze_dx);
+  frame.left_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy);
+  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2 + layout.gaze_dx);
+  frame.right_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy);
   frame.eye_radius = layout.eye_radius;
   frame.eye_w = layout.eye_w;
   frame.eye_h = layout.eye_h;
   frame.eye_corner = clamp_i16_frame(layout.eye_h / 2, 1, 14);
 
-  const int16_t max_pupil_dx = clamp_i16_frame(layout.eye_w / 2 - layout.pupil_radius - 2, 0, 16);
-  const int16_t max_pupil_dy = clamp_i16_frame(layout.eye_h / 2 - layout.pupil_radius - 2, 0, 12);
-  const int16_t pupil_dx = clamp_i16_frame(layout.pupil_dx, -max_pupil_dx, max_pupil_dx);
-  const int16_t pupil_dy = clamp_i16_frame(layout.pupil_dy, -max_pupil_dy, max_pupil_dy);
-
-  frame.left_pupil_x = static_cast<int16_t>(frame.left_eye_x + pupil_dx);
-  frame.left_pupil_y = static_cast<int16_t>(frame.left_eye_y + pupil_dy);
-  frame.right_pupil_x = static_cast<int16_t>(frame.right_eye_x + pupil_dx);
-  frame.right_pupil_y = static_cast<int16_t>(frame.right_eye_y + pupil_dy);
-  frame.pupil_radius = layout.eye_h <= 4 ? 0 : layout.pupil_radius;
+  frame.left_pupil_x = frame.left_eye_x;
+  frame.left_pupil_y = frame.left_eye_y;
+  frame.right_pupil_x = frame.right_eye_x;
+  frame.right_pupil_y = frame.right_eye_y;
+  frame.pupil_radius = 0;
 
   frame.mouth_w = layout.mouth_w;
   frame.mouth_h = layout.mouth_h;

@@ -17,11 +17,11 @@ int16_t gaze_dx(ncos::models::face::GazeDirection direction) {
     case ncos::models::face::GazeDirection::kLeft:
     case ncos::models::face::GazeDirection::kUpLeft:
     case ncos::models::face::GazeDirection::kDownLeft:
-      return -6;
+      return -10;
     case ncos::models::face::GazeDirection::kRight:
     case ncos::models::face::GazeDirection::kUpRight:
     case ncos::models::face::GazeDirection::kDownRight:
-      return 6;
+      return 10;
     default:
       return 0;
   }
@@ -32,11 +32,11 @@ int16_t gaze_dy(ncos::models::face::GazeDirection direction) {
     case ncos::models::face::GazeDirection::kUp:
     case ncos::models::face::GazeDirection::kUpLeft:
     case ncos::models::face::GazeDirection::kUpRight:
-      return -4;
+      return -6;
     case ncos::models::face::GazeDirection::kDown:
     case ncos::models::face::GazeDirection::kDownLeft:
     case ncos::models::face::GazeDirection::kDownRight:
-      return 4;
+      return 6;
     default:
       return 0;
   }
@@ -70,30 +70,29 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
       clamp_i16(112 + (static_cast<int32_t>(state.geometry.eye_line_height_percent) - 50) / 2, 92, 132);
 
   const int16_t base_eye_radius =
-      clamp_i16(12 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 4, 8, 18);
+      clamp_i16(11 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 6, 7, 14);
   const uint8_t openness = state.lids.openness_percent;
-  layout.eye_radius = openness > 80 ? base_eye_radius : (openness > 40 ? base_eye_radius / 2 : 3);
+  layout.eye_radius = openness > 80 ? base_eye_radius : (openness > 40 ? base_eye_radius / 2 : 2);
 
-  layout.eye_w = clamp_i16(30 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 2, 24, 42);
-  const int16_t base_eye_h = clamp_i16(22 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 3,
-                                       16, 30);
-  layout.eye_h = clamp_i16(base_eye_h * static_cast<int32_t>(openness) / 100, 3, base_eye_h);
+  layout.eye_w = clamp_i16(28 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 2, 22, 38);
+  const int16_t base_eye_h = clamp_i16(12 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 4,
+                                       8, 18);
+  layout.eye_h = clamp_i16(base_eye_h * static_cast<int32_t>(openness) / 100, 2, base_eye_h);
 
-  layout.pupil_dx = gaze_dx(state.eyes.direction);
-  layout.pupil_dy = gaze_dy(state.eyes.direction);
-  layout.pupil_radius = clamp_i16(layout.eye_h / 4 + 2, 2, 7);
+  layout.gaze_dx = gaze_dx(state.eyes.direction);
+  layout.gaze_dy = gaze_dy(state.eyes.direction);
 
   layout.mouth_w =
-      clamp_i16(52 + (static_cast<int32_t>(state.geometry.mouth_width_percent) - 50) / 2, 34, 74);
+      clamp_i16(36 + (static_cast<int32_t>(state.geometry.mouth_width_percent) - 50) / 3, 24, 52);
 
   const int16_t mouth_base_h =
-      clamp_i16(3 + (static_cast<int32_t>(state.geometry.mouth_height_percent) - 50) / 10, 2, 6);
+      clamp_i16(2 + (static_cast<int32_t>(state.geometry.mouth_height_percent) - 50) / 16, 1, 4);
   layout.mouth_h = state.mouth.openness_percent > 25
-                       ? clamp_i16(mouth_base_h + 3, 4, 10)
+                       ? clamp_i16(mouth_base_h + 2, 2, 6)
                        : mouth_base_h;
 
   layout.mouth_y =
-      clamp_i16(178 + (50 - static_cast<int32_t>(state.geometry.brow_height_percent)) / 3, 156, 194);
+      clamp_i16(180 + (50 - static_cast<int32_t>(state.geometry.brow_height_percent)) / 4, 164, 196);
 
   *out_layout = layout;
   return true;

@@ -18,9 +18,8 @@ struct FaceGeometryLayout {
   int16_t eye_w = 34;
   int16_t eye_h = 24;
 
-  int16_t pupil_dx = 0;
-  int16_t pupil_dy = 0;
-  int16_t pupil_radius = 6;
+  int16_t gaze_dx = 0;
+  int16_t gaze_dy = 0;
 
   int16_t mouth_w = 52;
   int16_t mouth_h = 4;

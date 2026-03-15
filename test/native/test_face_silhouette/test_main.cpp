@@ -24,10 +24,10 @@ struct FrozenSilhouetteFrame {
 };
 
 constexpr FrozenSilhouetteFrame kFrozenFrames[] = {
-    {ncos::models::face::FaceShapeProfile::kCompanionBalanced, 145, 149, 20, 56, 52, 177},
-    {ncos::models::face::FaceShapeProfile::kHeroicWide, 156, 134, 15, 62, 58, 178},
-    {ncos::models::face::FaceShapeProfile::kCuriousTall, 139, 152, 18, 52, 49, 174},
-    {ncos::models::face::FaceShapeProfile::kPlayfulRound, 147, 151, 24, 54, 55, 176},
+    {ncos::models::face::FaceShapeProfile::kCompanionBalanced, 145, 149, 20, 56, 36, 179},
+    {ncos::models::face::FaceShapeProfile::kHeroicWide, 156, 134, 15, 62, 40, 180},
+    {ncos::models::face::FaceShapeProfile::kCuriousTall, 139, 152, 18, 52, 34, 177},
+    {ncos::models::face::FaceShapeProfile::kPlayfulRound, 147, 151, 24, 54, 38, 179},
 };
 
 ncos::services::face::FaceFrame compose_profile(ncos::models::face::FaceShapeProfile profile) {
