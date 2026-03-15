@@ -13,6 +13,11 @@ struct RuntimeConfig {
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
   uint8_t boot_display_attempts = 2;
+
+  bool ota_enabled = false;
+  bool ota_remote_allowed = false;
+  uint32_t ota_confirm_uptime_ms = 12000;
+
   uint32_t audio_probe_interval_ms = 1500;
   uint32_t touch_probe_interval_ms = 120;
   uint32_t imu_probe_interval_ms = 100;
@@ -53,6 +58,11 @@ constexpr RuntimeConfig make_runtime_config() {
     cfg.runtime_tick_watchdog_ms = 3200;
     cfg.diagnostics_heartbeat_ms = 5000;
     cfg.boot_display_attempts = 3;
+
+    cfg.ota_enabled = true;
+    cfg.ota_remote_allowed = false;
+    cfg.ota_confirm_uptime_ms = 18000;
+
     cfg.audio_probe_interval_ms = 2000;
     cfg.touch_probe_interval_ms = 160;
     cfg.imu_probe_interval_ms = 140;

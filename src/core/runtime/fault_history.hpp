@@ -13,6 +13,8 @@ enum class FaultCode : uint8_t {
   kRuntimeTickStallDetected = 4,
   kPowerElectricalGuardTripped = 5,
   kPowerThermalGuardTripped = 6,
+  kOtaPolicyBlockedUnsafe = 7,
+  kOtaConfirmTimeoutFallback = 8,
 };
 
 struct FaultEvent {

@@ -18,6 +18,7 @@
 #include "drivers/power/power_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
+#include "drivers/update/update_local_port.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -29,6 +30,7 @@ constexpr uint16_t EmotionServiceId = 63;
 constexpr uint16_t VoiceServiceId = 64;
 constexpr uint16_t PerceptionServiceId = 65;
 constexpr uint16_t PowerServiceId = 66;
+constexpr uint16_t UpdateServiceId = 67;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -215,6 +217,20 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "PowerService iniciou em estado degradado");
   }
 
+  update_service_.bind_port(ncos::drivers::update::acquire_shared_update_port());
+  if (!update_service_.initialize(UpdateServiceId, now, ncos::config::kGlobalConfig.runtime)) {
+    ESP_LOGW(Tag, "UpdateService iniciou em estado degradado");
+  }
+
+  const ncos::core::contracts::UpdateDecision ota_boot = update_service_.evaluate_boot_policy(now);
+  if (ota_boot.valid && ota_boot.request_safe_fallback && !ota_fault_reported_) {
+    ota_fault_reported_ = true;
+    system_manager_.report_runtime_fault(ncos::core::runtime::FaultCode::kOtaPolicyBlockedUnsafe,
+                                         ota_boot.reason,
+                                         now,
+                                         true);
+  }
+
   motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
   if (!motion_service_.initialize(now)) {
     ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
@@ -327,6 +343,16 @@ void FirmwareEntrypoint::tick() {
                                          "power_thermal_guard_tripped",
                                          now,
                                          thermal_is_critical);
+  }
+
+  const ncos::core::contracts::UpdateDecision ota_tick =
+      update_service_.tick(now, system_manager_.status());
+  if (ota_tick.valid && ota_tick.request_safe_fallback && !ota_fallback_reported_) {
+    ota_fallback_reported_ = true;
+    system_manager_.report_runtime_fault(ncos::core::runtime::FaultCode::kOtaConfirmTimeoutFallback,
+                                         ota_tick.reason,
+                                         now,
+                                         true);
   }
 
   const ncos::core::contracts::CompanionSnapshot face_snapshot =
