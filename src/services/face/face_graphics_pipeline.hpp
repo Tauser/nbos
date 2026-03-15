@@ -1,27 +1,33 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
+#include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/face_render_state_contracts.hpp"
 #include "services/face/face_clip_player.hpp"
 #include "services/face/face_compositor.hpp"
 #include "services/face/face_display_renderer.hpp"
 #include "services/face/face_frame_composer.hpp"
 #include "services/face/face_gaze_controller.hpp"
+#include "services/face/face_multimodal_sync.hpp"
 #include "services/face/face_preset_library.hpp"
+#include "services/face/face_tooling.hpp"
 
 namespace ncos::services::face {
 
 class FaceGraphicsPipeline final {
  public:
   bool initialize(uint64_t now_ms);
-  void tick(uint64_t now_ms);
+  void tick(uint64_t now_ms, const ncos::core::contracts::FaceMultimodalInput& multimodal);
   bool initialized() const;
+  size_t export_preview_json(char* out_buffer, size_t out_buffer_size) const;
 
  private:
   static constexpr uint16_t kPresetOwnerServiceId = 31;
   static constexpr uint16_t kGazeOwnerServiceId = 32;
   static constexpr uint16_t kClipOwnerServiceId = 33;
+  static constexpr uint16_t kModulationOwnerServiceId = 34;
   static constexpr uint32_t kRenderPeriodMs = 120;
 
   bool initialized_ = false;
@@ -35,9 +41,10 @@ class FaceGraphicsPipeline final {
   FaceCompositor compositor_{};
   FaceClipPlayer clip_player_{kClipOwnerServiceId};
   FaceGazeController gaze_controller_{kGazeOwnerServiceId};
+  FaceMultimodalSync multimodal_sync_{};
+  FacePreviewSnapshot preview_snapshot_{};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};
 };
 
 }  // namespace ncos::services::face
-

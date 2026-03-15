@@ -66,6 +66,17 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
     return false;
   }
 
+  FaceLayerRequest modulation_request{};
+  modulation_request.layer = ncos::models::face::FaceLayer::kModulation;
+  modulation_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kModulationOwner;
+  modulation_request.requester_service = kModulationOwnerServiceId;
+  modulation_request.priority = 4;
+
+  if (!compositor_.request_layer(modulation_request, now_ms).granted) {
+    return false;
+  }
+
+  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms);
   next_render_ms_ = now_ms;
   next_gaze_target_ms_ = now_ms;
   next_clip_start_ms_ = now_ms + 3800;
@@ -73,7 +84,8 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   return true;
 }
 
-void FaceGraphicsPipeline::tick(uint64_t now_ms) {
+void FaceGraphicsPipeline::tick(uint64_t now_ms,
+                                const ncos::core::contracts::FaceMultimodalInput& multimodal) {
   if (!initialized_ || now_ms < next_render_ms_) {
     return;
   }
@@ -118,11 +130,14 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms) {
     (void)clip_player_.tick(now_ms, &compositor_, &state_);
   }
 
+  (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, kModulationOwnerServiceId, now_ms);
+
   FaceFrame frame{};
   if (composer_.compose(state_, &frame)) {
     (void)renderer_.render(frame);
   }
 
+  preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms);
   next_render_ms_ = now_ms + kRenderPeriodMs;
 }
 
@@ -130,5 +145,8 @@ bool FaceGraphicsPipeline::initialized() const {
   return initialized_;
 }
 
-}  // namespace ncos::services::face
+size_t FaceGraphicsPipeline::export_preview_json(char* out_buffer, size_t out_buffer_size) const {
+  return export_face_preview_json(preview_snapshot_, out_buffer, out_buffer_size);
+}
 
+}  // namespace ncos::services::face

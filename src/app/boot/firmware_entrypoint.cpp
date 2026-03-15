@@ -4,6 +4,7 @@
 
 #include "app/boot/boot_flow.hpp"
 #include "config/system_config.hpp"
+#include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
@@ -108,7 +109,11 @@ void FirmwareEntrypoint::tick() {
   imu_service_.tick(now);
   motion_service_.tick(now);
   led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
-  face_service_.tick(now);
+
+  const ncos::core::contracts::FaceMultimodalInput face_multimodal =
+      ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
+                                                        imu_service_.state(), now);
+  face_service_.tick(now, face_multimodal);
 }
 
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {
