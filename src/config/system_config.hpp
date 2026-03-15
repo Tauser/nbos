@@ -14,6 +14,7 @@ struct RuntimeConfig {
   uint32_t audio_probe_interval_ms = 1500;
   uint32_t touch_probe_interval_ms = 120;
   uint32_t imu_probe_interval_ms = 100;
+  uint32_t camera_probe_interval_ms = 700;
   uint32_t led_refresh_interval_ms = 120;
 };
 
@@ -46,6 +47,7 @@ constexpr RuntimeConfig make_runtime_config() {
     cfg.audio_probe_interval_ms = 2000;
     cfg.touch_probe_interval_ms = 160;
     cfg.imu_probe_interval_ms = 140;
+    cfg.camera_probe_interval_ms = 1000;
     cfg.led_refresh_interval_ms = 180;
   }
 
@@ -81,4 +83,5 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+
 

@@ -13,6 +13,7 @@
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
+#include "drivers/camera/camera_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
@@ -25,6 +26,7 @@ constexpr uint16_t BehaviorServiceId = 61;
 constexpr uint16_t RoutineServiceId = 62;
 constexpr uint16_t EmotionServiceId = 63;
 constexpr uint16_t VoiceServiceId = 64;
+constexpr uint16_t PerceptionServiceId = 65;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -202,6 +204,15 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "ImuService iniciou em estado degradado");
   }
 
+  camera_service_.bind_port(ncos::drivers::camera::acquire_shared_camera_port());
+  if (!camera_service_.initialize(now)) {
+    ESP_LOGW(Tag, "CameraService iniciou em estado degradado");
+  }
+
+  if (!perception_service_.initialize(PerceptionServiceId, now)) {
+    ESP_LOGW(Tag, "PerceptionService iniciou em estado degradado");
+  }
+
   motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
   if (!motion_service_.initialize(now)) {
     ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
@@ -235,6 +246,18 @@ void FirmwareEntrypoint::tick() {
   audio_service_.tick(now);
   touch_service_.tick(now);
   imu_service_.tick(now);
+  camera_service_.tick(now);
+
+  const ncos::core::contracts::CompanionSnapshot perception_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+  ncos::core::contracts::CompanionAttentionalSignal perception_attention{};
+  ncos::core::contracts::CompanionInteractionSignal perception_interaction{};
+  if (perception_service_.tick(audio_service_.state(), touch_service_.state(), camera_service_.state(),
+                               perception_snapshot, now, &perception_attention,
+                               &perception_interaction)) {
+    (void)system_manager_.ingest_attentional_signal(perception_attention, now);
+    (void)system_manager_.ingest_interactional_signal(perception_interaction, now);
+  }
 
   const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
@@ -296,3 +319,7 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
+
+
+

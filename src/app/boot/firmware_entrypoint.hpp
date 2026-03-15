@@ -12,6 +12,8 @@
 #include "services/sensing/imu_service.hpp"
 #include "services/sensing/touch_service.hpp"
 #include "services/voice/voice_service.hpp"
+#include "services/vision/camera_service.hpp"
+#include "services/vision/perception_service.hpp"
 
 namespace ncos::app::boot {
 
@@ -33,9 +35,14 @@ class FirmwareEntrypoint final {
   ncos::services::voice::VoiceService voice_service_{};
   ncos::services::sensing::TouchService touch_service_{};
   ncos::services::sensing::ImuService imu_service_{};
+  ncos::services::vision::CameraService camera_service_{};
+  ncos::services::vision::PerceptionService perception_service_{};
   ncos::services::motion::MotionService motion_service_{};
   ncos::services::led::LedService led_service_{};
   ncos::services::face::FaceService face_service_{};
 };
 
 }  // namespace ncos::app::boot
+
+
+
