@@ -18,6 +18,7 @@
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
 #include "drivers/power/power_local_port.hpp"
+#include "drivers/telemetry/telemetry_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
 #include "drivers/update/update_local_port.hpp"
@@ -34,6 +35,7 @@ constexpr uint16_t PerceptionServiceId = 65;
 constexpr uint16_t PowerServiceId = 66;
 constexpr uint16_t UpdateServiceId = 67;
 constexpr uint16_t CloudBridgeServiceId = 68;
+constexpr uint16_t TelemetryServiceId = 69;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -231,6 +233,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "CloudBridgeService iniciou em estado degradado");
   }
 
+  telemetry_service_.bind_port(ncos::drivers::telemetry::acquire_shared_telemetry_port());
+  if (!telemetry_service_.initialize(TelemetryServiceId, now, ncos::config::kGlobalConfig.runtime)) {
+    ESP_LOGW(Tag, "TelemetryService iniciou em estado degradado");
+  }
+
   const ncos::core::contracts::UpdateDecision ota_boot = update_service_.evaluate_boot_policy(now);
   if (ota_boot.valid && ota_boot.request_safe_fallback && !ota_fault_reported_) {
     ota_fault_reported_ = true;
@@ -375,6 +382,25 @@ void FirmwareEntrypoint::tick() {
   const ncos::core::contracts::CompanionSnapshot cloud_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
   (void)cloud_bridge_service_.tick(cloud_snapshot, now);
+
+  ncos::core::contracts::TelemetryRuntimeInput telemetry_runtime{};
+  const ncos::core::runtime::RuntimeStatus runtime_status = system_manager_.status();
+  telemetry_runtime.initialized = runtime_status.initialized;
+  telemetry_runtime.started = runtime_status.started;
+  telemetry_runtime.safe_mode = runtime_status.safe_mode;
+  telemetry_runtime.scheduler_tasks = runtime_status.scheduler_tasks;
+  telemetry_runtime.fault_count = runtime_status.fault_count;
+  telemetry_runtime.bus_published_total = runtime_status.bus_published_total;
+  telemetry_runtime.bus_dispatched_total = runtime_status.bus_dispatched_total;
+  telemetry_runtime.bus_dropped_total = runtime_status.bus_dropped_total;
+  telemetry_runtime.governance_allowed_total = runtime_status.governance_allowed_total;
+  telemetry_runtime.governance_preempted_total = runtime_status.governance_preempted_total;
+  telemetry_runtime.governance_rejected_total = runtime_status.governance_rejected_total;
+  telemetry_runtime.companion_state_revision = runtime_status.companion_state_revision;
+
+  const ncos::core::contracts::CompanionSnapshot telemetry_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  (void)telemetry_service_.tick(telemetry_runtime, telemetry_snapshot, cloud_bridge_service_.state(), now);
 
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);

@@ -22,6 +22,13 @@ struct RuntimeConfig {
   bool cloud_bridge_enabled = false;
   bool cloud_extension_enabled = false;
   uint32_t cloud_sync_interval_ms = 2500;
+
+  bool telemetry_enabled = false;
+  bool telemetry_export_off_device = false;
+  uint32_t telemetry_interval_ms = 8000;
+  bool telemetry_collect_interactional = false;
+  bool telemetry_collect_emotional = false;
+  bool telemetry_collect_transient = false;
   uint32_t cloud_sync_retry_backoff_ms = 6000;
   uint8_t cloud_sync_failure_threshold = 3;
 
@@ -74,6 +81,13 @@ constexpr RuntimeConfig make_runtime_config() {
     cfg.cloud_bridge_enabled = false;
     cfg.cloud_extension_enabled = false;
     cfg.cloud_sync_interval_ms = 3500;
+
+    cfg.telemetry_enabled = false;
+    cfg.telemetry_export_off_device = false;
+    cfg.telemetry_interval_ms = 12000;
+    cfg.telemetry_collect_interactional = false;
+    cfg.telemetry_collect_emotional = false;
+    cfg.telemetry_collect_transient = false;
     cfg.cloud_sync_retry_backoff_ms = 8000;
     cfg.cloud_sync_failure_threshold = 3;
 
