@@ -16,6 +16,10 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
 
   state_ = ncos::core::contracts::make_face_render_state_baseline();
 
+  if (!apply_face_preset(exploratory_preset_, &state_, now_ms)) {
+    return false;
+  }
+
   ncos::core::contracts::FaceLayerClaim base_claim{};
   base_claim.layer = ncos::models::face::FaceLayer::kBase;
   base_claim.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBaseOwner;

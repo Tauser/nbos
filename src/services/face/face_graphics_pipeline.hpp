@@ -6,6 +6,7 @@
 #include "services/face/face_display_renderer.hpp"
 #include "services/face/face_frame_composer.hpp"
 #include "services/face/face_gaze_controller.hpp"
+#include "services/face/face_preset_library.hpp"
 
 namespace ncos::services::face {
 
@@ -25,6 +26,7 @@ class FaceGraphicsPipeline final {
   bool gaze_left_ = false;
 
   ncos::core::contracts::FaceRenderState state_{};
+  FaceExploratoryPresetId exploratory_preset_ = FaceExploratoryPresetId::kClarityNeutral;
   FaceGazeController gaze_controller_{kFaceServiceId};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};
