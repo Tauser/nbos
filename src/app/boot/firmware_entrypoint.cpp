@@ -13,6 +13,7 @@
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/camera/camera_local_port.hpp"
+#include "drivers/cloud/cloud_local_extension_port.hpp"
 #include "drivers/cloud/cloud_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
@@ -32,7 +33,7 @@ constexpr uint16_t VoiceServiceId = 64;
 constexpr uint16_t PerceptionServiceId = 65;
 constexpr uint16_t PowerServiceId = 66;
 constexpr uint16_t UpdateServiceId = 67;
-constexpr uint16_t CloudSyncServiceId = 68;
+constexpr uint16_t CloudBridgeServiceId = 68;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -224,9 +225,10 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "UpdateService iniciou em estado degradado");
   }
 
-  cloud_sync_service_.bind_port(ncos::drivers::cloud::acquire_shared_cloud_port());
-  if (!cloud_sync_service_.initialize(CloudSyncServiceId, now, ncos::config::kGlobalConfig.runtime)) {
-    ESP_LOGW(Tag, "CloudSyncService iniciou em estado degradado");
+  cloud_bridge_service_.bind_sync_port(ncos::drivers::cloud::acquire_shared_cloud_port());
+  cloud_bridge_service_.bind_extension_port(ncos::drivers::cloud::acquire_shared_cloud_extension_port());
+  if (!cloud_bridge_service_.initialize(CloudBridgeServiceId, now, ncos::config::kGlobalConfig.runtime)) {
+    ESP_LOGW(Tag, "CloudBridgeService iniciou em estado degradado");
   }
 
   const ncos::core::contracts::UpdateDecision ota_boot = update_service_.evaluate_boot_policy(now);
@@ -372,7 +374,7 @@ void FirmwareEntrypoint::tick() {
 
   const ncos::core::contracts::CompanionSnapshot cloud_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
-  (void)cloud_sync_service_.tick(cloud_snapshot, now);
+  (void)cloud_bridge_service_.tick(cloud_snapshot, now);
 
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
@@ -389,4 +391,3 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
-

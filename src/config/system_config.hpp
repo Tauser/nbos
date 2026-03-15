@@ -19,6 +19,8 @@ struct RuntimeConfig {
   uint32_t ota_confirm_uptime_ms = 12000;
 
   bool cloud_sync_enabled = false;
+  bool cloud_bridge_enabled = false;
+  bool cloud_extension_enabled = false;
   uint32_t cloud_sync_interval_ms = 2500;
   uint32_t cloud_sync_retry_backoff_ms = 6000;
   uint8_t cloud_sync_failure_threshold = 3;
@@ -69,6 +71,8 @@ constexpr RuntimeConfig make_runtime_config() {
     cfg.ota_confirm_uptime_ms = 18000;
 
     cfg.cloud_sync_enabled = false;
+    cfg.cloud_bridge_enabled = false;
+    cfg.cloud_extension_enabled = false;
     cfg.cloud_sync_interval_ms = 3500;
     cfg.cloud_sync_retry_backoff_ms = 8000;
     cfg.cloud_sync_failure_threshold = 3;
@@ -117,4 +121,3 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
-

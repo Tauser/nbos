@@ -4,7 +4,7 @@
 #include "core/runtime/system_manager.hpp"
 #include "services/audio/audio_service.hpp"
 #include "services/behavior/behavior_service.hpp"
-#include "services/cloud/cloud_sync_service.hpp"
+#include "services/cloud/cloud_bridge_service.hpp"
 #include "services/emotion/emotion_service.hpp"
 #include "services/face/face_service.hpp"
 #include "services/led/led_service.hpp"
@@ -42,7 +42,7 @@ class FirmwareEntrypoint final {
   ncos::services::vision::PerceptionService perception_service_{};
   ncos::services::power::PowerService power_service_{};
   ncos::services::update::UpdateService update_service_{};
-  ncos::services::cloud::CloudSyncService cloud_sync_service_{};
+  ncos::services::cloud::CloudBridgeService cloud_bridge_service_{};
   ncos::services::motion::MotionService motion_service_{};
   ncos::services::led::LedService led_service_{};
   ncos::services::face::FaceService face_service_{};
@@ -54,4 +54,3 @@ class FirmwareEntrypoint final {
 };
 
 }  // namespace ncos::app::boot
-
