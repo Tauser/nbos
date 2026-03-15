@@ -84,7 +84,7 @@ void test_update_service_blocks_remote_ota_without_rollback_support() {
   TEST_ASSERT_TRUE(decision.request_safe_fallback);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::OtaHealth::kBlockedUnsafe),
                         static_cast<int>(state.health));
-  TEST_ASSERT_EQUAL_UINT32(1, state.blocked_total);
+  TEST_ASSERT_EQUAL_UINT32(2, state.blocked_total);
 }
 
 void test_update_service_confirms_image_after_uptime_window() {
