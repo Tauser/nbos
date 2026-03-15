@@ -3,7 +3,22 @@
 namespace {
 
 constexpr uint16_t kOrientationDotColor = 0xF800;
-constexpr int16_t kEyeErasePadding = 12;
+constexpr int16_t kEyeDirtyPadding = 16;
+
+int16_t min_i16(int16_t a, int16_t b) {
+  return a < b ? a : b;
+}
+
+int16_t max_i16(int16_t a, int16_t b) {
+  return a > b ? a : b;
+}
+
+struct EyeRect {
+  int16_t x = 0;
+  int16_t y = 0;
+  int16_t w = 0;
+  int16_t h = 0;
+};
 
 bool requires_full_redraw(const ncos::services::face::FaceFrame& prev,
                           const ncos::services::face::FaceFrame& next) {
@@ -12,17 +27,47 @@ bool requires_full_redraw(const ncos::services::face::FaceFrame& prev,
          prev.head_h != next.head_h || prev.head_radius != next.head_radius;
 }
 
-void erase_eye(ncos::drivers::display::DisplayDriver* display,
-               const ncos::services::face::FaceFrame& previous_frame,
-               int16_t eye_x,
-               int16_t eye_y) {
-  const int16_t erase_w = static_cast<int16_t>(previous_frame.eye_w + kEyeErasePadding);
-  const int16_t erase_h = static_cast<int16_t>(previous_frame.eye_h + kEyeErasePadding);
-  const int16_t erase_x = static_cast<int16_t>(eye_x - erase_w / 2);
-  const int16_t erase_y = static_cast<int16_t>(eye_y - erase_h / 2);
-  const int16_t erase_corner = static_cast<int16_t>(
-      (previous_frame.eye_corner + 6) > 18 ? 18 : (previous_frame.eye_corner + 6));
-  display->fillRoundRect(erase_x, erase_y, erase_w, erase_h, erase_corner, previous_frame.face_color);
+EyeRect make_eye_rect(const ncos::services::face::FaceFrame& frame, bool left_eye) {
+  const int16_t eye_x = left_eye ? frame.left_eye_x : frame.right_eye_x;
+  const int16_t eye_y = left_eye ? frame.left_eye_y : frame.right_eye_y;
+
+  EyeRect rect{};
+  rect.w = static_cast<int16_t>(frame.eye_w + kEyeDirtyPadding);
+  rect.h = static_cast<int16_t>(frame.eye_h + kEyeDirtyPadding);
+  rect.x = static_cast<int16_t>(eye_x - rect.w / 2);
+  rect.y = static_cast<int16_t>(eye_y - rect.h / 2);
+  return rect;
+}
+
+void clear_dirty_eye_region(ncos::drivers::display::DisplayDriver* display,
+                            const ncos::services::face::FaceFrame& previous_frame,
+                            const ncos::services::face::FaceFrame& current_frame) {
+  const EyeRect prev_left = make_eye_rect(previous_frame, true);
+  const EyeRect prev_right = make_eye_rect(previous_frame, false);
+  const EyeRect next_left = make_eye_rect(current_frame, true);
+  const EyeRect next_right = make_eye_rect(current_frame, false);
+
+  int16_t x0 = min_i16(min_i16(prev_left.x, prev_right.x), min_i16(next_left.x, next_right.x));
+  int16_t y0 = min_i16(min_i16(prev_left.y, prev_right.y), min_i16(next_left.y, next_right.y));
+  int16_t x1 = max_i16(max_i16(static_cast<int16_t>(prev_left.x + prev_left.w),
+                               static_cast<int16_t>(prev_right.x + prev_right.w)),
+                       max_i16(static_cast<int16_t>(next_left.x + next_left.w),
+                               static_cast<int16_t>(next_right.x + next_right.w)));
+  int16_t y1 = max_i16(max_i16(static_cast<int16_t>(prev_left.y + prev_left.h),
+                               static_cast<int16_t>(prev_right.y + prev_right.h)),
+                       max_i16(static_cast<int16_t>(next_left.y + next_left.h),
+                               static_cast<int16_t>(next_right.y + next_right.h)));
+
+  x0 = x0 < 0 ? 0 : x0;
+  y0 = y0 < 0 ? 0 : y0;
+  x1 = x1 > display->width() ? display->width() : x1;
+  y1 = y1 > display->height() ? display->height() : y1;
+
+  if (x1 > x0 && y1 > y0) {
+    const int16_t dirty_w = static_cast<int16_t>(x1 - x0);
+    const int16_t dirty_h = static_cast<int16_t>(y1 - y0);
+    display->fillRect(x0, y0, dirty_w, dirty_h, current_frame.face_color);
+  }
 }
 
 }  // namespace
@@ -54,8 +99,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
                               frame.head_radius, frame.face_color);
     }
   } else {
-    erase_eye(display_, previous_frame_, previous_frame_.left_eye_x, previous_frame_.left_eye_y);
-    erase_eye(display_, previous_frame_, previous_frame_.right_eye_x, previous_frame_.right_eye_y);
+    clear_dirty_eye_region(display_, previous_frame_, frame);
   }
 
   const int16_t left_eye_x = static_cast<int16_t>(frame.left_eye_x - frame.eye_w / 2);

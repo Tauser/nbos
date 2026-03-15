@@ -65,7 +65,7 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
                 8, 30);
 
   layout.eye_spacing =
-      clamp_i16(77 + (static_cast<int32_t>(state.geometry.eye_spacing_percent) - 50) / 2, 60, 106);
+      clamp_i16(102 + (static_cast<int32_t>(state.geometry.eye_spacing_percent) - 50) * 3 / 4, 82, 136);
   layout.eye_line_y =
       clamp_i16(112 + (static_cast<int32_t>(state.geometry.eye_line_height_percent) - 50) / 2, 92, 132);
 
@@ -92,4 +92,6 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
 }
 
 }  // namespace ncos::services::face
+
+
 
