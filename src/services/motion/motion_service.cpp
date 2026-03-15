@@ -8,7 +8,12 @@
 
 namespace {
 constexpr const char* kTag = "NCOS_MOTION_SVC";
+
+int16_t abs_i16(int16_t v) {
+  return v < 0 ? static_cast<int16_t>(-v) : v;
 }
+
+}  // namespace
 
 namespace ncos::services::motion {
 
@@ -36,6 +41,7 @@ bool MotionService::initialize(uint64_t now_ms) {
     return false;
   }
 
+  next_embodiment_ms_ = now_ms;
   return apply_neutral_pose(now_ms);
 }
 
@@ -100,6 +106,38 @@ void MotionService::tick(uint64_t now_ms) {
   if (state_.has_active_plan && now_ms >= state_.active_plan.hold_until_ms) {
     state_.has_active_plan = false;
   }
+
+  if (!state_.initialized || now_ms < next_embodiment_ms_) {
+    return;
+  }
+
+  if (state_.companion_signal.safe_mode) {
+    if (!state_.neutral_applied) {
+      (void)recover_to_neutral(now_ms);
+    }
+    next_embodiment_ms_ = now_ms + 480;
+    return;
+  }
+
+  const bool gaze_has_shift = abs_i16(state_.face_signal.gaze_x_percent) >= 12 ||
+                              abs_i16(state_.face_signal.gaze_y_percent) >= 10;
+  if (!gaze_has_shift && !state_.face_signal.clip_active) {
+    next_embodiment_ms_ = now_ms + 220;
+    return;
+  }
+
+  ncos::core::contracts::MotionCommand follow{};
+  follow.intent = state_.face_signal.clip_active ? ncos::core::contracts::MotionIntent::kAttendUser
+                                                 : ncos::core::contracts::MotionIntent::kObserveStimulus;
+  follow.origin = ncos::core::contracts::MotionCommandOrigin::kFace;
+  follow.priority = ncos::core::contracts::MotionPriority::kLow;
+  follow.pose.yaw_permille = static_cast<int16_t>(state_.face_signal.gaze_x_percent * 6);
+  follow.pose.pitch_permille = static_cast<int16_t>(state_.face_signal.gaze_y_percent * 5);
+  follow.pose.speed_percent = static_cast<uint16_t>(28 + state_.companion_signal.emotional_arousal_percent / 4);
+  follow.hold_ms = 140;
+
+  (void)request_motion(follow, now_ms);
+  next_embodiment_ms_ = now_ms + 260;
 }
 
 const ncos::core::contracts::MotionRuntimeState& MotionService::state() const {

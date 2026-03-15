@@ -32,6 +32,7 @@ class MotionService final {
   ncos::interfaces::motion::MotionPort* port_ = nullptr;
   ncos::core::contracts::MotionRuntimeState state_ =
       ncos::core::contracts::make_motion_runtime_baseline();
+  uint64_t next_embodiment_ms_ = 0;
 };
 
 }  // namespace ncos::services::motion

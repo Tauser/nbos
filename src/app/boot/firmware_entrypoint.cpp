@@ -4,8 +4,10 @@
 
 #include "app/boot/boot_flow.hpp"
 #include "config/system_config.hpp"
+#include "core/contracts/companion_state_contracts.hpp"
 #include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
+#include "core/contracts/motion_runtime_contracts.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
@@ -21,6 +23,35 @@ constexpr const char* kTag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
   return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
+}
+
+uint8_t map_arousal_percent(const ncos::core::contracts::CompanionEmotionalState& emotional) {
+  uint8_t base = 30;
+  switch (emotional.arousal) {
+    case ncos::core::contracts::EmotionalArousal::kHigh:
+      base = 85;
+      break;
+    case ncos::core::contracts::EmotionalArousal::kMedium:
+      base = 60;
+      break;
+    case ncos::core::contracts::EmotionalArousal::kLow:
+    default:
+      base = 30;
+      break;
+  }
+
+  return static_cast<uint8_t>((static_cast<uint16_t>(base) + emotional.intensity_percent) / 2U);
+}
+
+ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
+    const ncos::core::contracts::CompanionSnapshot& snapshot) {
+  ncos::core::contracts::MotionCompanionSignal signal{};
+  signal.safe_mode = snapshot.runtime.safe_mode ||
+                     snapshot.energetic.mode == ncos::core::contracts::EnergyMode::kCritical;
+  signal.attention_lock = snapshot.attentional.lock_active ||
+                          snapshot.attentional.focus_confidence_percent >= 70;
+  signal.emotional_arousal_percent = map_arousal_percent(snapshot.emotional);
+  return signal;
 }
 }
 
@@ -107,13 +138,19 @@ void FirmwareEntrypoint::tick() {
   audio_service_.tick(now);
   touch_service_.tick(now);
   imu_service_.tick(now);
-  motion_service_.tick(now);
-  led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
 
   const ncos::core::contracts::FaceMultimodalInput face_multimodal =
       ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
                                                         imu_service_.state(), now);
   face_service_.tick(now, face_multimodal);
+
+  const ncos::core::contracts::CompanionSnapshot companion_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
+  motion_service_.update_companion_signal(make_motion_companion_signal(companion_snapshot), now);
+  motion_service_.update_face_signal(face_service_.motion_signal(), now);
+  motion_service_.tick(now);
+
+  led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
 }
 
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {

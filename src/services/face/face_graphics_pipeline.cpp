@@ -23,6 +23,48 @@ constexpr ncos::models::face::FaceClip kSignatureClip = {
     280,
 };
 
+ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
+    ncos::models::face::GazeDirection direction, bool clip_active) {
+  ncos::core::contracts::MotionFaceSignal signal{};
+  signal.clip_active = clip_active;
+
+  switch (direction) {
+    case ncos::models::face::GazeDirection::kLeft:
+      signal.gaze_x_percent = -55;
+      break;
+    case ncos::models::face::GazeDirection::kRight:
+      signal.gaze_x_percent = 55;
+      break;
+    case ncos::models::face::GazeDirection::kUp:
+      signal.gaze_y_percent = 45;
+      break;
+    case ncos::models::face::GazeDirection::kDown:
+      signal.gaze_y_percent = -45;
+      break;
+    case ncos::models::face::GazeDirection::kUpLeft:
+      signal.gaze_x_percent = -45;
+      signal.gaze_y_percent = 35;
+      break;
+    case ncos::models::face::GazeDirection::kUpRight:
+      signal.gaze_x_percent = 45;
+      signal.gaze_y_percent = 35;
+      break;
+    case ncos::models::face::GazeDirection::kDownLeft:
+      signal.gaze_x_percent = -45;
+      signal.gaze_y_percent = -35;
+      break;
+    case ncos::models::face::GazeDirection::kDownRight:
+      signal.gaze_x_percent = 45;
+      signal.gaze_y_percent = -35;
+      break;
+    case ncos::models::face::GazeDirection::kCenter:
+    default:
+      break;
+  }
+
+  return signal;
+}
+
 }  // namespace
 
 namespace ncos::services::face {
@@ -77,6 +119,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   }
 
   preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms);
+  motion_signal_ = face_direction_to_motion_signal(state_.eyes.direction, false);
   next_render_ms_ = now_ms;
   next_gaze_target_ms_ = now_ms;
   next_clip_start_ms_ = now_ms + 3800;
@@ -138,6 +181,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   }
 
   preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms);
+  motion_signal_ = face_direction_to_motion_signal(state_.eyes.direction, clip_player_.active());
   next_render_ms_ = now_ms + kRenderPeriodMs;
 }
 
@@ -147,6 +191,10 @@ bool FaceGraphicsPipeline::initialized() const {
 
 size_t FaceGraphicsPipeline::export_preview_json(char* out_buffer, size_t out_buffer_size) const {
   return export_face_preview_json(preview_snapshot_, out_buffer, out_buffer_size);
+}
+
+ncos::core::contracts::MotionFaceSignal FaceGraphicsPipeline::motion_signal() const {
+  return motion_signal_;
 }
 
 }  // namespace ncos::services::face

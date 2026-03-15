@@ -125,6 +125,11 @@ RuntimeStatus SystemManager::status() const {
   return out;
 }
 
+ncos::core::contracts::CompanionSnapshot SystemManager::companion_snapshot_for(
+    ncos::core::contracts::CompanionStateReader reader) const {
+  return companion_state_.snapshot_for(reader);
+}
+
 void SystemManager::lifecycle_watchdog_task(void* context) {
   if (context == nullptr) {
     return;
@@ -187,3 +192,5 @@ void SystemManager::sync_companion_state(uint64_t now_ms) {
 }
 
 }  // namespace ncos::core::runtime
+
+

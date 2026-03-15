@@ -14,4 +14,8 @@ size_t FaceService::export_preview_json(char* out_buffer, size_t out_buffer_size
   return pipeline_.export_preview_json(out_buffer, out_buffer_size);
 }
 
+ncos::core::contracts::MotionFaceSignal FaceService::motion_signal() const {
+  return pipeline_.motion_signal();
+}
+
 }  // namespace ncos::services::face

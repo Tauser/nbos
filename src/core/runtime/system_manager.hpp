@@ -4,6 +4,7 @@
 
 #include "app/lifecycle/system_lifecycle.hpp"
 #include "config/system_config.hpp"
+#include "core/contracts/companion_state_contracts.hpp"
 #include "core/governance/action_governor.hpp"
 #include "core/messaging/event_bus.hpp"
 #include "core/runtime/companion_state_axis.hpp"
@@ -41,6 +42,8 @@ class SystemManager final {
   void start(uint64_t now_ms);
   void tick(uint64_t now_ms);
   RuntimeStatus status() const;
+  ncos::core::contracts::CompanionSnapshot companion_snapshot_for(
+      ncos::core::contracts::CompanionStateReader reader) const;
 
  private:
   static void lifecycle_watchdog_task(void* context);
@@ -69,4 +72,3 @@ class SystemManager final {
 };
 
 }  // namespace ncos::core::runtime
-
