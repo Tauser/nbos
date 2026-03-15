@@ -259,16 +259,18 @@ void FirmwareEntrypoint::tick() {
     (void)system_manager_.ingest_interactional_signal(perception_interaction, now);
   }
 
-  const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
-
+  const ncos::core::contracts::CompanionSnapshot voice_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kVoiceService);
   ncos::core::contracts::CompanionAttentionalSignal voice_attention{};
   ncos::core::contracts::CompanionInteractionSignal voice_interaction{};
-  if (voice_service_.tick(audio_service_.state(), behavior_snapshot, now, &voice_attention,
+  if (voice_service_.tick(audio_service_.state(), voice_snapshot, now, &voice_attention,
                           &voice_interaction)) {
     (void)system_manager_.ingest_attentional_signal(voice_attention, now);
     (void)system_manager_.ingest_interactional_signal(voice_interaction, now);
   }
+
+  const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
 
   ncos::core::contracts::BehaviorProposal behavior_proposal{};
   if (behavior_service_.tick(behavior_snapshot, now, &behavior_proposal) && behavior_proposal.valid) {
@@ -280,8 +282,11 @@ void FirmwareEntrypoint::tick() {
     }
   }
 
+  const ncos::core::contracts::CompanionSnapshot routine_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+
   ncos::core::contracts::RoutineProposal routine_proposal{};
-  if (routine_service_.tick(behavior_snapshot, behavior_service_.state(), now, &routine_proposal) &&
+  if (routine_service_.tick(routine_snapshot, behavior_service_.state(), now, &routine_proposal) &&
       routine_proposal.valid) {
     const ncos::core::contracts::GovernanceDecision routine_decision =
         system_manager_.govern_action(routine_proposal.proposal, now);
@@ -313,12 +318,12 @@ void FirmwareEntrypoint::tick() {
 
   led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
 }
-
 const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() const {
   return lifecycle_;
 }
 
 }  // namespace ncos::app::boot
+
 
 
 

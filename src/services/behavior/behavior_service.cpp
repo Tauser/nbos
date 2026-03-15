@@ -153,6 +153,9 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
     const ncos::core::contracts::CompanionSnapshot& snapshot) const {
   const bool user_attention = snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
                               snapshot.attentional.focus_confidence_percent >= 45;
+  const bool auditory_trigger_context =
+      snapshot.attentional.channel == ncos::core::contracts::AttentionChannel::kAuditory &&
+      snapshot.interactional.response_pending;
 
   if (user_attention && !snapshot.runtime.safe_mode) {
     return make_behavior_proposal(
@@ -160,15 +163,16 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::ActionDomain::kFace,
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
-        6,
+        auditory_trigger_context ? 7 : 6,
         220,
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
-        "attend_user");
+        auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user");
   }
 
   return ncos::core::contracts::BehaviorProposal{};
 }
 
 }  // namespace ncos::services::behavior
+
 
 

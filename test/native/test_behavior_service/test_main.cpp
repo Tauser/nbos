@@ -87,11 +87,33 @@ void test_behavior_service_tracks_governance_preemption_and_rejection() {
   TEST_ASSERT_EQUAL_UINT32(1, state.rejected_total);
 }
 
+void test_behavior_service_raises_attend_priority_on_voice_trigger_context() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 5000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kAuditory;
+  snapshot.attentional.focus_confidence_percent = 70;
+  snapshot.interactional.response_pending = true;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 5300, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_behavior_service_emits_energy_protect_when_critical);
   RUN_TEST(test_behavior_service_prefers_alert_scan_over_attend_user);
   RUN_TEST(test_behavior_service_respects_cooldown);
   RUN_TEST(test_behavior_service_tracks_governance_preemption_and_rejection);
+  RUN_TEST(test_behavior_service_raises_attend_priority_on_voice_trigger_context);
   return UNITY_END();
 }
+
+
+
