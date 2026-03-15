@@ -5,7 +5,7 @@
 namespace ncos::services::face {
 
 struct FaceGeometryLayout {
-  int16_t center_x = 120;
+  int16_t center_x = 160;
   int16_t center_y = 120;
 
   int16_t head_w = 146;

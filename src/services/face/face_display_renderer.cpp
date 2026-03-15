@@ -37,7 +37,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
     return false;
   }
 
-  display_->setRotation(0);
+  display_->setRotation(1);
 
   const bool full_redraw = !has_previous_frame_ || requires_full_redraw(previous_frame_, frame);
 
