@@ -13,6 +13,7 @@ class MotionService final {
   bool initialize(uint64_t now_ms);
 
   bool apply_neutral_pose(uint64_t now_ms);
+  bool recover_to_neutral(uint64_t now_ms);
   bool apply_pose(const ncos::core::contracts::MotionPoseCommand& pose, uint64_t now_ms);
   bool request_motion(const ncos::core::contracts::MotionCommand& command, uint64_t now_ms);
 
@@ -24,6 +25,8 @@ class MotionService final {
   [[nodiscard]] const ncos::core::contracts::MotionRuntimeState& state() const;
 
  private:
+  ncos::core::contracts::MotionCommand sanitize_command(const ncos::core::contracts::MotionCommand& command,
+                                                        uint64_t now_ms);
   bool apply_plan(const ncos::core::contracts::MotionExecutionPlan& plan, uint64_t now_ms);
 
   ncos::interfaces::motion::MotionPort* port_ = nullptr;

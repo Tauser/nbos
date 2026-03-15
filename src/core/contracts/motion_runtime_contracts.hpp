@@ -12,6 +12,7 @@ enum class MotionIntent : uint8_t {
   kObserveStimulus = 4,
   kAcknowledgeTouch = 5,
   kPowerSave = 6,
+  kRecovery = 7,
 };
 
 enum class MotionCommandOrigin : uint8_t {
@@ -33,6 +34,21 @@ struct MotionPoseCommand {
   int16_t yaw_permille = 0;    // -1000..1000
   int16_t pitch_permille = 0;  // -1000..1000
   uint16_t speed_percent = 40;
+};
+
+struct MotionSafetyLimits {
+  int16_t yaw_min_permille = -420;
+  int16_t yaw_max_permille = 420;
+  int16_t pitch_min_permille = -350;
+  int16_t pitch_max_permille = 300;
+  uint16_t speed_max_percent = 70;
+  uint16_t recovery_speed_percent = 35;
+};
+
+struct MotionSafetyReport {
+  bool clamped_yaw = false;
+  bool clamped_pitch = false;
+  bool clamped_speed = false;
 };
 
 struct MotionCommand {
@@ -72,20 +88,27 @@ struct MotionRuntimeState {
   bool last_apply_ok = false;
   bool has_active_plan = false;
   bool rejected_for_priority = false;
+  bool safety_clamp_applied = false;
   MotionPoseCommand last_pose{};
   MotionExecutionPlan active_plan{};
   MotionCompanionSignal companion_signal{};
   MotionFaceSignal face_signal{};
+  MotionSafetyLimits safety_limits{};
   size_t last_tx_bytes = 0;
   uint64_t last_update_ms = 0;
   uint32_t apply_success_total = 0;
   uint32_t apply_failure_total = 0;
   uint32_t plan_applied_total = 0;
   uint32_t plan_rejected_total = 0;
+  uint32_t safety_clamp_total = 0;
 };
 
 constexpr MotionPoseCommand make_neutral_pose() {
   return MotionPoseCommand{};
+}
+
+constexpr MotionSafetyLimits make_default_motion_safety_limits() {
+  return MotionSafetyLimits{};
 }
 
 constexpr MotionCommand make_neutral_hold_command() {
@@ -97,13 +120,65 @@ constexpr MotionCommand make_neutral_hold_command() {
   return cmd;
 }
 
+constexpr MotionCommand make_recovery_command() {
+  MotionCommand cmd{};
+  cmd.intent = MotionIntent::kRecovery;
+  cmd.origin = MotionCommandOrigin::kSafety;
+  cmd.priority = MotionPriority::kHigh;
+  cmd.pose = make_neutral_pose();
+  cmd.hold_ms = 300;
+  return cmd;
+}
+
 constexpr MotionRuntimeState make_motion_runtime_baseline() {
-  return MotionRuntimeState{};
+  MotionRuntimeState state{};
+  state.safety_limits = make_default_motion_safety_limits();
+  return state;
 }
 
 constexpr bool is_pose_valid(const MotionPoseCommand& pose) {
   return pose.yaw_permille >= -1000 && pose.yaw_permille <= 1000 &&
          pose.pitch_permille >= -1000 && pose.pitch_permille <= 1000 && pose.speed_percent <= 100;
+}
+
+constexpr bool are_safety_limits_valid(const MotionSafetyLimits& limits) {
+  return limits.yaw_min_permille < limits.yaw_max_permille &&
+         limits.pitch_min_permille < limits.pitch_max_permille && limits.speed_max_percent <= 100 &&
+         limits.recovery_speed_percent <= 100;
+}
+
+constexpr MotionPoseCommand clamp_pose_to_safety(const MotionPoseCommand& pose,
+                                                 const MotionSafetyLimits& limits,
+                                                 MotionSafetyReport* out_report = nullptr) {
+  MotionPoseCommand clamped = pose;
+  MotionSafetyReport report{};
+
+  if (clamped.yaw_permille < limits.yaw_min_permille) {
+    clamped.yaw_permille = limits.yaw_min_permille;
+    report.clamped_yaw = true;
+  } else if (clamped.yaw_permille > limits.yaw_max_permille) {
+    clamped.yaw_permille = limits.yaw_max_permille;
+    report.clamped_yaw = true;
+  }
+
+  if (clamped.pitch_permille < limits.pitch_min_permille) {
+    clamped.pitch_permille = limits.pitch_min_permille;
+    report.clamped_pitch = true;
+  } else if (clamped.pitch_permille > limits.pitch_max_permille) {
+    clamped.pitch_permille = limits.pitch_max_permille;
+    report.clamped_pitch = true;
+  }
+
+  if (clamped.speed_percent > limits.speed_max_percent) {
+    clamped.speed_percent = limits.speed_max_percent;
+    report.clamped_speed = true;
+  }
+
+  if (out_report != nullptr) {
+    *out_report = report;
+  }
+
+  return clamped;
 }
 
 constexpr bool is_motion_command_valid(const MotionCommand& cmd) {

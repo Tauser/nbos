@@ -36,11 +36,15 @@ bool MotionService::initialize(uint64_t now_ms) {
     return false;
   }
 
-  return request_motion(ncos::core::contracts::make_neutral_hold_command(), now_ms);
+  return apply_neutral_pose(now_ms);
 }
 
 bool MotionService::apply_neutral_pose(uint64_t now_ms) {
   return request_motion(ncos::core::contracts::make_neutral_hold_command(), now_ms);
+}
+
+bool MotionService::recover_to_neutral(uint64_t now_ms) {
+  return request_motion(ncos::core::contracts::make_recovery_command(), now_ms);
 }
 
 bool MotionService::apply_pose(const ncos::core::contracts::MotionPoseCommand& pose, uint64_t now_ms) {
@@ -55,7 +59,8 @@ bool MotionService::apply_pose(const ncos::core::contracts::MotionPoseCommand& p
 
 bool MotionService::request_motion(const ncos::core::contracts::MotionCommand& command,
                                    uint64_t now_ms) {
-  if (!state_.initialized || port_ == nullptr || !ncos::core::contracts::is_motion_command_valid(command)) {
+  if (!state_.initialized || port_ == nullptr || !ncos::core::contracts::is_motion_command_valid(command) ||
+      !ncos::core::contracts::are_safety_limits_valid(state_.safety_limits)) {
     state_.last_apply_ok = false;
     ++state_.apply_failure_total;
     ++state_.plan_rejected_total;
@@ -63,8 +68,10 @@ bool MotionService::request_motion(const ncos::core::contracts::MotionCommand& c
     return false;
   }
 
+  const ncos::core::contracts::MotionCommand safe_command = sanitize_command(command, now_ms);
+
   if (state_.has_active_plan &&
-      !ncos::core::contracts::should_preempt_plan(state_.active_plan, command, now_ms)) {
+      !ncos::core::contracts::should_preempt_plan(state_.active_plan, safe_command, now_ms)) {
     state_.rejected_for_priority = true;
     ++state_.plan_rejected_total;
     state_.last_update_ms = now_ms;
@@ -73,7 +80,7 @@ bool MotionService::request_motion(const ncos::core::contracts::MotionCommand& c
 
   state_.rejected_for_priority = false;
   const ncos::core::contracts::MotionExecutionPlan plan =
-      ncos::core::contracts::make_execution_plan(command, now_ms);
+      ncos::core::contracts::make_execution_plan(safe_command, now_ms);
   return apply_plan(plan, now_ms);
 }
 
@@ -97,6 +104,35 @@ void MotionService::tick(uint64_t now_ms) {
 
 const ncos::core::contracts::MotionRuntimeState& MotionService::state() const {
   return state_;
+}
+
+ncos::core::contracts::MotionCommand MotionService::sanitize_command(
+    const ncos::core::contracts::MotionCommand& command, uint64_t now_ms) {
+  ncos::core::contracts::MotionCommand safe = command;
+
+  if (state_.companion_signal.safe_mode &&
+      safe.priority != ncos::core::contracts::MotionPriority::kCritical) {
+    safe.pose.speed_percent =
+        safe.pose.speed_percent > 45 ? 45 : safe.pose.speed_percent;
+    safe.hold_ms = safe.hold_ms > 180 ? 180 : safe.hold_ms;
+  }
+
+  if (safe.intent == ncos::core::contracts::MotionIntent::kRecovery) {
+    safe.pose = ncos::core::contracts::make_neutral_pose();
+    safe.pose.speed_percent = state_.safety_limits.recovery_speed_percent;
+  }
+
+  ncos::core::contracts::MotionSafetyReport report{};
+  safe.pose =
+      ncos::core::contracts::clamp_pose_to_safety(safe.pose, state_.safety_limits, &report);
+
+  state_.safety_clamp_applied = report.clamped_yaw || report.clamped_pitch || report.clamped_speed;
+  if (state_.safety_clamp_applied) {
+    ++state_.safety_clamp_total;
+  }
+
+  state_.last_update_ms = now_ms;
+  return safe;
 }
 
 bool MotionService::apply_plan(const ncos::core::contracts::MotionExecutionPlan& plan, uint64_t now_ms) {
