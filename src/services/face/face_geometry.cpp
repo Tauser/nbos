@@ -75,8 +75,7 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
   layout.eye_radius = openness > 80 ? base_eye_radius : (openness > 40 ? base_eye_radius / 2 : 2);
 
   layout.eye_w = clamp_i16(66 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 2, 50, 90);
-  const int16_t base_eye_h =
-      clamp_i16(55 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 3, 36, 74);
+  const int16_t base_eye_h = layout.eye_w;  // Open-eye baseline must be square.
   layout.eye_h = clamp_i16(base_eye_h * static_cast<int32_t>(openness) / 100, 2, base_eye_h);
 
   layout.gaze_dx = gaze_dx(state.eyes.direction);
@@ -92,6 +91,7 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
 }
 
 }  // namespace ncos::services::face
+
 
 
 
