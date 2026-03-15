@@ -9,6 +9,7 @@
 #include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
 #include "core/contracts/motion_runtime_contracts.hpp"
+#include "core/contracts/routine_runtime_contracts.hpp"
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
@@ -21,6 +22,7 @@
 
 namespace {
 constexpr uint16_t kBehaviorServiceId = 61;
+constexpr uint16_t kRoutineServiceId = 62;
 constexpr const char* kTag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -101,6 +103,10 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(kTag, "BehaviorService iniciou em estado degradado");
   }
 
+  if (!routine_service_.initialize(kRoutineServiceId, now)) {
+    ESP_LOGW(kTag, "RoutineService iniciou em estado degradado");
+  }
+
   touch_service_.bind_port(ncos::drivers::touch::acquire_shared_touch_port());
   if (!touch_service_.initialize(now)) {
     ESP_LOGW(kTag, "TouchService iniciou em estado degradado");
@@ -157,6 +163,14 @@ void FirmwareEntrypoint::tick() {
     const ncos::core::contracts::GovernanceDecision behavior_decision =
         system_manager_.govern_action(behavior_proposal.proposal, now);
     behavior_service_.on_governance_decision(behavior_decision, now);
+  }
+
+  ncos::core::contracts::RoutineProposal routine_proposal{};
+  if (routine_service_.tick(behavior_snapshot, behavior_service_.state(), now, &routine_proposal) &&
+      routine_proposal.valid) {
+    const ncos::core::contracts::GovernanceDecision routine_decision =
+        system_manager_.govern_action(routine_proposal.proposal, now);
+    routine_service_.on_governance_decision(routine_decision, now);
   }
 
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
