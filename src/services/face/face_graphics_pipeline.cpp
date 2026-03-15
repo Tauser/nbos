@@ -23,6 +23,27 @@ constexpr ncos::models::face::FaceClip kSignatureClip = {
     280,
 };
 
+ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
+    const ncos::core::contracts::FaceMultimodalInput& input) {
+  if (input.behavior_activation_percent >= 75 || input.emotional_arousal_percent >= 80) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreLock;
+  }
+
+  if (input.behavior_activation_percent >= 55 || input.social_engagement_percent >= 70) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreAttend;
+  }
+
+  if (input.emotional_arousal_percent >= 58) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreCurious;
+  }
+
+  if (input.social_engagement_percent <= 30) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreCalm;
+  }
+
+  return ncos::services::face::FaceOfficialPresetId::kCoreNeutral;
+}
+
 ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
     ncos::models::face::GazeDirection direction, bool clip_active) {
   ncos::core::contracts::MotionFaceSignal signal{};
@@ -134,6 +155,23 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   }
 
   compositor_.tick(now_ms);
+
+  const FaceOfficialPresetId target_preset = select_official_preset_for_input(multimodal);
+  if (target_preset != official_preset_ && !clip_player_.active()) {
+    FaceLayerRequest base_request{};
+    base_request.layer = ncos::models::face::FaceLayer::kBase;
+    base_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBaseOwner;
+    base_request.requester_service = kPresetOwnerServiceId;
+    base_request.priority = 3;
+    base_request.hold_ms = 260;
+    base_request.cooldown_ms = 120;
+
+    if (compositor_.request_layer(base_request, now_ms).granted &&
+        compositor_.can_write(ncos::models::face::FaceLayer::kBase, kPresetOwnerServiceId) &&
+        apply_official_face_preset(target_preset, &state_, now_ms)) {
+      official_preset_ = target_preset;
+    }
+  }
 
   if (!clip_player_.active() && now_ms >= next_clip_start_ms_) {
     (void)clip_player_.play(kSignatureClip, &compositor_, &state_, now_ms);
