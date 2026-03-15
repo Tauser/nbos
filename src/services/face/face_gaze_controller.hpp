@@ -7,6 +7,14 @@
 
 namespace ncos::services::face {
 
+enum class FaceGazeMotionPhase : uint8_t {
+  kIdle = 0,
+  kSaccade = 1,
+  kOvershoot = 2,
+  kSettle = 3,
+  kFixation = 4,
+};
+
 class FaceGazeController final {
  public:
   explicit FaceGazeController(uint16_t owner_service = 0);
@@ -20,10 +28,20 @@ class FaceGazeController final {
  private:
   bool owner_can_write(const ncos::core::contracts::FaceRenderState& state) const;
 
-  uint16_t owner_service_ = 0;
   bool active_target_ = false;
-  uint64_t expires_at_ms_ = 0;
+  uint16_t owner_service_ = 0;
+
   ncos::models::face::FaceGazeTarget target_{};
+  ncos::models::face::GazeDirection current_direction_ = ncos::models::face::GazeDirection::kCenter;
+
+  ncos::models::face::GazeDirection start_direction_ = ncos::models::face::GazeDirection::kCenter;
+  ncos::models::face::GazeDirection overshoot_direction_ = ncos::models::face::GazeDirection::kCenter;
+
+  FaceGazeMotionPhase phase_ = FaceGazeMotionPhase::kIdle;
+  uint64_t saccade_end_ms_ = 0;
+  uint64_t overshoot_end_ms_ = 0;
+  uint64_t settle_end_ms_ = 0;
+  uint64_t fixation_end_ms_ = 0;
 };
 
 }  // namespace ncos::services::face

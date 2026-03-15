@@ -54,12 +54,12 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms) {
                                   : ncos::models::face::GazeDirection::kRight;
     target.focus_percent = 48;
     target.salience_percent = 30;
-    target.hold_ms = 360;
+    target.hold_ms = 420;
     target.origin = ncos::models::face::FaceGazeTargetOrigin::kSystem;
 
     (void)gaze_controller_.set_target(target, now_ms);
     gaze_left_ = !gaze_left_;
-    next_gaze_target_ms_ = now_ms + 360;
+    next_gaze_target_ms_ = now_ms + 700;
   }
 
   (void)gaze_controller_.tick(now_ms, &state_);
