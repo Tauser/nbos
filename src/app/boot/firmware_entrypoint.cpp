@@ -23,38 +23,114 @@
 namespace {
 constexpr uint16_t kBehaviorServiceId = 61;
 constexpr uint16_t kRoutineServiceId = 62;
+constexpr uint16_t kEmotionServiceId = 63;
 constexpr const char* kTag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
   return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
 }
 
-uint8_t map_arousal_percent(const ncos::core::contracts::CompanionEmotionalState& emotional) {
-  uint8_t base = 30;
-  switch (emotional.arousal) {
-    case ncos::core::contracts::EmotionalArousal::kHigh:
-      base = 85;
-      break;
-    case ncos::core::contracts::EmotionalArousal::kMedium:
-      base = 60;
-      break;
-    case ncos::core::contracts::EmotionalArousal::kLow:
-    default:
-      base = 30;
-      break;
+bool decision_allows(const ncos::core::contracts::GovernanceDecision& decision) {
+  return decision.kind == ncos::core::contracts::GovernanceDecisionKind::kAllow ||
+         decision.kind == ncos::core::contracts::GovernanceDecisionKind::kPreemptAndAllow;
+}
+
+void ingest_behavior_companion_signals(ncos::core::runtime::SystemManager* manager,
+                                       ncos::core::contracts::BehaviorProfile profile,
+                                       uint64_t now_ms) {
+  if (manager == nullptr) {
+    return;
   }
 
-  return static_cast<uint8_t>((static_cast<uint16_t>(base) + emotional.intensity_percent) / 2U);
+  switch (profile) {
+    case ncos::core::contracts::BehaviorProfile::kEnergyProtect: {
+      ncos::core::contracts::CompanionEnergeticSignal energetic{};
+      energetic.mode = ncos::core::contracts::EnergyMode::kConstrained;
+      energetic.battery_percent = 24;
+      energetic.thermal_load_percent = 38;
+      energetic.external_power = false;
+      (void)manager->ingest_energetic_signal(energetic, now_ms);
+      break;
+    }
+
+    case ncos::core::contracts::BehaviorProfile::kAlertScan: {
+      ncos::core::contracts::CompanionAttentionalSignal attentional{};
+      attentional.target = ncos::core::contracts::AttentionTarget::kStimulus;
+      attentional.channel = ncos::core::contracts::AttentionChannel::kMultimodal;
+      attentional.focus_confidence_percent = 78;
+      attentional.lock_active = true;
+      (void)manager->ingest_attentional_signal(attentional, now_ms);
+
+      ncos::core::contracts::CompanionInteractionSignal interaction{};
+      interaction.phase = ncos::core::contracts::InteractionPhase::kActing;
+      interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+      interaction.session_active = true;
+      interaction.response_pending = false;
+      (void)manager->ingest_interactional_signal(interaction, now_ms);
+      break;
+    }
+
+    case ncos::core::contracts::BehaviorProfile::kAttendUser: {
+      ncos::core::contracts::CompanionAttentionalSignal attentional{};
+      attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+      attentional.channel = ncos::core::contracts::AttentionChannel::kMultimodal;
+      attentional.focus_confidence_percent = 86;
+      attentional.lock_active = true;
+      (void)manager->ingest_attentional_signal(attentional, now_ms);
+
+      ncos::core::contracts::CompanionInteractionSignal interaction{};
+      interaction.phase = ncos::core::contracts::InteractionPhase::kListening;
+      interaction.turn_owner = ncos::core::contracts::TurnOwner::kUser;
+      interaction.session_active = true;
+      interaction.response_pending = false;
+      (void)manager->ingest_interactional_signal(interaction, now_ms);
+      break;
+    }
+
+    case ncos::core::contracts::BehaviorProfile::kIdleObserve:
+    default:
+      break;
+  }
+}
+
+uint8_t map_arousal_percent(const ncos::core::contracts::CompanionSnapshot& snapshot,
+                            const ncos::core::contracts::BehaviorRuntimeState& behavior_state,
+                            uint64_t now_ms) {
+  uint16_t base = snapshot.emotional.vector.arousal_percent;
+
+  if (snapshot.emotional.arousal == ncos::core::contracts::EmotionalArousal::kHigh) {
+    base = static_cast<uint16_t>(base + 10);
+  }
+
+  if (behavior_state.active_profile == ncos::core::contracts::BehaviorProfile::kAlertScan &&
+      behavior_state.last_accept_ms > 0 && (now_ms - behavior_state.last_accept_ms) < 1400) {
+    base = static_cast<uint16_t>(base + 12);
+  }
+
+  if (base > 100U) {
+    base = 100U;
+  }
+
+  return static_cast<uint8_t>(base);
 }
 
 ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
-    const ncos::core::contracts::CompanionSnapshot& snapshot) {
+    const ncos::core::contracts::CompanionSnapshot& snapshot,
+    const ncos::core::contracts::BehaviorRuntimeState& behavior_state,
+    uint64_t now_ms) {
   ncos::core::contracts::MotionCompanionSignal signal{};
   signal.safe_mode = snapshot.runtime.safe_mode ||
                      snapshot.energetic.mode == ncos::core::contracts::EnergyMode::kCritical;
+
+  const bool behavior_attention_lock =
+      (behavior_state.active_profile == ncos::core::contracts::BehaviorProfile::kAlertScan ||
+       behavior_state.active_profile == ncos::core::contracts::BehaviorProfile::kAttendUser) &&
+      behavior_state.last_accept_ms > 0 && (now_ms - behavior_state.last_accept_ms) < 1600;
+
   signal.attention_lock = snapshot.attentional.lock_active ||
-                          snapshot.attentional.focus_confidence_percent >= 70;
-  signal.emotional_arousal_percent = map_arousal_percent(snapshot.emotional);
+                          snapshot.attentional.focus_confidence_percent >= 70 ||
+                          behavior_attention_lock;
+  signal.emotional_arousal_percent = map_arousal_percent(snapshot, behavior_state, now_ms);
   return signal;
 }
 }  // namespace
@@ -107,6 +183,10 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(kTag, "RoutineService iniciou em estado degradado");
   }
 
+  if (!emotion_service_.initialize(kEmotionServiceId, now)) {
+    ESP_LOGW(kTag, "EmotionService iniciou em estado degradado");
+  }
+
   touch_service_.bind_port(ncos::drivers::touch::acquire_shared_touch_port());
   if (!touch_service_.initialize(now)) {
     ESP_LOGW(kTag, "TouchService iniciou em estado degradado");
@@ -151,18 +231,17 @@ void FirmwareEntrypoint::tick() {
   touch_service_.tick(now);
   imu_service_.tick(now);
 
-  const ncos::core::contracts::FaceMultimodalInput face_multimodal =
-      ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
-                                                        imu_service_.state(), now);
-  face_service_.tick(now, face_multimodal);
-
   const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+
   ncos::core::contracts::BehaviorProposal behavior_proposal{};
   if (behavior_service_.tick(behavior_snapshot, now, &behavior_proposal) && behavior_proposal.valid) {
     const ncos::core::contracts::GovernanceDecision behavior_decision =
         system_manager_.govern_action(behavior_proposal.proposal, now);
     behavior_service_.on_governance_decision(behavior_decision, now);
+    if (decision_allows(behavior_decision)) {
+      ingest_behavior_companion_signals(&system_manager_, behavior_proposal.profile, now);
+    }
   }
 
   ncos::core::contracts::RoutineProposal routine_proposal{};
@@ -173,9 +252,26 @@ void FirmwareEntrypoint::tick() {
     routine_service_.on_governance_decision(routine_decision, now);
   }
 
+  const ncos::core::contracts::CompanionSnapshot emotion_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+  ncos::core::contracts::CompanionEmotionalSignal emotional_signal{};
+  if (emotion_service_.tick(emotion_snapshot, behavior_service_.state(), routine_service_.state(), now,
+                            &emotional_signal)) {
+    (void)system_manager_.ingest_emotional_signal(emotional_signal, now);
+  }
+
+  const ncos::core::contracts::CompanionSnapshot face_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kFaceService);
+  const ncos::core::contracts::FaceMultimodalInput face_multimodal =
+      ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
+                                                        imu_service_.state(), face_snapshot,
+                                                        behavior_service_.state(), now);
+  face_service_.tick(now, face_multimodal);
+
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
-  motion_service_.update_companion_signal(make_motion_companion_signal(companion_snapshot), now);
+  motion_service_.update_companion_signal(
+      make_motion_companion_signal(companion_snapshot, behavior_service_.state(), now), now);
   motion_service_.update_face_signal(face_service_.motion_signal(), now);
   motion_service_.tick(now);
 

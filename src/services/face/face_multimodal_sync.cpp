@@ -37,16 +37,23 @@ bool FaceMultimodalSync::apply(const ncos::core::contracts::FaceMultimodalInput&
   FaceMultimodalSyncResult result{};
   result.applied = true;
 
-  const uint32_t expressiveness_mix =
-      (static_cast<uint32_t>(input.audio_energy_percent) * 6U +
-       static_cast<uint32_t>(input.touch_intensity_percent) * 3U +
+  const uint32_t sensor_mix =
+      (static_cast<uint32_t>(input.audio_energy_percent) * 4U +
+       static_cast<uint32_t>(input.touch_intensity_percent) * 2U +
        static_cast<uint32_t>(input.motion_intensity_percent) * 1U) /
+      7U;
+
+  const uint32_t semantic_mix =
+      (static_cast<uint32_t>(input.emotional_arousal_percent) * 5U +
+       static_cast<uint32_t>(input.social_engagement_percent) * 3U +
+       static_cast<uint32_t>(input.behavior_activation_percent) * 2U) /
       10U;
 
-  result.target_focus_percent = clamp_percent_sync(32U + expressiveness_mix / 2U);
-  result.target_lid_open_percent =
-      clamp_percent_sync(100U - (input.motion_active ? input.motion_intensity_percent / 3U : 0U));
-  result.target_brow_intensity_percent = clamp_percent_sync(expressiveness_mix / 2U);
+  result.target_focus_percent = clamp_percent_sync(26U + sensor_mix / 3U + semantic_mix / 2U);
+  result.target_lid_open_percent = clamp_percent_sync(
+      100U - (input.motion_active ? input.motion_intensity_percent / 4U : 0U) -
+      input.emotional_arousal_percent / 6U);
+  result.target_brow_intensity_percent = clamp_percent_sync((sensor_mix + semantic_mix) / 2U);
 
   state->eyes.focus_percent = result.target_focus_percent;
   state->lids.openness_percent = result.target_lid_open_percent;

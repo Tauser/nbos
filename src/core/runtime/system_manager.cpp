@@ -138,6 +138,33 @@ ncos::core::contracts::GovernanceDecision SystemManager::govern_action(
   return decision;
 }
 
+bool SystemManager::ingest_emotional_signal(
+    const ncos::core::contracts::CompanionEmotionalSignal& signal, uint64_t now_ms) {
+  return companion_state_.ingest_emotional(signal,
+                                           ncos::core::contracts::CompanionStateWriter::kEmotionService,
+                                           now_ms);
+}
+
+bool SystemManager::ingest_attentional_signal(
+    const ncos::core::contracts::CompanionAttentionalSignal& signal, uint64_t now_ms) {
+  return companion_state_.ingest_attentional(signal,
+                                             ncos::core::contracts::CompanionStateWriter::kAttentionService,
+                                             now_ms);
+}
+
+bool SystemManager::ingest_interactional_signal(
+    const ncos::core::contracts::CompanionInteractionSignal& signal, uint64_t now_ms) {
+  return companion_state_.ingest_interactional(
+      signal, ncos::core::contracts::CompanionStateWriter::kInteractionService, now_ms);
+}
+
+bool SystemManager::ingest_energetic_signal(
+    const ncos::core::contracts::CompanionEnergeticSignal& signal, uint64_t now_ms) {
+  return companion_state_.ingest_energetic(signal,
+                                           ncos::core::contracts::CompanionStateWriter::kPowerService,
+                                           now_ms);
+}
+
 void SystemManager::lifecycle_watchdog_task(void* context) {
   if (context == nullptr) {
     return;

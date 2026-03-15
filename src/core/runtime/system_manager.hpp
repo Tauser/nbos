@@ -46,6 +46,14 @@ class SystemManager final {
       ncos::core::contracts::CompanionStateReader reader) const;
   ncos::core::contracts::GovernanceDecision govern_action(
       const ncos::core::contracts::ActionProposal& proposal, uint64_t now_ms);
+  bool ingest_emotional_signal(const ncos::core::contracts::CompanionEmotionalSignal& signal,
+                               uint64_t now_ms);
+  bool ingest_attentional_signal(const ncos::core::contracts::CompanionAttentionalSignal& signal,
+                                 uint64_t now_ms);
+  bool ingest_interactional_signal(const ncos::core::contracts::CompanionInteractionSignal& signal,
+                                   uint64_t now_ms);
+  bool ingest_energetic_signal(const ncos::core::contracts::CompanionEnergeticSignal& signal,
+                               uint64_t now_ms);
 
  private:
   static void lifecycle_watchdog_task(void* context);

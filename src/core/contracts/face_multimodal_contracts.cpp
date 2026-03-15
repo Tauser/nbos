@@ -28,6 +28,26 @@ uint8_t motion_intensity_percent(const ncos::core::contracts::ImuRuntimeState& i
   return clamp_percent(total > 600U ? 100U : (total * 100U) / 600U);
 }
 
+uint8_t behavior_activation_percent(const ncos::core::contracts::BehaviorRuntimeState& behavior,
+                                    uint64_t now_ms) {
+  if (!behavior.initialized || behavior.active_profile == ncos::core::contracts::BehaviorProfile::kIdleObserve ||
+      behavior.last_accept_ms == 0 || (now_ms - behavior.last_accept_ms) > 1400) {
+    return 0;
+  }
+
+  switch (behavior.active_profile) {
+    case ncos::core::contracts::BehaviorProfile::kEnergyProtect:
+      return 82;
+    case ncos::core::contracts::BehaviorProfile::kAlertScan:
+      return 72;
+    case ncos::core::contracts::BehaviorProfile::kAttendUser:
+      return 58;
+    case ncos::core::contracts::BehaviorProfile::kIdleObserve:
+    default:
+      return 0;
+  }
+}
+
 }  // namespace
 
 namespace ncos::core::contracts {
@@ -35,6 +55,8 @@ namespace ncos::core::contracts {
 FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
                                                const TouchRuntimeState& touch,
                                                const ImuRuntimeState& imu,
+                                               const CompanionSnapshot& companion,
+                                               const BehaviorRuntimeState& behavior,
                                                uint64_t now_ms) {
   FaceMultimodalInput input{};
   input.audio_ready = is_ready_for_local_audio(audio);
@@ -45,6 +67,12 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
   input.touch_intensity_percent = touch_intensity_percent(touch);
   input.motion_intensity_percent = motion_intensity_percent(imu);
   input.motion_active = input.motion_intensity_percent >= 15;
+
+  input.emotional_arousal_percent = companion.emotional.vector.arousal_percent;
+  input.social_engagement_percent = companion.emotional.vector.social_engagement_percent;
+  input.behavior_activation_percent = behavior_activation_percent(behavior, now_ms);
+  input.behavior_active = input.behavior_activation_percent > 0;
+
   input.observed_at_ms = now_ms;
   return input;
 }

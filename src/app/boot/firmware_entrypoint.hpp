@@ -4,6 +4,7 @@
 #include "core/runtime/system_manager.hpp"
 #include "services/audio/audio_service.hpp"
 #include "services/behavior/behavior_service.hpp"
+#include "services/emotion/emotion_service.hpp"
 #include "services/face/face_service.hpp"
 #include "services/led/led_service.hpp"
 #include "services/motion/motion_service.hpp"
@@ -27,6 +28,7 @@ class FirmwareEntrypoint final {
   ncos::services::audio::AudioService audio_service_{};
   ncos::services::behavior::BehaviorService behavior_service_{};
   ncos::services::routine::RoutineService routine_service_{};
+  ncos::services::emotion::EmotionService emotion_service_{};
   ncos::services::sensing::TouchService touch_service_{};
   ncos::services::sensing::ImuService imu_service_{};
   ncos::services::motion::MotionService motion_service_{};
