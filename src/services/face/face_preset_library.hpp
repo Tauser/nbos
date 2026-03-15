@@ -20,6 +20,8 @@ enum class FaceExploratoryPresetId : uint8_t {
   kCuriousObserve = 4,
   kPlayfulLift = 5,
   kAttentiveLock = 6,
+  kSocialGlance = 7,
+  kIdleDrift = 8,
 };
 
 struct FacePresetSpec {
