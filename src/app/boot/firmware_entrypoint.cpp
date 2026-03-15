@@ -13,6 +13,7 @@
 #include "core/runtime/runtime_readiness.hpp"
 #include "drivers/audio/audio_local_port.hpp"
 #include "drivers/camera/camera_local_port.hpp"
+#include "drivers/cloud/cloud_local_port.hpp"
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
 #include "drivers/power/power_local_port.hpp"
@@ -31,6 +32,7 @@ constexpr uint16_t VoiceServiceId = 64;
 constexpr uint16_t PerceptionServiceId = 65;
 constexpr uint16_t PowerServiceId = 66;
 constexpr uint16_t UpdateServiceId = 67;
+constexpr uint16_t CloudSyncServiceId = 68;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -222,6 +224,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "UpdateService iniciou em estado degradado");
   }
 
+  cloud_sync_service_.bind_port(ncos::drivers::cloud::acquire_shared_cloud_port());
+  if (!cloud_sync_service_.initialize(CloudSyncServiceId, now, ncos::config::kGlobalConfig.runtime)) {
+    ESP_LOGW(Tag, "CloudSyncService iniciou em estado degradado");
+  }
+
   const ncos::core::contracts::UpdateDecision ota_boot = update_service_.evaluate_boot_policy(now);
   if (ota_boot.valid && ota_boot.request_safe_fallback && !ota_fault_reported_) {
     ota_fault_reported_ = true;
@@ -363,6 +370,10 @@ void FirmwareEntrypoint::tick() {
                                                         behavior_service_.state(), now);
   face_service_.tick(now, face_multimodal);
 
+  const ncos::core::contracts::CompanionSnapshot cloud_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
+  (void)cloud_sync_service_.tick(cloud_snapshot, now);
+
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
   motion_service_.update_companion_signal(
@@ -378,3 +389,4 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
