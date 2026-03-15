@@ -15,6 +15,7 @@
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/camera/camera_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
+#include "drivers/power/power_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
 
@@ -27,6 +28,7 @@ constexpr uint16_t RoutineServiceId = 62;
 constexpr uint16_t EmotionServiceId = 63;
 constexpr uint16_t VoiceServiceId = 64;
 constexpr uint16_t PerceptionServiceId = 65;
+constexpr uint16_t PowerServiceId = 66;
 constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -46,16 +48,6 @@ void ingest_behavior_companion_signals(ncos::core::runtime::SystemManager* manag
   }
 
   switch (profile) {
-    case ncos::core::contracts::BehaviorProfile::kEnergyProtect: {
-      ncos::core::contracts::CompanionEnergeticSignal energetic{};
-      energetic.mode = ncos::core::contracts::EnergyMode::kConstrained;
-      energetic.battery_percent = 24;
-      energetic.thermal_load_percent = 38;
-      energetic.external_power = false;
-      (void)manager->ingest_energetic_signal(energetic, now_ms);
-      break;
-    }
-
     case ncos::core::contracts::BehaviorProfile::kAlertScan: {
       ncos::core::contracts::CompanionAttentionalSignal attentional{};
       attentional.target = ncos::core::contracts::AttentionTarget::kStimulus;
@@ -213,6 +205,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "PerceptionService iniciou em estado degradado");
   }
 
+  power_service_.bind_port(ncos::drivers::power::acquire_shared_power_port());
+  if (!power_service_.initialize(PowerServiceId, now)) {
+    ESP_LOGW(Tag, "PowerService iniciou em estado degradado");
+  }
+
   motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
   if (!motion_service_.initialize(now)) {
     ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
@@ -301,6 +298,13 @@ void FirmwareEntrypoint::tick() {
     (void)system_manager_.ingest_emotional_signal(emotional_signal, now);
   }
 
+  const ncos::core::contracts::CompanionSnapshot power_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kPowerService);
+  ncos::core::contracts::CompanionEnergeticSignal energetic_signal{};
+  if (power_service_.tick(power_snapshot, now, &energetic_signal)) {
+    (void)system_manager_.ingest_energetic_signal(energetic_signal, now);
+  }
+
   const ncos::core::contracts::CompanionSnapshot face_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kFaceService);
   const ncos::core::contracts::FaceMultimodalInput face_multimodal =
@@ -323,8 +327,3 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
-
-
-
-
-

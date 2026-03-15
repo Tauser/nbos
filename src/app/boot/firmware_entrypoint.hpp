@@ -8,6 +8,7 @@
 #include "services/face/face_service.hpp"
 #include "services/led/led_service.hpp"
 #include "services/motion/motion_service.hpp"
+#include "services/power/power_service.hpp"
 #include "services/routine/routine_service.hpp"
 #include "services/sensing/imu_service.hpp"
 #include "services/sensing/touch_service.hpp"
@@ -37,12 +38,10 @@ class FirmwareEntrypoint final {
   ncos::services::sensing::ImuService imu_service_{};
   ncos::services::vision::CameraService camera_service_{};
   ncos::services::vision::PerceptionService perception_service_{};
+  ncos::services::power::PowerService power_service_{};
   ncos::services::motion::MotionService motion_service_{};
   ncos::services::led::LedService led_service_{};
   ncos::services::face::FaceService face_service_{};
 };
 
 }  // namespace ncos::app::boot
-
-
-
