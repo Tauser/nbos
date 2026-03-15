@@ -11,12 +11,21 @@ class MotionService final {
  public:
   void bind_port(ncos::interfaces::motion::MotionPort* port);
   bool initialize(uint64_t now_ms);
+
   bool apply_neutral_pose(uint64_t now_ms);
   bool apply_pose(const ncos::core::contracts::MotionPoseCommand& pose, uint64_t now_ms);
+  bool request_motion(const ncos::core::contracts::MotionCommand& command, uint64_t now_ms);
+
+  void update_companion_signal(const ncos::core::contracts::MotionCompanionSignal& signal,
+                               uint64_t now_ms);
+  void update_face_signal(const ncos::core::contracts::MotionFaceSignal& signal, uint64_t now_ms);
+
   void tick(uint64_t now_ms);
   [[nodiscard]] const ncos::core::contracts::MotionRuntimeState& state() const;
 
  private:
+  bool apply_plan(const ncos::core::contracts::MotionExecutionPlan& plan, uint64_t now_ms);
+
   ncos::interfaces::motion::MotionPort* port_ = nullptr;
   ncos::core::contracts::MotionRuntimeState state_ =
       ncos::core::contracts::make_motion_runtime_baseline();
