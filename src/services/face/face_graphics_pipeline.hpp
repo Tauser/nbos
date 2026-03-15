@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "core/contracts/face_render_state_contracts.hpp"
+#include "services/face/face_compositor.hpp"
 #include "services/face/face_display_renderer.hpp"
 #include "services/face/face_frame_composer.hpp"
 #include "services/face/face_gaze_controller.hpp"
@@ -17,7 +18,8 @@ class FaceGraphicsPipeline final {
   bool initialized() const;
 
  private:
-  static constexpr uint16_t kFaceServiceId = 31;
+  static constexpr uint16_t kPresetOwnerServiceId = 31;
+  static constexpr uint16_t kGazeOwnerServiceId = 32;
   static constexpr uint32_t kRenderPeriodMs = 120;
 
   bool initialized_ = false;
@@ -27,7 +29,8 @@ class FaceGraphicsPipeline final {
 
   ncos::core::contracts::FaceRenderState state_{};
   FaceExploratoryPresetId exploratory_preset_ = FaceExploratoryPresetId::kClarityNeutral;
-  FaceGazeController gaze_controller_{kFaceServiceId};
+  FaceCompositor compositor_{};
+  FaceGazeController gaze_controller_{kGazeOwnerServiceId};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};
 };
