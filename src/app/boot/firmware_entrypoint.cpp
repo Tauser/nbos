@@ -4,6 +4,7 @@
 
 #include "app/boot/boot_flow.hpp"
 #include "config/system_config.hpp"
+#include "core/contracts/behavior_runtime_contracts.hpp"
 #include "core/contracts/companion_state_contracts.hpp"
 #include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/interaction_taxonomy.hpp"
@@ -19,6 +20,7 @@
 #include "esp_timer.h"
 
 namespace {
+constexpr uint16_t kBehaviorServiceId = 61;
 constexpr const char* kTag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
@@ -53,7 +55,7 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
   signal.emotional_arousal_percent = map_arousal_percent(snapshot.emotional);
   return signal;
 }
-}
+}  // namespace
 
 namespace ncos::app::boot {
 
@@ -93,6 +95,10 @@ void FirmwareEntrypoint::run() {
   audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
   if (!audio_service_.initialize(now)) {
     ESP_LOGW(kTag, "AudioService iniciou em estado degradado");
+  }
+
+  if (!behavior_service_.initialize(kBehaviorServiceId, now)) {
+    ESP_LOGW(kTag, "BehaviorService iniciou em estado degradado");
   }
 
   touch_service_.bind_port(ncos::drivers::touch::acquire_shared_touch_port());
@@ -143,6 +149,15 @@ void FirmwareEntrypoint::tick() {
       ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
                                                         imu_service_.state(), now);
   face_service_.tick(now, face_multimodal);
+
+  const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
+      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+  ncos::core::contracts::BehaviorProposal behavior_proposal{};
+  if (behavior_service_.tick(behavior_snapshot, now, &behavior_proposal) && behavior_proposal.valid) {
+    const ncos::core::contracts::GovernanceDecision behavior_decision =
+        system_manager_.govern_action(behavior_proposal.proposal, now);
+    behavior_service_.on_governance_decision(behavior_decision, now);
+  }
 
   const ncos::core::contracts::CompanionSnapshot companion_snapshot =
       system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);

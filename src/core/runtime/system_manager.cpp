@@ -130,6 +130,14 @@ ncos::core::contracts::CompanionSnapshot SystemManager::companion_snapshot_for(
   return companion_state_.snapshot_for(reader);
 }
 
+ncos::core::contracts::GovernanceDecision SystemManager::govern_action(
+    const ncos::core::contracts::ActionProposal& proposal, uint64_t now_ms) {
+  ncos::core::contracts::GovernanceDecision decision = action_governor_.evaluate(proposal, now_ms);
+  (void)companion_state_.ingest_governance_decision(
+      decision, ncos::core::contracts::CompanionStateWriter::kGovernanceCore, now_ms);
+  return decision;
+}
+
 void SystemManager::lifecycle_watchdog_task(void* context) {
   if (context == nullptr) {
     return;
@@ -192,5 +200,3 @@ void SystemManager::sync_companion_state(uint64_t now_ms) {
 }
 
 }  // namespace ncos::core::runtime
-
-

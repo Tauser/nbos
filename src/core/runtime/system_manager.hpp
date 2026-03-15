@@ -44,6 +44,8 @@ class SystemManager final {
   RuntimeStatus status() const;
   ncos::core::contracts::CompanionSnapshot companion_snapshot_for(
       ncos::core::contracts::CompanionStateReader reader) const;
+  ncos::core::contracts::GovernanceDecision govern_action(
+      const ncos::core::contracts::ActionProposal& proposal, uint64_t now_ms);
 
  private:
   static void lifecycle_watchdog_task(void* context);
