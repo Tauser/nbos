@@ -89,6 +89,8 @@ struct MotionRuntimeState {
   bool has_active_plan = false;
   bool rejected_for_priority = false;
   bool safety_clamp_applied = false;
+  bool stale_face_guard_active = false;
+  bool fail_safe_guard_active = false;
   MotionPoseCommand last_pose{};
   MotionExecutionPlan active_plan{};
   MotionCompanionSignal companion_signal{};
@@ -96,11 +98,16 @@ struct MotionRuntimeState {
   MotionSafetyLimits safety_limits{};
   size_t last_tx_bytes = 0;
   uint64_t last_update_ms = 0;
+  uint64_t last_companion_signal_ms = 0;
+  uint64_t last_face_signal_ms = 0;
+  uint64_t last_neutral_command_ms = 0;
+  uint16_t consecutive_apply_failures = 0;
   uint32_t apply_success_total = 0;
   uint32_t apply_failure_total = 0;
   uint32_t plan_applied_total = 0;
   uint32_t plan_rejected_total = 0;
   uint32_t safety_clamp_total = 0;
+  uint32_t guard_interventions_total = 0;
 };
 
 constexpr MotionPoseCommand make_neutral_pose() {
@@ -206,3 +213,4 @@ constexpr MotionExecutionPlan make_execution_plan(const MotionCommand& cmd, uint
 }
 
 }  // namespace ncos::core::contracts
+

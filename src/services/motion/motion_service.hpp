@@ -28,6 +28,7 @@ class MotionService final {
   ncos::core::contracts::MotionCommand sanitize_command(const ncos::core::contracts::MotionCommand& command,
                                                         uint64_t now_ms);
   bool apply_plan(const ncos::core::contracts::MotionExecutionPlan& plan, uint64_t now_ms);
+  bool enforce_neutral_guard(uint64_t now_ms, bool recovery_command);
 
   ncos::interfaces::motion::MotionPort* port_ = nullptr;
   ncos::core::contracts::MotionRuntimeState state_ =
@@ -36,3 +37,5 @@ class MotionService final {
 };
 
 }  // namespace ncos::services::motion
+
+

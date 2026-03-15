@@ -84,7 +84,7 @@ void test_motion_service_rejects_lower_priority_during_hold_window() {
   high_priority.pose.yaw_permille = 200;
   high_priority.hold_ms = 500;
 
-  TEST_ASSERT_TRUE(service.request_motion(high_priority, 1100));
+  TEST_ASSERT_TRUE(service.request_motion(high_priority, 1300));
 
   ncos::core::contracts::MotionCommand low_priority{};
   low_priority.intent = ncos::core::contracts::MotionIntent::kObserveStimulus;
@@ -92,11 +92,11 @@ void test_motion_service_rejects_lower_priority_during_hold_window() {
   low_priority.pose.yaw_permille = -200;
   low_priority.hold_ms = 100;
 
-  TEST_ASSERT_FALSE(service.request_motion(low_priority, 1200));
+  TEST_ASSERT_FALSE(service.request_motion(low_priority, 1400));
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.rejected_for_priority);
   TEST_ASSERT_EQUAL_UINT32(1, state.plan_rejected_total);
-  TEST_ASSERT_EQUAL_INT16(200, state.last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(140, state.last_pose.yaw_permille);
 }
 
 void test_motion_service_clamps_pose_to_safe_limits() {
@@ -114,13 +114,13 @@ void test_motion_service_clamps_pose_to_safe_limits() {
   command.pose.speed_percent = 95;
   command.hold_ms = 200;
 
-  TEST_ASSERT_TRUE(service.request_motion(command, 2100));
+  TEST_ASSERT_TRUE(service.request_motion(command, 2300));
 
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.safety_clamp_applied);
   TEST_ASSERT_EQUAL_UINT32(1, state.safety_clamp_total);
-  TEST_ASSERT_EQUAL_INT16(420, state.last_pose.yaw_permille);
-  TEST_ASSERT_EQUAL_INT16(-350, state.last_pose.pitch_permille);
+  TEST_ASSERT_EQUAL_INT16(140, state.last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(-120, state.last_pose.pitch_permille);
   TEST_ASSERT_EQUAL_UINT16(70, state.last_pose.speed_percent);
 }
 
@@ -137,9 +137,9 @@ void test_motion_service_recovery_command_returns_to_neutral() {
   command.pose.yaw_permille = 260;
   command.pose.pitch_permille = 120;
   command.hold_ms = 200;
-  TEST_ASSERT_TRUE(service.request_motion(command, 3100));
+  TEST_ASSERT_TRUE(service.request_motion(command, 3300));
 
-  TEST_ASSERT_TRUE(service.recover_to_neutral(3200));
+  TEST_ASSERT_TRUE(service.recover_to_neutral(3600));
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.neutral_applied);
   TEST_ASSERT_EQUAL_INT16(0, state.last_pose.yaw_permille);
@@ -164,7 +164,7 @@ void test_motion_service_tick_aligns_head_with_face_signal() {
 
   const auto& state = service.state();
   TEST_ASSERT_GREATER_THAN_UINT32(1, state.apply_success_total);
-  TEST_ASSERT_EQUAL_INT16(180, state.last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(140, state.last_pose.yaw_permille);
   TEST_ASSERT_EQUAL_INT16(-100, state.last_pose.pitch_permille);
 }
 
@@ -181,13 +181,13 @@ void test_motion_service_tick_uses_companion_safe_mode_for_recovery() {
   command.pose.yaw_permille = 220;
   command.pose.pitch_permille = 120;
   command.hold_ms = 100;
-  TEST_ASSERT_TRUE(service.request_motion(command, 5100));
+  TEST_ASSERT_TRUE(service.request_motion(command, 5300));
 
   ncos::core::contracts::MotionCompanionSignal companion{};
   companion.safe_mode = true;
-  service.update_companion_signal(companion, 5200);
+  service.update_companion_signal(companion, 5400);
 
-  service.tick(5300);
+  service.tick(5800);
 
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.neutral_applied);
@@ -195,24 +195,83 @@ void test_motion_service_tick_uses_companion_safe_mode_for_recovery() {
   TEST_ASSERT_EQUAL_INT16(0, state.last_pose.pitch_permille);
 }
 
-void test_motion_service_updates_companion_and_face_signals() {
+void test_motion_service_stale_face_signal_guard_returns_to_neutral() {
   FakeMotionPort fake{};
 
   ncos::services::motion::MotionService service;
   service.bind_port(&fake);
   TEST_ASSERT_TRUE(service.initialize(6000));
 
+  ncos::core::contracts::MotionCommand command{};
+  command.intent = ncos::core::contracts::MotionIntent::kDirectPose;
+  command.priority = ncos::core::contracts::MotionPriority::kHigh;
+  command.pose.yaw_permille = 180;
+  command.pose.pitch_permille = 90;
+  command.hold_ms = 100;
+  TEST_ASSERT_TRUE(service.request_motion(command, 6300));
+
+  ncos::core::contracts::MotionFaceSignal face{};
+  face.gaze_x_percent = 20;
+  face.gaze_y_percent = 5;
+  service.update_face_signal(face, 6400);
+
+  service.tick(8001);
+
+  const auto& state = service.state();
+  TEST_ASSERT_TRUE(state.stale_face_guard_active);
+  TEST_ASSERT_TRUE(state.neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, state.last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(0, state.last_pose.pitch_permille);
+}
+
+void test_motion_service_fail_safe_guard_blocks_non_recovery_until_neutral() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(7000));
+
+  fake.apply_ok = false;
+
+  ncos::core::contracts::MotionCommand command{};
+  command.intent = ncos::core::contracts::MotionIntent::kDirectPose;
+  command.priority = ncos::core::contracts::MotionPriority::kNormal;
+  command.pose.yaw_permille = 100;
+  command.pose.pitch_permille = 40;
+  command.hold_ms = 100;
+
+  TEST_ASSERT_FALSE(service.request_motion(command, 7300));
+  TEST_ASSERT_FALSE(service.request_motion(command, 7400));
+  TEST_ASSERT_FALSE(service.request_motion(command, 7500));
+
+  TEST_ASSERT_TRUE(service.state().fail_safe_guard_active);
+
+  fake.apply_ok = true;
+  TEST_ASSERT_FALSE(service.request_motion(command, 7600));
+  TEST_ASSERT_TRUE(service.recover_to_neutral(7700));
+  TEST_ASSERT_FALSE(service.state().fail_safe_guard_active);
+
+  TEST_ASSERT_TRUE(service.request_motion(command, 8400));
+}
+
+void test_motion_service_updates_companion_and_face_signals() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(9000));
+
   ncos::core::contracts::MotionCompanionSignal companion{};
   companion.safe_mode = true;
   companion.attention_lock = true;
   companion.emotional_arousal_percent = 78;
-  service.update_companion_signal(companion, 6100);
+  service.update_companion_signal(companion, 9100);
 
   ncos::core::contracts::MotionFaceSignal face{};
   face.gaze_x_percent = 40;
   face.gaze_y_percent = -10;
   face.clip_active = true;
-  service.update_face_signal(face, 6200);
+  service.update_face_signal(face, 9200);
 
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.companion_signal.safe_mode);
@@ -221,6 +280,8 @@ void test_motion_service_updates_companion_and_face_signals() {
   TEST_ASSERT_EQUAL_INT8(40, state.face_signal.gaze_x_percent);
   TEST_ASSERT_EQUAL_INT8(-10, state.face_signal.gaze_y_percent);
   TEST_ASSERT_TRUE(state.face_signal.clip_active);
+  TEST_ASSERT_EQUAL_UINT64(9100, state.last_companion_signal_ms);
+  TEST_ASSERT_EQUAL_UINT64(9200, state.last_face_signal_ms);
 }
 
 int main() {
@@ -232,6 +293,9 @@ int main() {
   RUN_TEST(test_motion_service_recovery_command_returns_to_neutral);
   RUN_TEST(test_motion_service_tick_aligns_head_with_face_signal);
   RUN_TEST(test_motion_service_tick_uses_companion_safe_mode_for_recovery);
+  RUN_TEST(test_motion_service_stale_face_signal_guard_returns_to_neutral);
+  RUN_TEST(test_motion_service_fail_safe_guard_blocks_non_recovery_until_neutral);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }
+
