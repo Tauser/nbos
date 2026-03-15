@@ -3,6 +3,7 @@
 namespace {
 
 constexpr uint16_t kOrientationDotColor = 0xF800;
+constexpr int16_t kEyeErasePadding = 12;
 
 bool requires_full_redraw(const ncos::services::face::FaceFrame& prev,
                           const ncos::services::face::FaceFrame& next) {
@@ -12,15 +13,16 @@ bool requires_full_redraw(const ncos::services::face::FaceFrame& prev,
 }
 
 void erase_eye(ncos::drivers::display::DisplayDriver* display,
-               const ncos::services::face::FaceFrame& frame,
+               const ncos::services::face::FaceFrame& previous_frame,
                int16_t eye_x,
                int16_t eye_y) {
-  const int16_t erase_w = static_cast<int16_t>(frame.eye_w + 8);
-  const int16_t erase_h = static_cast<int16_t>(frame.eye_h + 8);
+  const int16_t erase_w = static_cast<int16_t>(previous_frame.eye_w + kEyeErasePadding);
+  const int16_t erase_h = static_cast<int16_t>(previous_frame.eye_h + kEyeErasePadding);
   const int16_t erase_x = static_cast<int16_t>(eye_x - erase_w / 2);
   const int16_t erase_y = static_cast<int16_t>(eye_y - erase_h / 2);
-  const int16_t erase_corner = static_cast<int16_t>((frame.eye_corner + 4) > 16 ? 16 : (frame.eye_corner + 4));
-  display->fillRoundRect(erase_x, erase_y, erase_w, erase_h, erase_corner, frame.face_color);
+  const int16_t erase_corner = static_cast<int16_t>(
+      (previous_frame.eye_corner + 6) > 18 ? 18 : (previous_frame.eye_corner + 6));
+  display->fillRoundRect(erase_x, erase_y, erase_w, erase_h, erase_corner, previous_frame.face_color);
 }
 
 }  // namespace
@@ -40,6 +42,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
   }
 
   display_->setRotation(1);
+  display_->startWrite();
 
   const bool full_redraw = !has_previous_frame_ || requires_full_redraw(previous_frame_, frame);
 
@@ -51,8 +54,8 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
                               frame.head_radius, frame.face_color);
     }
   } else {
-    erase_eye(display_, frame, previous_frame_.left_eye_x, previous_frame_.left_eye_y);
-    erase_eye(display_, frame, previous_frame_.right_eye_x, previous_frame_.right_eye_y);
+    erase_eye(display_, previous_frame_, previous_frame_.left_eye_x, previous_frame_.left_eye_y);
+    erase_eye(display_, previous_frame_, previous_frame_.right_eye_x, previous_frame_.right_eye_y);
   }
 
   const int16_t left_eye_x = static_cast<int16_t>(frame.left_eye_x - frame.eye_w / 2);
@@ -68,6 +71,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
   const int16_t orientation_x = static_cast<int16_t>(display_->width() / 2);
   const int16_t orientation_y = static_cast<int16_t>(display_->height() - 8);
   display_->fillCircle(orientation_x, orientation_y, 3, kOrientationDotColor);
+  display_->endWrite();
 
   previous_frame_ = frame;
   has_previous_frame_ = true;
@@ -75,4 +79,3 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 }
 
 }  // namespace ncos::services::face
-
