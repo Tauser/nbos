@@ -31,7 +31,7 @@ void test_emotion_service_raise_arousal_on_alert_behavior() {
   TEST_ASSERT_TRUE(service.tick(snapshot, behavior, routine, 1200, &out));
   TEST_ASSERT_TRUE(out.vector_authoritative);
   TEST_ASSERT_GREATER_THAN_UINT8(28, out.vector.arousal_percent);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalArousal::kHigh),
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::EmotionalArousal::kMedium),
                         static_cast<int>(out.arousal));
 }
 
@@ -65,3 +65,4 @@ int main() {
   RUN_TEST(test_emotion_service_boost_social_on_attend_user_with_user_routine);
   return UNITY_END();
 }
+

@@ -36,7 +36,11 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   imu.gy_dps = -60;
   imu.gz_dps = 40;
 
-  const auto input = ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, 1234);
+  ncos::core::contracts::CompanionSnapshot companion{};
+  ncos::core::contracts::BehaviorRuntimeState behavior{};
+
+  const auto input =
+      ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 1234);
 
   TEST_ASSERT_TRUE(input.audio_ready);
   TEST_ASSERT_TRUE(input.touch_active);
@@ -97,3 +101,4 @@ int main() {
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);
   return UNITY_END();
 }
+

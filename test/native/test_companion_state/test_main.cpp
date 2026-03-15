@@ -47,7 +47,11 @@ void test_companion_state_updates_emotional_domain() {
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
 
   ncos::core::contracts::CompanionEmotionalSignal emotional{};
-  emotional.tone = ncos::core::contracts::EmotionalTone::kCurious;
+  emotional.vector_authoritative = true;
+  emotional.vector.valence_percent = -30;
+  emotional.vector.arousal_percent = 82;
+  emotional.vector.social_engagement_percent = 32;
+  emotional.intensity_percent = 72;
   emotional.arousal = ncos::core::contracts::EmotionalArousal::kMedium;
   emotional.intensity_percent = 62;
   emotional.stability_percent = 74;
@@ -186,7 +190,11 @@ void test_companion_state_redacts_by_reader_profile() {
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
 
   ncos::core::contracts::CompanionEmotionalSignal emotional{};
-  emotional.tone = ncos::core::contracts::EmotionalTone::kAlert;
+  emotional.vector_authoritative = true;
+  emotional.vector.valence_percent = -30;
+  emotional.vector.arousal_percent = 82;
+  emotional.vector.social_engagement_percent = 32;
+  emotional.intensity_percent = 72;
   TEST_ASSERT_TRUE(
       store.ingest_emotional(emotional, ncos::core::contracts::CompanionStateWriter::kEmotionService,
                              1100));
@@ -218,6 +226,7 @@ int main() {
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }
+
 
 
 
