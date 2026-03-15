@@ -19,7 +19,7 @@ class BehaviorService final {
   [[nodiscard]] const ncos::core::contracts::BehaviorRuntimeState& state() const;
 
  private:
-  static constexpr uint64_t kBehaviorCooldownMs = 220;
+  static constexpr uint64_t BehaviorCooldownMs = 220;
 
   ncos::core::contracts::BehaviorProposal propose_energy_protect(
       const ncos::core::contracts::CompanionSnapshot& snapshot) const;
@@ -33,3 +33,4 @@ class BehaviorService final {
 };
 
 }  // namespace ncos::services::behavior
+

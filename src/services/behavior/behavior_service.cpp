@@ -48,7 +48,7 @@ bool BehaviorService::tick(const ncos::core::contracts::CompanionSnapshot& snaps
   state_.last_tick_ms = now_ms;
   out_proposal->valid = false;
 
-  if ((now_ms - state_.last_emit_ms) < kBehaviorCooldownMs) {
+  if ((now_ms - state_.last_emit_ms) < BehaviorCooldownMs) {
     return false;
   }
 
@@ -170,4 +170,5 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
 }
 
 }  // namespace ncos::services::behavior
+
 

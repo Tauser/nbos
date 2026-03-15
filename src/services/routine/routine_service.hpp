@@ -21,8 +21,8 @@ class RoutineService final {
   [[nodiscard]] const ncos::core::contracts::RoutineRuntimeState& state() const;
 
  private:
-  static constexpr uint64_t kRoutineCooldownMs = 900;
-  static constexpr uint64_t kBehaviorSuppressionMs = 650;
+  static constexpr uint64_t RoutineCooldownMs = 900;
+  static constexpr uint64_t BehaviorSuppressionMs = 650;
 
   ncos::core::contracts::AttentionMode resolve_attention_mode(
       const ncos::core::contracts::CompanionSnapshot& snapshot) const;
@@ -40,3 +40,4 @@ class RoutineService final {
 };
 
 }  // namespace ncos::services::routine
+

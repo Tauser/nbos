@@ -26,11 +26,11 @@ class FaceGraphicsPipeline final {
   ncos::core::contracts::MotionFaceSignal motion_signal() const;
 
  private:
-  static constexpr uint16_t kPresetOwnerServiceId = 31;
-  static constexpr uint16_t kGazeOwnerServiceId = 32;
-  static constexpr uint16_t kClipOwnerServiceId = 33;
-  static constexpr uint16_t kModulationOwnerServiceId = 34;
-  static constexpr uint32_t kRenderPeriodMs = 120;
+  static constexpr uint16_t PresetOwnerServiceId = 31;
+  static constexpr uint16_t GazeOwnerServiceId = 32;
+  static constexpr uint16_t ClipOwnerServiceId = 33;
+  static constexpr uint16_t ModulationOwnerServiceId = 34;
+  static constexpr uint32_t RenderPeriodMs = 120;
 
   bool initialized_ = false;
   uint64_t next_render_ms_ = 0;
@@ -41,8 +41,8 @@ class FaceGraphicsPipeline final {
   ncos::core::contracts::FaceRenderState state_{};
   FaceOfficialPresetId official_preset_ = FaceOfficialPresetId::kCoreNeutral;
   FaceCompositor compositor_{};
-  FaceClipPlayer clip_player_{kClipOwnerServiceId};
-  FaceGazeController gaze_controller_{kGazeOwnerServiceId};
+  FaceClipPlayer clip_player_{ClipOwnerServiceId};
+  FaceGazeController gaze_controller_{GazeOwnerServiceId};
   FaceMultimodalSync multimodal_sync_{};
   FacePreviewSnapshot preview_snapshot_{};
   ncos::core::contracts::MotionFaceSignal motion_signal_{};
@@ -51,3 +51,4 @@ class FaceGraphicsPipeline final {
 };
 
 }  // namespace ncos::services::face
+

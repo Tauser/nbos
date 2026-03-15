@@ -74,3 +74,8 @@ Antes de F1, respeitar gate arquitetural:
 - FaceService como fachada/orquestrador (não monólito)
 
 Sem esse gate, não avançar para geometria/presets complexos.
+
+## Convenção de nomes
+- Preferir identificadores sem prefixo k em novos códigos (BehaviorServiceId, RenderPeriodMs).
+- Evitar refactor massivo apenas para renomeação; migrar gradualmente quando tocar no arquivo.
+

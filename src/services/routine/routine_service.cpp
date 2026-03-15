@@ -63,7 +63,7 @@ bool RoutineService::tick(const ncos::core::contracts::CompanionSnapshot& snapsh
     return false;
   }
 
-  if ((now_ms - state_.last_emit_ms) < kRoutineCooldownMs) {
+  if ((now_ms - state_.last_emit_ms) < RoutineCooldownMs) {
     return false;
   }
 
@@ -215,7 +215,8 @@ bool RoutineService::should_suppress_by_behavior(
     return false;
   }
 
-  return (now_ms - behavior_state.last_accept_ms) < kBehaviorSuppressionMs;
+  return (now_ms - behavior_state.last_accept_ms) < BehaviorSuppressionMs;
 }
 
 }  // namespace ncos::services::routine
+

@@ -21,10 +21,10 @@
 #include "esp_timer.h"
 
 namespace {
-constexpr uint16_t kBehaviorServiceId = 61;
-constexpr uint16_t kRoutineServiceId = 62;
-constexpr uint16_t kEmotionServiceId = 63;
-constexpr const char* kTag = "NCOS_ENTRY";
+constexpr uint16_t BehaviorServiceId = 61;
+constexpr uint16_t RoutineServiceId = 62;
+constexpr uint16_t EmotionServiceId = 63;
+constexpr const char* Tag = "NCOS_ENTRY";
 
 uint64_t monotonic_ms() {
   return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
@@ -138,20 +138,20 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
 namespace ncos::app::boot {
 
 void FirmwareEntrypoint::run() {
-  ESP_LOGI(kTag, "Entrypoint iniciado");
+  ESP_LOGI(Tag, "Entrypoint iniciado");
 
   if (!ncos::config::kConfigReady) {
-    ESP_LOGE(kTag, "Config centralizada invalida: build_profile=%s",
+    ESP_LOGE(Tag, "Config centralizada invalida: build_profile=%s",
              ncos::config::build_profile_name());
     lifecycle_.mark_fault();
     return;
   }
 
-  ESP_LOGI(kTag, "Config ativa: profile=%s board=%s touch=%d imu=(%d,%d)",
+  ESP_LOGI(Tag, "Config ativa: profile=%s board=%s touch=%d imu=(%d,%d)",
            ncos::config::build_profile_name(), ncos::config::kGlobalConfig.board.board_name,
            ncos::config::kGlobalConfig.board.touch, ncos::config::kGlobalConfig.board.imu_sda,
            ncos::config::kGlobalConfig.board.imu_scl);
-  ESP_LOGI(kTag, "Taxonomia semantica v%u", ncos::core::contracts::kSemanticTaxonomyVersion);
+  ESP_LOGI(Tag, "Taxonomia semantica v%u", ncos::core::contracts::kSemanticTaxonomyVersion);
 
   lifecycle_.start_boot();
 
@@ -159,10 +159,10 @@ void FirmwareEntrypoint::run() {
   const BootReport report = boot_flow.execute();
 
   lifecycle_.finish_boot(report.has_required_failures, report.has_warnings);
-  ESP_LOGI(kTag, "Lifecycle apos boot: %s", lifecycle_.state_name());
+  ESP_LOGI(Tag, "Lifecycle apos boot: %s", lifecycle_.state_name());
 
   if (!system_manager_.initialize(&lifecycle_, &ncos::config::kGlobalConfig)) {
-    ESP_LOGE(kTag, "Falha ao inicializar SystemManager");
+    ESP_LOGE(Tag, "Falha ao inicializar SystemManager");
     lifecycle_.mark_fault();
     return;
   }
@@ -172,50 +172,50 @@ void FirmwareEntrypoint::run() {
 
   audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
   if (!audio_service_.initialize(now)) {
-    ESP_LOGW(kTag, "AudioService iniciou em estado degradado");
+    ESP_LOGW(Tag, "AudioService iniciou em estado degradado");
   }
 
-  if (!behavior_service_.initialize(kBehaviorServiceId, now)) {
-    ESP_LOGW(kTag, "BehaviorService iniciou em estado degradado");
+  if (!behavior_service_.initialize(BehaviorServiceId, now)) {
+    ESP_LOGW(Tag, "BehaviorService iniciou em estado degradado");
   }
 
-  if (!routine_service_.initialize(kRoutineServiceId, now)) {
-    ESP_LOGW(kTag, "RoutineService iniciou em estado degradado");
+  if (!routine_service_.initialize(RoutineServiceId, now)) {
+    ESP_LOGW(Tag, "RoutineService iniciou em estado degradado");
   }
 
-  if (!emotion_service_.initialize(kEmotionServiceId, now)) {
-    ESP_LOGW(kTag, "EmotionService iniciou em estado degradado");
+  if (!emotion_service_.initialize(EmotionServiceId, now)) {
+    ESP_LOGW(Tag, "EmotionService iniciou em estado degradado");
   }
 
   touch_service_.bind_port(ncos::drivers::touch::acquire_shared_touch_port());
   if (!touch_service_.initialize(now)) {
-    ESP_LOGW(kTag, "TouchService iniciou em estado degradado");
+    ESP_LOGW(Tag, "TouchService iniciou em estado degradado");
   }
 
   imu_service_.bind_port(ncos::drivers::imu::acquire_shared_imu_port());
   if (!imu_service_.initialize(now)) {
-    ESP_LOGW(kTag, "ImuService iniciou em estado degradado");
+    ESP_LOGW(Tag, "ImuService iniciou em estado degradado");
   }
 
   motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
   if (!motion_service_.initialize(now)) {
-    ESP_LOGW(kTag, "MotionService iniciou em estado degradado");
+    ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
   }
 
   led_service_.bind_port(ncos::drivers::led::acquire_shared_led_port());
   if (!led_service_.initialize(now)) {
-    ESP_LOGW(kTag, "LedService iniciou em estado degradado");
+    ESP_LOGW(Tag, "LedService iniciou em estado degradado");
   }
 
   if (!face_service_.initialize(now)) {
-    ESP_LOGW(kTag, "Pipeline grafico base nao inicializado");
+    ESP_LOGW(Tag, "Pipeline grafico base nao inicializado");
   }
 
   const ncos::core::runtime::RuntimeReadinessReport readiness =
       ncos::core::runtime::evaluate_runtime_readiness(ncos::config::kGlobalConfig, lifecycle_,
                                                       system_manager_.status());
 
-  ESP_LOGI(kTag,
+  ESP_LOGI(Tag,
            "Runtime readiness=%s cfg=%d board=%d lifecycle=%d init=%d started=%d tasks=%d safe=%d faults=%d",
            readiness.level_name(), readiness.config_valid ? 1 : 0,
            readiness.board_profile_bound ? 1 : 0, readiness.lifecycle_allows_runtime ? 1 : 0,
@@ -283,3 +283,4 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+

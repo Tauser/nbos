@@ -4,18 +4,18 @@
 
 namespace {
 
-constexpr ncos::models::face::FaceClipKeyframe kSignatureClipFrames[] = {
+constexpr ncos::models::face::FaceClipKeyframe SignatureClipFrames[] = {
     {0, {ncos::models::face::GazeAnchor::kUser, ncos::models::face::GazeDirection::kCenter, 54, 96}},
     {180, {ncos::models::face::GazeAnchor::kUser, ncos::models::face::GazeDirection::kUpRight, 74, 92}},
     {360, {ncos::models::face::GazeAnchor::kUser, ncos::models::face::GazeDirection::kUpLeft, 70, 88}},
     {540, {ncos::models::face::GazeAnchor::kUser, ncos::models::face::GazeDirection::kCenter, 50, 96}},
 };
 
-constexpr ncos::models::face::FaceClip kSignatureClip = {
+constexpr ncos::models::face::FaceClip SignatureClip = {
     1001,
     "signature_glance_arc",
-    kSignatureClipFrames,
-    sizeof(kSignatureClipFrames) / sizeof(kSignatureClipFrames[0]),
+    SignatureClipFrames,
+    sizeof(SignatureClipFrames) / sizeof(SignatureClipFrames[0]),
     620,
     220,
     8,
@@ -108,7 +108,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   FaceLayerRequest base_request{};
   base_request.layer = ncos::models::face::FaceLayer::kBase;
   base_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBaseOwner;
-  base_request.requester_service = kPresetOwnerServiceId;
+  base_request.requester_service = PresetOwnerServiceId;
   base_request.priority = 3;
 
   if (!compositor_.request_layer(base_request, now_ms).granted) {
@@ -122,7 +122,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   FaceLayerRequest gaze_request{};
   gaze_request.layer = ncos::models::face::FaceLayer::kGaze;
   gaze_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kGazeOwner;
-  gaze_request.requester_service = kGazeOwnerServiceId;
+  gaze_request.requester_service = GazeOwnerServiceId;
   gaze_request.priority = 5;
 
   if (!compositor_.request_layer(gaze_request, now_ms).granted) {
@@ -132,7 +132,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   FaceLayerRequest modulation_request{};
   modulation_request.layer = ncos::models::face::FaceLayer::kModulation;
   modulation_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kModulationOwner;
-  modulation_request.requester_service = kModulationOwnerServiceId;
+  modulation_request.requester_service = ModulationOwnerServiceId;
   modulation_request.priority = 4;
 
   if (!compositor_.request_layer(modulation_request, now_ms).granted) {
@@ -161,20 +161,20 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     FaceLayerRequest base_request{};
     base_request.layer = ncos::models::face::FaceLayer::kBase;
     base_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kBaseOwner;
-    base_request.requester_service = kPresetOwnerServiceId;
+    base_request.requester_service = PresetOwnerServiceId;
     base_request.priority = 3;
     base_request.hold_ms = 260;
     base_request.cooldown_ms = 120;
 
     if (compositor_.request_layer(base_request, now_ms).granted &&
-        compositor_.can_write(ncos::models::face::FaceLayer::kBase, kPresetOwnerServiceId) &&
+        compositor_.can_write(ncos::models::face::FaceLayer::kBase, PresetOwnerServiceId) &&
         apply_official_face_preset(target_preset, &state_, now_ms)) {
       official_preset_ = target_preset;
     }
   }
 
   if (!clip_player_.active() && now_ms >= next_clip_start_ms_) {
-    (void)clip_player_.play(kSignatureClip, &compositor_, &state_, now_ms);
+    (void)clip_player_.play(SignatureClip, &compositor_, &state_, now_ms);
     next_clip_start_ms_ = now_ms + 6200;
   }
 
@@ -185,7 +185,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
       FaceLayerRequest gaze_request{};
       gaze_request.layer = ncos::models::face::FaceLayer::kGaze;
       gaze_request.requester_role = ncos::core::contracts::FaceLayerOwnerRole::kGazeOwner;
-      gaze_request.requester_service = kGazeOwnerServiceId;
+      gaze_request.requester_service = GazeOwnerServiceId;
       gaze_request.priority = 5;
 
       if (compositor_.request_layer(gaze_request, now_ms).granted) {
@@ -211,7 +211,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     (void)clip_player_.tick(now_ms, &compositor_, &state_);
   }
 
-  (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, kModulationOwnerServiceId, now_ms);
+  (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, ModulationOwnerServiceId, now_ms);
 
   FaceFrame frame{};
   if (composer_.compose(state_, &frame)) {
@@ -220,7 +220,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
 
   preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms);
   motion_signal_ = face_direction_to_motion_signal(state_.eyes.direction, clip_player_.active());
-  next_render_ms_ = now_ms + kRenderPeriodMs;
+  next_render_ms_ = now_ms + RenderPeriodMs;
 }
 
 bool FaceGraphicsPipeline::initialized() const {
@@ -236,3 +236,4 @@ ncos::core::contracts::MotionFaceSignal FaceGraphicsPipeline::motion_signal() co
 }
 
 }  // namespace ncos::services::face
+
