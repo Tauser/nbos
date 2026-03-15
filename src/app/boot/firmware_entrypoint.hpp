@@ -11,6 +11,7 @@
 #include "services/routine/routine_service.hpp"
 #include "services/sensing/imu_service.hpp"
 #include "services/sensing/touch_service.hpp"
+#include "services/voice/voice_service.hpp"
 
 namespace ncos::app::boot {
 
@@ -29,6 +30,7 @@ class FirmwareEntrypoint final {
   ncos::services::behavior::BehaviorService behavior_service_{};
   ncos::services::routine::RoutineService routine_service_{};
   ncos::services::emotion::EmotionService emotion_service_{};
+  ncos::services::voice::VoiceService voice_service_{};
   ncos::services::sensing::TouchService touch_service_{};
   ncos::services::sensing::ImuService imu_service_{};
   ncos::services::motion::MotionService motion_service_{};
