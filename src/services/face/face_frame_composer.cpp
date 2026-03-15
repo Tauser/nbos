@@ -31,10 +31,10 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
 
   FaceFrame frame{};
   frame.background = 0x0000;   // black
-  frame.face_color = 0x0000;   // hidden mask (EMO-like face window)
+  frame.face_color = 0x0000;   // hidden mask
   frame.eye_color = 0x061F;    // cyan
-  frame.pupil_color = 0x0000;  // disabled in this style
-  frame.mouth_color = 0x04FF;  // softer cyan
+  frame.pupil_color = 0x0000;
+  frame.mouth_color = 0x0000;
 
   frame.head_w = layout.head_w;
   frame.head_h = layout.head_h;
@@ -49,7 +49,7 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
   frame.eye_radius = layout.eye_radius;
   frame.eye_w = layout.eye_w;
   frame.eye_h = layout.eye_h;
-  frame.eye_corner = clamp_i16_frame(layout.eye_h / 2, 1, 14);
+  frame.eye_corner = clamp_i16_frame(layout.eye_h / 4, 5, 14);
 
   frame.left_pupil_x = frame.left_eye_x;
   frame.left_pupil_y = frame.left_eye_y;
@@ -57,11 +57,11 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
   frame.right_pupil_y = frame.right_eye_y;
   frame.pupil_radius = 0;
 
-  frame.mouth_w = layout.mouth_w;
-  frame.mouth_h = layout.mouth_h;
-  frame.mouth_y = layout.mouth_y;
-  frame.mouth_x = static_cast<int16_t>(layout.center_x - layout.mouth_w / 2);
-  frame.mouth_corner = clamp_i16_frame(layout.mouth_h / 2, 1, 8);
+  frame.mouth_w = 0;
+  frame.mouth_h = 0;
+  frame.mouth_y = 0;
+  frame.mouth_x = 0;
+  frame.mouth_corner = 0;
 
   *out_frame = frame;
   return true;

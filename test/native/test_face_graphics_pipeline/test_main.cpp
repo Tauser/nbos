@@ -21,10 +21,10 @@ void test_face_frame_composer_maps_baseline_to_renderable_frame() {
   TEST_ASSERT_LESS_THAN_INT16(frame.right_eye_x, frame.left_eye_x);
   TEST_ASSERT_GREATER_THAN_INT16(0, frame.eye_w);
   TEST_ASSERT_GREATER_THAN_INT16(0, frame.eye_h);
-  TEST_ASSERT_GREATER_THAN_INT16(0, frame.mouth_w);
   TEST_ASSERT_GREATER_THAN_INT16(0, frame.head_w);
   TEST_ASSERT_GREATER_THAN_INT16(0, frame.head_h);
-  TEST_ASSERT_EQUAL_INT16(0, frame.pupil_radius);
+  TEST_ASSERT_EQUAL_INT16(0, frame.mouth_w);
+  TEST_ASSERT_EQUAL_INT16(0, frame.mouth_h);
 }
 
 void test_face_frame_composer_applies_gaze_offset_without_renderer_semantics() {

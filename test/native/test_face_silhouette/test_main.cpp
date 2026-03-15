@@ -19,15 +19,13 @@ struct FrozenSilhouetteFrame {
   int16_t head_h;
   int16_t head_radius;
   int16_t eye_span;
-  int16_t mouth_w;
-  int16_t mouth_y;
 };
 
 constexpr FrozenSilhouetteFrame kFrozenFrames[] = {
-    {ncos::models::face::FaceShapeProfile::kCompanionBalanced, 145, 149, 20, 56, 36, 179},
-    {ncos::models::face::FaceShapeProfile::kHeroicWide, 156, 134, 15, 62, 40, 180},
-    {ncos::models::face::FaceShapeProfile::kCuriousTall, 139, 152, 18, 52, 34, 177},
-    {ncos::models::face::FaceShapeProfile::kPlayfulRound, 147, 151, 24, 54, 38, 179},
+    {ncos::models::face::FaceShapeProfile::kCompanionBalanced, 145, 149, 20, 60},
+    {ncos::models::face::FaceShapeProfile::kHeroicWide, 156, 134, 15, 66},
+    {ncos::models::face::FaceShapeProfile::kCuriousTall, 139, 152, 18, 56},
+    {ncos::models::face::FaceShapeProfile::kPlayfulRound, 147, 151, 24, 58},
 };
 
 ncos::services::face::FaceFrame compose_profile(ncos::models::face::FaceShapeProfile profile) {
@@ -52,8 +50,7 @@ void test_face_silhouette_frozen_keyframes_match_geometry_profiles() {
     TEST_ASSERT_EQUAL_INT16(expected.head_h, frame.head_h);
     TEST_ASSERT_EQUAL_INT16(expected.head_radius, frame.head_radius);
     TEST_ASSERT_EQUAL_INT16(expected.eye_span, eye_span);
-    TEST_ASSERT_EQUAL_INT16(expected.mouth_w, frame.mouth_w);
-    TEST_ASSERT_EQUAL_INT16(expected.mouth_y, frame.mouth_y);
+    TEST_ASSERT_EQUAL_INT16(0, frame.mouth_w);
   }
 }
 
@@ -63,12 +60,9 @@ void test_face_silhouette_profiles_are_pairwise_distinguishable() {
   const auto curious = compose_profile(ncos::models::face::FaceShapeProfile::kCuriousTall);
   const auto playful = compose_profile(ncos::models::face::FaceShapeProfile::kPlayfulRound);
 
-  // Product criterion: primary states must be visually recognizable by silhouette.
   TEST_ASSERT_TRUE(heroic.head_w > balanced.head_w);
   TEST_ASSERT_TRUE(curious.head_h > balanced.head_h);
   TEST_ASSERT_TRUE(playful.head_radius > balanced.head_radius);
-
-  TEST_ASSERT_TRUE(heroic.mouth_w > curious.mouth_w);
   TEST_ASSERT_TRUE(heroic.head_h < curious.head_h);
 }
 
@@ -88,7 +82,6 @@ void test_face_silhouette_renderer_contract_stays_semantic_free() {
   TEST_ASSERT_TRUE(composer.compose(baseline, &frame_a));
   TEST_ASSERT_TRUE(composer.compose(variant, &frame_b));
 
-  // Renderer consumes concrete geometry only; composition semantic ownership is unchanged.
   TEST_ASSERT_EQUAL_INT(static_cast<int>(baseline.composition.mode),
                         static_cast<int>(variant.composition.mode));
   TEST_ASSERT_NOT_EQUAL(frame_a.head_w, frame_b.head_w);

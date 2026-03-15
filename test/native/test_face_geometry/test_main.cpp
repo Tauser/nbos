@@ -58,9 +58,10 @@ void test_face_geometry_changes_silhouette_without_renderer_semantics() {
   const int16_t tall_eye_span = tall_frame.right_eye_x - tall_frame.left_eye_x;
 
   TEST_ASSERT_TRUE(wide_eye_span > tall_eye_span);
-  TEST_ASSERT_TRUE(wide_frame.mouth_w > tall_frame.mouth_w);
   TEST_ASSERT_TRUE(wide_frame.head_w > tall_frame.head_w);
   TEST_ASSERT_TRUE(tall_frame.head_h > wide_frame.head_h);
+  TEST_ASSERT_EQUAL_INT16(0, wide_frame.mouth_w);
+  TEST_ASSERT_EQUAL_INT16(0, tall_frame.mouth_w);
 }
 
 int main() {

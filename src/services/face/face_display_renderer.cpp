@@ -51,9 +51,6 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
   } else {
     erase_eye(display_, frame, previous_frame_.left_eye_x, previous_frame_.left_eye_y);
     erase_eye(display_, frame, previous_frame_.right_eye_x, previous_frame_.right_eye_y);
-    display_->fillRoundRect(previous_frame_.mouth_x - 2, previous_frame_.mouth_y - 2,
-                            previous_frame_.mouth_w + 4, previous_frame_.mouth_h + 4,
-                            previous_frame_.mouth_corner + 2, frame.face_color);
   }
 
   const int16_t left_eye_x = static_cast<int16_t>(frame.left_eye_x - frame.eye_w / 2);
@@ -65,10 +62,6 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
                           frame.eye_color);
   display_->fillRoundRect(right_eye_x, right_eye_y, frame.eye_w, frame.eye_h, frame.eye_corner,
                           frame.eye_color);
-
-  // EMO-like baseline: no visible pupils in default style.
-  display_->fillRoundRect(frame.mouth_x, frame.mouth_y, frame.mouth_w, frame.mouth_h,
-                          frame.mouth_corner, frame.mouth_color);
 
   previous_frame_ = frame;
   has_previous_frame_ = true;
