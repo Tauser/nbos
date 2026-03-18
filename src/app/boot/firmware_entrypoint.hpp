@@ -9,6 +9,7 @@
 #include "services/face/face_service.hpp"
 #include "services/led/led_service.hpp"
 #include "services/motion/motion_service.hpp"
+#include "services/observability/system_polish_tooling.hpp"
 #include "services/power/power_service.hpp"
 #include "services/routine/routine_service.hpp"
 #include "services/sensing/imu_service.hpp"
@@ -53,6 +54,9 @@ class FirmwareEntrypoint final {
   bool ota_fallback_reported_ = false;
   bool power_electrical_fault_reported_ = false;
   bool power_thermal_fault_reported_ = false;
+
+  uint64_t next_polish_review_ms_ = 0;
+  ncos::services::observability::CrossSubsystemReview last_polish_review_{};
 };
 
 }  // namespace ncos::app::boot

@@ -1,5 +1,6 @@
 #include "app/boot/firmware_entrypoint.hpp"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "app/boot/boot_flow.hpp"
@@ -37,6 +38,8 @@ constexpr uint16_t UpdateServiceId = 67;
 constexpr uint16_t CloudBridgeServiceId = 68;
 constexpr uint16_t TelemetryServiceId = 69;
 constexpr const char* Tag = "NCOS_ENTRY";
+constexpr const char* PolishTag = "NCOS_POLISH";
+constexpr uint32_t PolishReviewIntervalMs = 5000;
 
 uint64_t monotonic_ms() {
   return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
@@ -176,6 +179,7 @@ void FirmwareEntrypoint::run() {
 
   const uint64_t now = monotonic_ms();
   system_manager_.start(now);
+  next_polish_review_ms_ = now + PolishReviewIntervalMs;
 
   audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
   if (!audio_service_.initialize(now)) {
@@ -409,6 +413,30 @@ void FirmwareEntrypoint::tick() {
   motion_service_.update_face_signal(face_service_.motion_signal(), now);
   motion_service_.tick(now);
 
+  if (now >= next_polish_review_ms_) {
+    ncos::services::observability::CrossSubsystemInput polish_input{};
+    polish_input.companion = companion_snapshot;
+    polish_input.behavior = behavior_service_.state();
+    polish_input.perception = perception_service_.state();
+    polish_input.voice = voice_service_.state();
+    polish_input.motion = motion_service_.state();
+    polish_input.cloud = cloud_bridge_service_.state();
+    polish_input.face_signal = face_service_.motion_signal();
+
+    last_polish_review_ =
+        ncos::services::observability::review_cross_subsystem_coherence(polish_input, now);
+
+    char review_json[320] = {};
+    const size_t written = ncos::services::observability::export_cross_subsystem_review_json(
+        last_polish_review_, review_json, sizeof(review_json));
+
+    if (written > 0) {
+      ESP_LOGI(PolishTag, "%s", review_json);
+    }
+
+    next_polish_review_ms_ = now + PolishReviewIntervalMs;
+  }
+
   led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
 }
 
@@ -417,3 +445,10 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
+
+
+
+
+
+
