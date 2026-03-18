@@ -1,5 +1,6 @@
 #include "services/face/face_graphics_pipeline.hpp"
 
+#include "config/system_config.hpp"
 #include "drivers/display/display_runtime.hpp"
 
 namespace {
@@ -100,7 +101,20 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
     return false;
   }
 
+  diagnostics_mode_ = ncos::config::kGlobalConfig.runtime.display_diagnostics_mode;
+  (void)diagnostics_runner_.bind(display, &renderer_);
+  diagnostics_runner_.set_mode(diagnostics_mode_);
+
   state_ = ncos::core::contracts::make_face_render_state_baseline();
+  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms);
+  motion_signal_ = ncos::core::contracts::MotionFaceSignal{};
+
+  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff) {
+    next_render_ms_ = now_ms;
+    initialized_ = true;
+    return true;
+  }
+
   if (!compositor_.bind_state(&state_)) {
     return false;
   }
@@ -151,6 +165,12 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
 void FaceGraphicsPipeline::tick(uint64_t now_ms,
                                 const ncos::core::contracts::FaceMultimodalInput& multimodal) {
   if (!initialized_ || now_ms < next_render_ms_) {
+    return;
+  }
+
+  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff) {
+    diagnostics_runner_.tick(now_ms);
+    next_render_ms_ = now_ms + RenderPeriodMs;
     return;
   }
 
@@ -207,7 +227,6 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
 
     (void)gaze_controller_.tick(now_ms, &state_);
   } else if (!clip_updated) {
-    // If clip is active but did not write, keep timeline ownership healthy.
     (void)clip_player_.tick(now_ms, &compositor_, &state_);
   }
 
@@ -236,4 +255,3 @@ ncos::core::contracts::MotionFaceSignal FaceGraphicsPipeline::motion_signal() co
 }
 
 }  // namespace ncos::services::face
-

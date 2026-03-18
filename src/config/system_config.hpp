@@ -7,12 +7,29 @@
 
 namespace ncos::config {
 
+enum class DisplayDiagnosticsMode : uint8_t {
+  kOff = 0,
+  kStaticPrimaries,
+  kStaticClipGrid,
+  kHorizontalSweepFullRedraw,
+  kEyeTrailFullRedraw,
+  kEyeTrailDirtyRect,
+  kSpriteWindowTrail,
+  kPanelPolarityFlip,
+};
+
 struct RuntimeConfig {
   uint32_t lifecycle_watchdog_ms = 1000;
   uint32_t runtime_tick_watchdog_ms = 2600;
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
   uint8_t boot_display_attempts = 2;
+  DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kOff;
+  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kPanelPolarityFlip; ok
+  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kHorizontalSweepFullRedraw; // artefatos linhas passando dentro do retangulo branco 
+  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kEyeTrailFullRedraw; // artefatos diagonais passando dentro do quadrado cinza 
+  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kEyeTrailDirtyRect; // leves artefatos diagonais dentro do da pupila
+  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kSpriteWindowTrail; // leves artefatos piscando em todo retangulo vermelho
 
   bool ota_enabled = false;
   bool ota_remote_allowed = false;
@@ -135,3 +152,4 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+

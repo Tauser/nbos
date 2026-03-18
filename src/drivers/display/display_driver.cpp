@@ -5,12 +5,14 @@
 namespace ncos::drivers::display {
 
 DisplayDriver::DisplayDriver() {
+  const auto& profile = active_panel_capability_profile();
+
   {
     auto cfg = bus_.config();
     cfg.spi_host = SPI2_HOST;
     cfg.spi_mode = 0;
-    cfg.freq_write = 40000000;
-    cfg.freq_read = 16000000;
+    cfg.freq_write = profile.timing.spi_write_hz;
+    cfg.freq_read = profile.timing.spi_read_hz;
     cfg.spi_3wire = false;
     cfg.use_lock = true;
     cfg.dma_channel = SPI_DMA_CH_AUTO;
@@ -25,13 +27,13 @@ DisplayDriver::DisplayDriver() {
   {
     auto cfg = panel_.config();
     cfg.pin_cs = ncos::config::pins::kDisplayCs;
-    cfg.pin_rst = -1;
+    cfg.pin_rst = profile.reset_shared_with_enable ? -1 : ncos::config::pins::kDisplayRst;
     cfg.pin_busy = -1;
 
-    cfg.memory_width = 240;
-    cfg.memory_height = 320;
-    cfg.panel_width = 240;
-    cfg.panel_height = 320;
+    cfg.memory_width = profile.width;
+    cfg.memory_height = profile.height;
+    cfg.panel_width = profile.width;
+    cfg.panel_height = profile.height;
 
     cfg.offset_x = 0;
     cfg.offset_y = 0;
@@ -39,8 +41,8 @@ DisplayDriver::DisplayDriver() {
 
     cfg.dummy_read_pixel = 8;
     cfg.dummy_read_bits = 1;
-    cfg.readable = false;
-    cfg.invert = true;
+    cfg.readable = profile.readable;
+    cfg.invert = profile.workarounds.keep_panel_inverted;
     cfg.rgb_order = false;
     cfg.dlen_16bit = false;
     cfg.bus_shared = false;
@@ -51,5 +53,8 @@ DisplayDriver::DisplayDriver() {
   setPanel(&panel_);
 }
 
-}  // namespace ncos::drivers::display
+const DisplayPanelCapabilityProfile& DisplayDriver::capability_profile() const {
+  return active_panel_capability_profile();
+}
 
+}  // namespace ncos::drivers::display

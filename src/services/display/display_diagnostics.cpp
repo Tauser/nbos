@@ -1,0 +1,220 @@
+#include "services/display/display_diagnostics.hpp"
+
+namespace {
+
+constexpr uint16_t BackgroundColor = 0x0000;
+constexpr uint16_t FaceColor = 0x1082;
+constexpr uint16_t EyeColor = 0xFFFF;
+constexpr uint16_t AccentColor = 0xF800;
+constexpr uint16_t ClipGridColor = 0x07E0;
+constexpr int16_t SweepWidth = 24;
+
+uint16_t panel_flip_color(uint8_t phase) {
+  switch (phase % 4) {
+    case 0:
+      return 0x0000;
+    case 1:
+      return 0xFFFF;
+    case 2:
+      return 0xF800;
+    default:
+      return 0x001F;
+  }
+}
+
+uint16_t full_redraw_period_ms(const ncos::drivers::display::DisplayDriver* display) {
+  return display->capability_profile().timing.recommended_full_redraw_period_ms;
+}
+
+uint16_t partial_redraw_period_ms(const ncos::drivers::display::DisplayDriver* display) {
+  return display->capability_profile().timing.recommended_partial_redraw_period_ms;
+}
+
+uint16_t sprite_period_ms(const ncos::drivers::display::DisplayDriver* display) {
+  return display->capability_profile().timing.recommended_sprite_window_period_ms;
+}
+
+}  // namespace
+
+namespace ncos::services::display {
+
+bool DisplayDiagnosticsRunner::bind(ncos::drivers::display::DisplayDriver* display,
+                                    ncos::services::face::FaceDisplayRenderer* renderer) {
+  display_ = display;
+  renderer_ = renderer;
+  last_step_ms_ = 0;
+  last_sweep_x_ = -1;
+  last_sprite_x_ = -1;
+  panel_flip_phase_ = 0;
+  return display_ != nullptr && renderer_ != nullptr;
+}
+
+void DisplayDiagnosticsRunner::set_mode(ncos::config::DisplayDiagnosticsMode mode) {
+  mode_ = mode;
+  last_step_ms_ = 0;
+  last_sweep_x_ = -1;
+  last_sprite_x_ = -1;
+  panel_flip_phase_ = 0;
+}
+
+ncos::config::DisplayDiagnosticsMode DisplayDiagnosticsRunner::mode() const {
+  return mode_;
+}
+
+void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
+  if (display_ == nullptr || renderer_ == nullptr || mode_ == ncos::config::DisplayDiagnosticsMode::kOff) {
+    return;
+  }
+
+  switch (mode_) {
+    case ncos::config::DisplayDiagnosticsMode::kStaticPrimaries:
+      render_static_primaries();
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kStaticClipGrid:
+      render_static_clip_grid();
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kHorizontalSweepFullRedraw:
+      render_horizontal_sweep(now_ms);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kEyeTrailFullRedraw:
+      render_eye_trail(now_ms, DisplayRenderMode::kForceFullRedraw);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kEyeTrailDirtyRect:
+      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kSpriteWindowTrail:
+      render_sprite_window_trail(now_ms);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kPanelPolarityFlip:
+      render_panel_polarity_flip(now_ms);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kOff:
+    default:
+      break;
+  }
+}
+
+void DisplayDiagnosticsRunner::render_static_primaries() {
+  display_->startWrite();
+  display_->fillScreen(BackgroundColor);
+  display_->fillRect(0, 0, display_->width() / 3, display_->height(), 0xF800);
+  display_->fillRect(display_->width() / 3, 0, display_->width() / 3, display_->height(), 0x07E0);
+  display_->fillRect((display_->width() / 3) * 2, 0, display_->width() / 3, display_->height(), 0x001F);
+  display_->drawRect(0, 0, display_->width(), display_->height(), EyeColor);
+  display_->endWrite();
+}
+
+void DisplayDiagnosticsRunner::render_static_clip_grid() {
+  display_->startWrite();
+  display_->fillScreen(BackgroundColor);
+  for (int16_t x = -20; x < display_->width(); x += 24) {
+    display_->drawFastVLine(x, 0, display_->height(), ClipGridColor);
+  }
+  for (int16_t y = -20; y < display_->height(); y += 24) {
+    display_->drawFastHLine(0, y, display_->width(), ClipGridColor);
+  }
+  display_->drawRoundRect(-6, -6, 72, 52, 10, AccentColor);
+  display_->drawRoundRect(display_->width() - 54, display_->height() - 40, 64, 50, 10, AccentColor);
+  display_->endWrite();
+}
+
+void DisplayDiagnosticsRunner::render_horizontal_sweep(uint64_t now_ms) {
+  if (last_step_ms_ != 0 && (now_ms - last_step_ms_) < full_redraw_period_ms(display_)) {
+    return;
+  }
+
+  last_step_ms_ = now_ms;
+  int16_t x = static_cast<int16_t>((now_ms / full_redraw_period_ms(display_)) %
+                                   (display_->width() + SweepWidth)) - SweepWidth;
+
+  display_->startWrite();
+  display_->fillScreen(BackgroundColor);
+  if (x < display_->width()) {
+    display_->fillRect(x, 0, SweepWidth, display_->height(), EyeColor);
+  }
+  display_->endWrite();
+  last_sweep_x_ = x;
+}
+
+ncos::services::face::FaceFrame DisplayDiagnosticsRunner::make_eye_trail_frame(uint64_t now_ms) const {
+  ncos::services::face::FaceFrame frame{};
+  frame.background = BackgroundColor;
+  frame.face_color = FaceColor;
+  frame.eye_color = EyeColor;
+  frame.head_x = 28;
+  frame.head_y = 42;
+  frame.head_w = 184;
+  frame.head_h = 184;
+  frame.head_radius = 32;
+  frame.eye_w = 34;
+  frame.eye_h = 54;
+  frame.eye_corner = 14;
+
+  const uint16_t period_ms = partial_redraw_period_ms(display_);
+  const int16_t phase = static_cast<int16_t>((now_ms / period_ms) % 10);
+  const int16_t offset = static_cast<int16_t>((phase - 5) * 8);
+  frame.left_eye_x = static_cast<int16_t>(84 + offset);
+  frame.right_eye_x = static_cast<int16_t>(156 + offset);
+  frame.left_eye_y = 124;
+  frame.right_eye_y = 124;
+  return frame;
+}
+
+void DisplayDiagnosticsRunner::render_eye_trail(uint64_t now_ms,
+                                                ncos::services::display::DisplayRenderMode render_mode) {
+  const uint16_t period_ms = render_mode == DisplayRenderMode::kForceFullRedraw
+                                 ? full_redraw_period_ms(display_)
+                                 : partial_redraw_period_ms(display_);
+  if (last_step_ms_ != 0 && (now_ms - last_step_ms_) < period_ms) {
+    return;
+  }
+
+  last_step_ms_ = now_ms;
+  renderer_->set_render_mode(render_mode);
+  (void)renderer_->render(make_eye_trail_frame(now_ms));
+}
+
+void DisplayDiagnosticsRunner::render_sprite_window_trail(uint64_t now_ms) {
+  if (last_step_ms_ != 0 && (now_ms - last_step_ms_) < sprite_period_ms(display_)) {
+    return;
+  }
+
+  last_step_ms_ = now_ms;
+  const int16_t sprite_w = 92;
+  const int16_t sprite_h = 72;
+  const int16_t x = static_cast<int16_t>((now_ms / sprite_period_ms(display_)) %
+                                         (display_->width() + sprite_w)) - sprite_w;
+  const int16_t y = static_cast<int16_t>(display_->height() / 2 - sprite_h / 2);
+
+  if (last_sprite_x_ < 0) {
+    display_->fillScreen(BackgroundColor);
+  }
+
+  if (last_sprite_x_ >= 0) {
+    display_->fillRect(last_sprite_x_, y, sprite_w, sprite_h, BackgroundColor);
+  }
+
+  lgfx::LGFX_Sprite sprite(display_);
+  sprite.setColorDepth(16);
+  sprite.createSprite(sprite_w, sprite_h);
+  sprite.fillSprite(BackgroundColor);
+  sprite.fillRoundRect(6, 8, sprite_w - 12, sprite_h - 16, 14, FaceColor);
+  sprite.fillRoundRect(18, 22, 18, 28, 8, EyeColor);
+  sprite.fillRoundRect(sprite_w - 36, 22, 18, 28, 8, EyeColor);
+  sprite.drawRect(0, 0, sprite_w, sprite_h, AccentColor);
+  sprite.pushSprite(x, y);
+  sprite.deleteSprite();
+  last_sprite_x_ = x;
+}
+
+void DisplayDiagnosticsRunner::render_panel_polarity_flip(uint64_t now_ms) {
+  if (last_step_ms_ != 0 && (now_ms - last_step_ms_) < 240) {
+    return;
+  }
+
+  last_step_ms_ = now_ms;
+  display_->fillScreen(panel_flip_color(panel_flip_phase_));
+  ++panel_flip_phase_;
+}
+
+}  // namespace ncos::services::display

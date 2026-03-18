@@ -3,9 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "config/system_config.hpp"
 #include "core/contracts/face_multimodal_contracts.hpp"
 #include "core/contracts/face_render_state_contracts.hpp"
 #include "core/contracts/motion_runtime_contracts.hpp"
+#include "services/display/display_diagnostics.hpp"
 #include "services/face/face_clip_player.hpp"
 #include "services/face/face_compositor.hpp"
 #include "services/face/face_display_renderer.hpp"
@@ -48,7 +50,8 @@ class FaceGraphicsPipeline final {
   ncos::core::contracts::MotionFaceSignal motion_signal_{};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};
+  ncos::services::display::DisplayDiagnosticsRunner diagnostics_runner_{};
+  ncos::config::DisplayDiagnosticsMode diagnostics_mode_ = ncos::config::DisplayDiagnosticsMode::kOff;
 };
 
 }  // namespace ncos::services::face
-
