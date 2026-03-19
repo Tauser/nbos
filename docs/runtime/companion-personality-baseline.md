@@ -52,6 +52,40 @@ Camada adaptavel oficial:
 
 Esses parametros sao a parte oficialmente adaptavel da personalidade porque modulam expressao, timing e sociabilidade sem reescrever os tracos-base.
 
+## Regras bounded de adaptacao
+
+A adaptacao oficial agora segue tres regras simples:
+
+- ajuste por contexto atual
+  - sessao recente com usuario aquece um pouco o calor social
+  - resposta ativa aumenta um pouco a energia de resposta
+  - `Sleep` e `EnergyProtect` puxam os biases para baixo
+- convergencia por passos pequenos
+  - `social_warmth_bias`: muda no maximo `2` pontos por refresh
+  - `response_energy_bias`: muda no maximo `2` pontos por refresh
+  - `continuity_window_bias`: muda no maximo `120 ms` por refresh
+- retorno automatico ao neutro
+  - sem contexto quente recente, os tres biases caminham de volta para `0`
+  - isso impede deriva acumulativa de identidade
+
+Targets oficiais desta fase:
+
+- usuario recente e quente
+  - `social warmth` ate `+6`
+  - `response energy` ate `+2` em `AttendUser` e ate `+6` em `Responding`
+  - `continuity window` ate `+380 ms`
+- estimulo recente
+  - `response energy` ate `+3`
+  - `continuity window` ate `+200 ms`
+- `Sleep`
+  - `social warmth = -4`
+  - `response energy = -4`
+  - `continuity window = -300 ms`
+- `EnergyProtect`
+  - `social warmth = -6`
+  - `response energy = -8`
+  - `continuity window = -600 ms`
+
 ## Onde a personalidade opera hoje
 
 A personalidade-base entra apenas onde ja existe efeito real de produto:
@@ -109,3 +143,4 @@ Baseline oficial de continuidade perceptivel:
   - continuidade com estimulo: `2,4 s`
   - reengajamento curto: `190 ms`
   - `AttendUser` e `AlertScan` continuam curtos por design, para nao deixar o companion pegajoso
+

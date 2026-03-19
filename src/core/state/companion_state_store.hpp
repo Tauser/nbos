@@ -51,6 +51,16 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
   static uint8_t derive_session_engagement_percent(
       const ncos::core::contracts::CompanionSnapshot& snapshot, bool user_now, bool stimulus_now,
       bool response_now);
+  static bool user_session_continuity_active(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
+  static bool stimulus_session_continuity_active(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
+  static int8_t derive_target_social_warmth_bias_percent(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
+  static int8_t derive_target_response_energy_bias_percent(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
+  static int16_t derive_target_continuity_window_bias_ms(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
   void refresh_session_memory(uint64_t now_ms,
                               ncos::core::contracts::CompanionProductState previous_state,
                               ncos::core::contracts::CompanionProductState next_state,
@@ -58,6 +68,7 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
                               bool stimulus_now,
                               bool response_now);
 
+  void refresh_adaptive_personality(uint64_t now_ms);
   void refresh_derived_runtime_state(uint64_t now_ms);
   bool authorize_write(ncos::core::contracts::CompanionStateWriter writer,
                        ncos::core::contracts::CompanionStateDomain domain) const;

@@ -8,6 +8,40 @@ constexpr uint64_t AlertScanHoldMs = 1600;
 constexpr uint64_t RespondingHoldMs = 900;
 constexpr uint64_t IdleToSleepMs = 12000;
 constexpr uint64_t SessionMemoryRetentionMs = 18000;
+constexpr int8_t AdaptiveBiasStepPercent = 2;
+constexpr int16_t AdaptiveContinuityStepMs = 120;
+
+int8_t move_toward_i8(int8_t current, int8_t target, int8_t step) {
+  if (current < target) {
+    const int16_t advanced = static_cast<int16_t>(current) + step;
+    return advanced > target ? target : static_cast<int8_t>(advanced);
+  }
+  if (current > target) {
+    const int16_t reduced = static_cast<int16_t>(current) - step;
+    return reduced < target ? target : static_cast<int8_t>(reduced);
+  }
+  return current;
+}
+
+int16_t move_toward_i16(int16_t current, int16_t target, int16_t step) {
+  if (current < target) {
+    const int32_t advanced = static_cast<int32_t>(current) + step;
+    return advanced > target ? target : static_cast<int16_t>(advanced);
+  }
+  if (current > target) {
+    const int32_t reduced = static_cast<int32_t>(current) - step;
+    return reduced < target ? target : static_cast<int16_t>(reduced);
+  }
+  return current;
+}
+
+uint8_t engagement_bonus(uint8_t engagement_percent, uint8_t floor_percent, uint8_t divisor, uint8_t cap) {
+  if (engagement_percent <= floor_percent || divisor == 0) {
+    return 0;
+  }
+  const uint8_t bonus = static_cast<uint8_t>((engagement_percent - floor_percent) / divisor);
+  return bonus > cap ? cap : bonus;
+}
 }
 
 namespace ncos::core::state {
@@ -289,6 +323,128 @@ uint8_t CompanionStateStore::derive_session_engagement_percent(
   return engagement;
 }
 
+bool CompanionStateStore::user_session_continuity_active(
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.session.warm || snapshot.session.last_activity_ms == 0 ||
+      snapshot.session.last_activity_ms > now_ms) {
+    return false;
+  }
+
+  const bool user_anchored =
+      snapshot.session.anchor_target == ncos::core::contracts::AttentionTarget::kUser ||
+      snapshot.session.recent_stimulus.target == ncos::core::contracts::AttentionTarget::kUser ||
+      snapshot.session.recent_interaction.phase == ncos::core::contracts::InteractionPhase::kResponding ||
+      snapshot.session.recent_interaction.turn_owner != ncos::core::contracts::TurnOwner::kNone;
+
+  return user_anchored &&
+         snapshot.session.engagement_recent_percent >=
+             ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                 snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kUser) &&
+         (now_ms - snapshot.session.last_activity_ms) <= snapshot.personality.user_continuity_window_ms;
+}
+
+bool CompanionStateStore::stimulus_session_continuity_active(
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.session.warm || snapshot.session.last_activity_ms == 0 ||
+      snapshot.session.last_activity_ms > now_ms) {
+    return false;
+  }
+
+  return snapshot.session.recent_stimulus.target == ncos::core::contracts::AttentionTarget::kStimulus &&
+         snapshot.session.engagement_recent_percent >=
+             ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                 snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus) &&
+         (now_ms - snapshot.session.last_activity_ms) <=
+             snapshot.personality.stimulus_continuity_window_ms;
+}
+
+int8_t CompanionStateStore::derive_target_social_warmth_bias_percent(
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.runtime.initialized || !snapshot.runtime.started) {
+    return 0;
+  }
+  if (energy_protect_active(snapshot)) {
+    return -6;
+  }
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kSleep) {
+    return -4;
+  }
+
+  int8_t target = 0;
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kAttendUser) {
+    target = 4;
+  }
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding &&
+      snapshot.session.anchor_target == ncos::core::contracts::AttentionTarget::kUser) {
+    target = 5;
+  }
+  if (user_session_continuity_active(snapshot, now_ms)) {
+    const int8_t continuity_target = static_cast<int8_t>(
+        3 + engagement_bonus(snapshot.session.engagement_recent_percent, 56, 8, 3));
+    target = continuity_target > target ? continuity_target : target;
+  }
+
+  return ncos::core::contracts::personality_clamp_i8(
+      target, ncos::core::contracts::personality_adaptive_social_warmth_bias_min_percent(),
+      ncos::core::contracts::personality_adaptive_social_warmth_bias_max_percent());
+}
+
+int8_t CompanionStateStore::derive_target_response_energy_bias_percent(
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.runtime.initialized || !snapshot.runtime.started) {
+    return 0;
+  }
+  if (energy_protect_active(snapshot)) {
+    return -8;
+  }
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kSleep) {
+    return -4;
+  }
+
+  int8_t target = 0;
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding) {
+    target = static_cast<int8_t>(
+        4 + engagement_bonus(snapshot.session.engagement_recent_percent, 60, 8, 2));
+  } else if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kAlertScan) {
+    target = 3;
+  } else if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kAttendUser) {
+    target = 2;
+  } else if (stimulus_session_continuity_active(snapshot, now_ms) ||
+             user_session_continuity_active(snapshot, now_ms)) {
+    target = 1;
+  }
+
+  return ncos::core::contracts::personality_clamp_i8(
+      target, ncos::core::contracts::personality_adaptive_response_energy_bias_min_percent(),
+      ncos::core::contracts::personality_adaptive_response_energy_bias_max_percent());
+}
+
+int16_t CompanionStateStore::derive_target_continuity_window_bias_ms(
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.runtime.initialized || !snapshot.runtime.started) {
+    return 0;
+  }
+  if (energy_protect_active(snapshot)) {
+    return -600;
+  }
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kSleep) {
+    return -300;
+  }
+  if (snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding &&
+      snapshot.session.anchor_target == ncos::core::contracts::AttentionTarget::kUser) {
+    return 360;
+  }
+  if (user_session_continuity_active(snapshot, now_ms)) {
+    return static_cast<int16_t>(
+        260 + engagement_bonus(snapshot.session.engagement_recent_percent, 56, 4, 2) * 60);
+  }
+  if (stimulus_session_continuity_active(snapshot, now_ms)) {
+    return static_cast<int16_t>(
+        120 + engagement_bonus(snapshot.session.engagement_recent_percent, 50, 5, 2) * 40);
+  }
+  return 0;
+}
+
 void CompanionStateStore::refresh_session_memory(
     uint64_t now_ms,
     ncos::core::contracts::CompanionProductState previous_state,
@@ -460,6 +616,22 @@ ncos::core::contracts::CompanionStateTransitionCause CompanionStateStore::derive
   return ncos::core::contracts::CompanionStateTransitionCause::kRecoveryToIdle;
 }
 
+void CompanionStateStore::refresh_adaptive_personality(uint64_t now_ms) {
+  const int8_t target_social_bias = derive_target_social_warmth_bias_percent(snapshot_, now_ms);
+  const int8_t target_response_bias = derive_target_response_energy_bias_percent(snapshot_, now_ms);
+  const int16_t target_continuity_bias = derive_target_continuity_window_bias_ms(snapshot_, now_ms);
+
+  snapshot_.personality.adaptive_social_warmth_bias_percent = move_toward_i8(
+      snapshot_.personality.adaptive_social_warmth_bias_percent, target_social_bias,
+      AdaptiveBiasStepPercent);
+  snapshot_.personality.adaptive_response_energy_bias_percent = move_toward_i8(
+      snapshot_.personality.adaptive_response_energy_bias_percent, target_response_bias,
+      AdaptiveBiasStepPercent);
+  snapshot_.personality.adaptive_continuity_window_bias_ms = move_toward_i16(
+      snapshot_.personality.adaptive_continuity_window_bias_ms, target_continuity_bias,
+      AdaptiveContinuityStepMs);
+}
+
 void CompanionStateStore::refresh_derived_runtime_state(uint64_t now_ms) {
   const auto previous_state = snapshot_.runtime.product_state;
 
@@ -478,6 +650,7 @@ void CompanionStateStore::refresh_derived_runtime_state(uint64_t now_ms) {
   snapshot_.runtime.product_state = next_state;
   snapshot_.runtime.presence_mode = derive_presence_mode(snapshot_);
   refresh_session_memory(now_ms, previous_state, next_state, user_now, stimulus_now, response_now);
+  refresh_adaptive_personality(now_ms);
 
   if (snapshot_.runtime.last_state_change_ms == 0) {
     snapshot_.runtime.last_state_change_ms = now_ms;
