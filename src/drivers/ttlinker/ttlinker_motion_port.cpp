@@ -4,7 +4,7 @@
 
 namespace ncos::drivers::ttlinker {
 
-bool TtlinkerMotionPort::has_console_pin_conflict() const {
+bool TtlinkerMotionPort::has_transport_conflict() const {
   return !bringup_.can_run_probe_with_console();
 }
 
@@ -52,3 +52,4 @@ ncos::interfaces::motion::MotionPort* acquire_shared_motion_port() {
 }
 
 }  // namespace ncos::drivers::ttlinker
+

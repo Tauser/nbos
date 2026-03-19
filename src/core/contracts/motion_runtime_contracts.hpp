@@ -83,7 +83,7 @@ struct MotionExecutionPlan {
 
 struct MotionRuntimeState {
   bool initialized = false;
-  bool console_pin_conflict = false;
+  bool transport_conflict = false;
   bool neutral_applied = false;
   bool last_apply_ok = false;
   bool has_active_plan = false;
@@ -213,4 +213,5 @@ constexpr MotionExecutionPlan make_execution_plan(const MotionCommand& cmd, uint
 }
 
 }  // namespace ncos::core::contracts
+
 

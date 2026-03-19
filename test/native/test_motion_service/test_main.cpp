@@ -9,7 +9,7 @@ namespace {
 
 class FakeMotionPort final : public ncos::interfaces::motion::MotionPort {
  public:
-  bool has_console_pin_conflict() const override {
+  bool has_transport_conflict() const override {
     return conflict;
   }
 
@@ -66,7 +66,7 @@ void test_motion_service_blocks_when_console_conflicts_with_ttlinker() {
 
   TEST_ASSERT_FALSE(service.initialize(200));
   const auto& state = service.state();
-  TEST_ASSERT_TRUE(state.console_pin_conflict);
+  TEST_ASSERT_TRUE(state.transport_conflict);
   TEST_ASSERT_FALSE(state.initialized);
   TEST_ASSERT_EQUAL_UINT32(0, fake.apply_calls);
 }
@@ -298,4 +298,5 @@ int main() {
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }
+
 

@@ -8,7 +8,6 @@
 #include "drivers/storage/sd_bringup.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
-#include "drivers/ttlinker/ttlinker_transport_bsp.hpp"
 #include "hal/platform/reset_reason.hpp"
 
 #include "esp_log.h"
@@ -211,12 +210,8 @@ bool step_ttlinker() {
   if (motion == nullptr) {
     ESP_LOGW(kTag, "TTLinker backend indisponivel");
     return false;
-  }
-
-  const auto& transport = ncos::drivers::ttlinker::active_ttlinker_transport_bsp();
-  if (motion->has_console_pin_conflict()) {
-    ESP_LOGW(kTag, "TTLinker adiado: transporte UART em conflito com console (%d/%d)",
-             transport.wiring.tx_gpio, transport.wiring.rx_gpio);
+  }  if (motion->has_transport_conflict()) {
+    ESP_LOGW(kTag, "TTLinker adiado: transporte indisponivel no perfil atual");
     return false;
   }
 
@@ -258,3 +253,8 @@ BootReport BootFlow::execute() {
 }
 
 }  // namespace ncos::app::boot
+
+
+
+
+

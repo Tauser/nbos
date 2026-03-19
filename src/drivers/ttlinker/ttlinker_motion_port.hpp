@@ -7,7 +7,7 @@ namespace ncos::drivers::ttlinker {
 
 class TtlinkerMotionPort final : public ncos::interfaces::motion::MotionPort {
  public:
-  bool has_console_pin_conflict() const override;
+  bool has_transport_conflict() const override;
   bool ensure_ready() override;
   bool apply_pose(const ncos::core::contracts::MotionPoseCommand& pose, size_t* out_tx_bytes) override;
 
@@ -19,3 +19,4 @@ class TtlinkerMotionPort final : public ncos::interfaces::motion::MotionPort {
 ncos::interfaces::motion::MotionPort* acquire_shared_motion_port();
 
 }  // namespace ncos::drivers::ttlinker
+

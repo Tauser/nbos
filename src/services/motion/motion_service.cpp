@@ -54,9 +54,9 @@ bool MotionService::initialize(uint64_t now_ms) {
     return false;
   }
 
-  state_.console_pin_conflict = port_->has_console_pin_conflict();
-  if (state_.console_pin_conflict) {
-    ESP_LOGW(kTag, "Motion bloqueado por conflito com UART de console");
+  state_.transport_conflict = port_->has_transport_conflict();
+  if (state_.transport_conflict) {
+    ESP_LOGW(kTag, "Motion bloqueado por conflito de transporte");
     return false;
   }
 
@@ -279,3 +279,5 @@ bool MotionService::enforce_neutral_guard(uint64_t now_ms, bool recovery_command
 }
 
 }  // namespace ncos::services::motion
+
+

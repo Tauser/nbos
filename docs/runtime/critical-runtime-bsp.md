@@ -54,12 +54,12 @@ Current official baseline:
 Provides:
 - UART wiring
 - UART buffer/baud baseline
-- console conflict status for the current build
+- transport conflict status for the current build
 - probe allowance flag
 
 Current official baseline:
 - TTLinker uses GPIO43/44
-- active probe stays blocked when console conflicts with those pins
+- active probe stays blocked when the runtime transport is not safely available
 
 ## Trade-offs
 
@@ -69,3 +69,10 @@ Accepted trade-offs for this stage:
 - power sensing remains fallback-based until ADC/charger telemetry is wired
 
 This keeps the runtime foundation explicit without reopening subsystem architecture.
+
+
+## Boundary rule
+
+Services should only observe generic transport availability or conflict state.
+Physical UART wiring and console-sharing details stay inside the TTLinker BSP/driver path.
+
