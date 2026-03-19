@@ -170,6 +170,27 @@ void test_behavior_service_does_not_hold_warm_reengagement_after_window() {
   TEST_ASSERT_FALSE(proposal.valid);
 }
 
+void test_behavior_service_reflects_adaptation_in_attend_priority_and_ttl() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 7400));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.focus_confidence_percent = 72;
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.adaptive_social_warmth_bias_percent = 8;
+  snapshot.personality.adaptive_response_energy_bias_percent = 6;
+  snapshot.personality.adaptive_continuity_window_bias_ms = 400;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 7700, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(8, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(288, proposal.proposal.ttl_ms);
+}
+
 void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
   ncos::services::behavior::BehaviorService service;
   TEST_ASSERT_TRUE(service.initialize(61, 6000));
@@ -210,6 +231,11 @@ int main() {
   RUN_TEST(test_behavior_service_uses_short_context_to_avoid_cold_reengagement);
   RUN_TEST(test_behavior_service_requires_identity_continuity_threshold_for_warm_reengagement);
   RUN_TEST(test_behavior_service_does_not_hold_warm_reengagement_after_window);
+  RUN_TEST(test_behavior_service_reflects_adaptation_in_attend_priority_and_ttl);
   RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }
+
+
+
+

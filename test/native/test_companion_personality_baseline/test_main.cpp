@@ -91,28 +91,67 @@ void test_companion_personality_adaptive_layer_is_bounded_and_separate_from_fixe
                 personality, ncos::core::contracts::PersonalityContinuityKind::kUser));
 }
 
-void test_companion_personality_adaptive_biases_modulate_outputs_without_changing_baseline_traits() {
+void test_companion_personality_adaptive_biases_raise_behavior_priority_within_bounds() {
   auto personality = ncos::core::contracts::make_companion_personality_state();
   personality.adaptive_social_warmth_bias_percent = 8;
   personality.adaptive_response_energy_bias_percent = 6;
   personality.adaptive_continuity_window_bias_ms = 400;
 
-  const auto baseline = ncos::core::contracts::make_companion_personality_state();
-  const auto warm_user = ncos::core::contracts::personality_face_profile(
-      personality, ncos::core::contracts::PersonalityFaceMode::kWarmUser);
-  const auto baseline_warm_user = ncos::core::contracts::personality_face_profile(
-      baseline, ncos::core::contracts::PersonalityFaceMode::kWarmUser);
-  const auto responding = ncos::core::contracts::personality_motion_profile(
-      personality, ncos::core::contracts::PersonalityMotionMode::kResponding);
-  const auto baseline_responding = ncos::core::contracts::personality_motion_profile(
-      baseline, ncos::core::contracts::PersonalityMotionMode::kResponding);
+  TEST_ASSERT_EQUAL_UINT8(
+      8, ncos::core::contracts::personality_behavior_priority(
+             personality, ncos::core::contracts::BehaviorProfile::kAttendUser, 6));
+  TEST_ASSERT_EQUAL_UINT8(
+      8, ncos::core::contracts::personality_behavior_priority(
+             personality, ncos::core::contracts::BehaviorProfile::kAlertScan, 7));
+  TEST_ASSERT_EQUAL_UINT8(
+      10, ncos::core::contracts::personality_behavior_priority(
+              personality, ncos::core::contracts::BehaviorProfile::kEnergyProtect, 10));
+  TEST_ASSERT_EQUAL_UINT32(
+      288, ncos::core::contracts::personality_behavior_ttl_ms(
+               personality, ncos::core::contracts::BehaviorProfile::kAttendUser));
+  TEST_ASSERT_EQUAL_UINT32(242,
+                           ncos::core::contracts::personality_reengagement_ttl_ms(personality));
+}
 
-  TEST_ASSERT_GREATER_THAN_UINT8(baseline_warm_user.salience_percent, warm_user.salience_percent);
-  TEST_ASSERT_GREATER_THAN_UINT16(baseline_responding.base_speed_percent,
-                                  responding.base_speed_percent);
-  TEST_ASSERT_GREATER_THAN_UINT32(
-      ncos::core::contracts::personality_reengagement_ttl_ms(baseline),
-      ncos::core::contracts::personality_reengagement_ttl_ms(personality));
+void test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits() {
+  auto warm_personality = ncos::core::contracts::make_companion_personality_state();
+  warm_personality.adaptive_social_warmth_bias_percent = 8;
+  warm_personality.adaptive_response_energy_bias_percent = 6;
+  warm_personality.adaptive_continuity_window_bias_ms = 400;
+
+  auto calm_personality = ncos::core::contracts::make_companion_personality_state();
+  calm_personality.adaptive_social_warmth_bias_percent = -6;
+  calm_personality.adaptive_response_energy_bias_percent = -6;
+  calm_personality.adaptive_continuity_window_bias_ms = -300;
+
+  const auto baseline = ncos::core::contracts::make_companion_personality_state();
+  const auto baseline_warm_stimulus = ncos::core::contracts::personality_face_profile(
+      baseline, ncos::core::contracts::PersonalityFaceMode::kWarmStimulus);
+  const auto warm_stimulus = ncos::core::contracts::personality_face_profile(
+      warm_personality, ncos::core::contracts::PersonalityFaceMode::kWarmStimulus);
+  const auto baseline_sleep = ncos::core::contracts::personality_face_profile(
+      baseline, ncos::core::contracts::PersonalityFaceMode::kSleep);
+  const auto calm_sleep = ncos::core::contracts::personality_face_profile(
+      calm_personality, ncos::core::contracts::PersonalityFaceMode::kSleep);
+  const auto baseline_alert_motion = ncos::core::contracts::personality_motion_profile(
+      baseline, ncos::core::contracts::PersonalityMotionMode::kAlertScan);
+  const auto warm_alert_motion = ncos::core::contracts::personality_motion_profile(
+      warm_personality, ncos::core::contracts::PersonalityMotionMode::kAlertScan);
+  const auto baseline_rest_motion = ncos::core::contracts::personality_motion_profile(
+      baseline, ncos::core::contracts::PersonalityMotionMode::kRest);
+  const auto calm_rest_motion = ncos::core::contracts::personality_motion_profile(
+      calm_personality, ncos::core::contracts::PersonalityMotionMode::kRest);
+
+  TEST_ASSERT_GREATER_THAN_UINT8(baseline_warm_stimulus.salience_percent, warm_stimulus.salience_percent);
+  TEST_ASSERT_LESS_THAN_UINT16(baseline_warm_stimulus.cadence_ms, warm_stimulus.cadence_ms);
+  TEST_ASSERT_GREATER_THAN_UINT16(baseline_sleep.cadence_ms, calm_sleep.cadence_ms);
+  TEST_ASSERT_GREATER_THAN_UINT16(baseline_alert_motion.base_speed_percent,
+                               warm_alert_motion.base_speed_percent);
+  TEST_ASSERT_GREATER_THAN_UINT16(baseline_rest_motion.hold_ms, calm_rest_motion.hold_ms);
+  TEST_ASSERT_LESS_THAN_UINT16(baseline_rest_motion.base_speed_percent,
+                               calm_rest_motion.base_speed_percent);
+  TEST_ASSERT_EQUAL_UINT8(68, warm_personality.warmth_percent);
+  TEST_ASSERT_EQUAL_UINT8(68, calm_personality.warmth_percent);
 }
 
 int main() {
@@ -122,6 +161,12 @@ int main() {
   RUN_TEST(test_companion_personality_continuity_gates_stay_consistent_across_channels);
   RUN_TEST(test_companion_personality_timing_keeps_continuity_short_and_predictable);
   RUN_TEST(test_companion_personality_adaptive_layer_is_bounded_and_separate_from_fixed_traits);
-  RUN_TEST(test_companion_personality_adaptive_biases_modulate_outputs_without_changing_baseline_traits);
+  RUN_TEST(test_companion_personality_adaptive_biases_raise_behavior_priority_within_bounds);
+  RUN_TEST(test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits);
   return UNITY_END();
 }
+
+
+
+
+

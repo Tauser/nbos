@@ -149,7 +149,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_energy_protect(
         ncos::core::contracts::ActionDomain::kPower,
         ncos::core::contracts::CommandTopic::kPowerModeSet,
         ncos::core::contracts::IntentTopic::kPreserveEnergy,
-        10,
+        ncos::core::contracts::personality_behavior_priority(
+            snapshot.personality, ncos::core::contracts::BehaviorProfile::kEnergyProtect, 10),
         ncos::core::contracts::personality_behavior_ttl_ms(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kEnergyProtect),
         ncos::core::contracts::PreemptionPolicy::kAllowAlways,
@@ -174,7 +175,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_alert_scan(
         ncos::core::contracts::ActionDomain::kMotion,
         ncos::core::contracts::CommandTopic::kMotionExecute,
         ncos::core::contracts::IntentTopic::kInspectStimulus,
-        7,
+        ncos::core::contracts::personality_behavior_priority(
+            snapshot.personality, ncos::core::contracts::BehaviorProfile::kAlertScan, 7),
         ncos::core::contracts::personality_behavior_ttl_ms(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAlertScan),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
@@ -201,7 +203,9 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::ActionDomain::kFace,
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
-        auditory_trigger_context ? 7 : 6,
+        ncos::core::contracts::personality_behavior_priority(
+            snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser,
+            auditory_trigger_context ? 7 : 6),
         ncos::core::contracts::personality_behavior_ttl_ms(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
@@ -214,7 +218,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::ActionDomain::kFace,
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
-        5,
+        ncos::core::contracts::personality_behavior_priority(
+            snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser, 5),
         ncos::core::contracts::personality_reengagement_ttl_ms(snapshot.personality),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         "attend_user_continuity");
@@ -224,3 +229,4 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
 }
 
 }  // namespace ncos::services::behavior
+

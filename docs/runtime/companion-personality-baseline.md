@@ -92,6 +92,7 @@ A personalidade-base entra apenas onde ja existe efeito real de produto:
 
 - `BehaviorService`
   - limita a permanencia operacional de `EnergyProtect`, `AlertScan` e `AttendUser`
+  - agora tambem modula prioridade e `ttl` curta dentro de limites previsiveis
 - `EmotionService`
   - aplica pisos e tetos em valencia, arousal, social engagement, intensidade e estabilidade
 - helpers centrais de personalidade
@@ -133,14 +134,17 @@ Baseline oficial de continuidade perceptivel:
   - `WarmUser` segura centro e calor visual por pouco tempo para evitar reengajamento frio
   - `AlertScan` acelera a cadencia e abre curiosidade lateral sem perder controle
   - `Responding` usa foco mais firme e saliencia mais alta, mas continua sem agressividade
+  - biases adaptativos agora aparecem tambem em `WarmStimulus`, `Sleep` e `EnergyProtect`, sem sair do envelope premium
 - `Motion`
   - `Rest` inclina levemente para baixo com baixa energia
   - `AttendUser` levanta a postura de forma acolhedora
   - `AlertScan` observa com energia moderada, nao tensa
   - `Responding` usa a postura mais firme do baseline, ainda abaixo de um gesto brusco
+  - biases adaptativos agora modulam `Rest`, `AlertScan` e `WarmStimulus` com mudancas pequenas e previsiveis
 - `Timing`
   - continuidade com usuario: `3,2 s`
   - continuidade com estimulo: `2,4 s`
   - reengajamento curto: `190 ms`
   - `AttendUser` e `AlertScan` continuam curtos por design, para nao deixar o companion pegajoso
+
 
