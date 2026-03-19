@@ -26,8 +26,11 @@ class FaceGraphicsPipeline final {
   bool initialized() const;
   size_t export_preview_json(char* out_buffer, size_t out_buffer_size) const;
   ncos::core::contracts::MotionFaceSignal motion_signal() const;
+  FaceRenderStats render_stats() const;
 
  private:
+  void schedule_next_render(uint64_t now_ms);
+
   static constexpr uint16_t PresetOwnerServiceId = 31;
   static constexpr uint16_t GazeOwnerServiceId = 32;
   static constexpr uint16_t ClipOwnerServiceId = 33;
@@ -47,6 +50,7 @@ class FaceGraphicsPipeline final {
   FaceGazeController gaze_controller_{GazeOwnerServiceId};
   FaceMultimodalSync multimodal_sync_{};
   FacePreviewSnapshot preview_snapshot_{};
+  FaceTuningTelemetry tuning_{};
   ncos::core::contracts::MotionFaceSignal motion_signal_{};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};

@@ -16,6 +16,7 @@ enum class DisplayDiagnosticsMode : uint8_t {
   kEyeTrailDirtyRect,
   kSpriteWindowTrail,
   kPanelPolarityFlip,
+  kFaceVisualDebug,
 };
 
 struct RuntimeConfig {
@@ -25,11 +26,7 @@ struct RuntimeConfig {
   bool diagnostics_enabled = true;
   uint8_t boot_display_attempts = 2;
   DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kOff;
-  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kPanelPolarityFlip; ok
-  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kHorizontalSweepFullRedraw; // artefatos linhas passando dentro do retangulo branco 
-  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kEyeTrailFullRedraw; // artefatos diagonais passando dentro do quadrado cinza 
-  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kEyeTrailDirtyRect; // leves artefatos diagonais dentro do da pupila
-  //DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kSpriteWindowTrail; // leves artefatos piscando em todo retangulo vermelho
+  uint32_t face_frame_budget_us = 14000;
 
   bool ota_enabled = false;
   bool ota_remote_allowed = false;

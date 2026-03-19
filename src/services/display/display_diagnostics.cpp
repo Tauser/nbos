@@ -1,5 +1,7 @@
 #include "services/display/display_diagnostics.hpp"
 
+#include <stdio.h>
+
 namespace {
 
 constexpr uint16_t BackgroundColor = 0x0000;
@@ -7,7 +9,33 @@ constexpr uint16_t FaceColor = 0x1082;
 constexpr uint16_t EyeColor = 0xFFFF;
 constexpr uint16_t AccentColor = 0xF800;
 constexpr uint16_t ClipGridColor = 0x07E0;
+constexpr uint16_t DebugPanelColor = 0x0000;
+constexpr uint16_t DebugFrameColor = 0x39E7;
+constexpr uint16_t DebugWarnColor = 0xFD20;
+constexpr uint16_t DebugHotColor = 0xF800;
+constexpr uint16_t DebugCoolColor = 0x07E0;
 constexpr int16_t SweepWidth = 24;
+
+uint16_t bar_color_for_ratio(uint32_t value, uint32_t budget) {
+  if (budget == 0) {
+    return DebugCoolColor;
+  }
+  if (value >= budget) {
+    return DebugHotColor;
+  }
+  if (value * 5 >= budget * 4) {
+    return DebugWarnColor;
+  }
+  return DebugCoolColor;
+}
+
+int16_t clamp_bar_width(uint32_t value, uint32_t budget, int16_t max_width) {
+  if (budget == 0 || max_width <= 0) {
+    return 0;
+  }
+  const uint32_t scaled = (value >= budget ? budget : value) * static_cast<uint32_t>(max_width);
+  return static_cast<int16_t>(scaled / budget);
+}
 
 uint16_t panel_flip_color(uint8_t phase) {
   switch (phase % 4) {
@@ -88,10 +116,86 @@ void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
     case ncos::config::DisplayDiagnosticsMode::kPanelPolarityFlip:
       render_panel_polarity_flip(now_ms);
       break;
+    case ncos::config::DisplayDiagnosticsMode::kFaceVisualDebug:
     case ncos::config::DisplayDiagnosticsMode::kOff:
     default:
       break;
   }
+}
+
+void DisplayDiagnosticsRunner::render_face_visual_debug(
+    const ncos::services::face::FacePreviewSnapshot& snapshot) {
+  if (display_ == nullptr) {
+    return;
+  }
+
+  constexpr int16_t panel_height = 44;
+  const int16_t panel_y = static_cast<int16_t>(display_->height() - panel_height);
+  const uint32_t dirty_budget_px = static_cast<uint32_t>(display_->width()) * 24u;
+
+  display_->startWrite();
+  display_->fillRect(0, panel_y, display_->width(), panel_height, DebugPanelColor);
+  display_->drawFastHLine(0, panel_y, display_->width(), DebugFrameColor);
+
+  const int16_t bar_x = 6;
+  const int16_t bar_w = 78;
+  const int16_t total_y = static_cast<int16_t>(panel_y + 6);
+  const int16_t render_y = static_cast<int16_t>(panel_y + 18);
+  const int16_t dirty_y = static_cast<int16_t>(panel_y + 30);
+
+  display_->drawRect(bar_x, total_y, bar_w, 7, DebugFrameColor);
+  display_->fillRect(bar_x + 1, total_y + 1,
+                     clamp_bar_width(snapshot.tuning.stages.total_us, snapshot.tuning.frame_budget_us, bar_w - 2), 5,
+                     bar_color_for_ratio(snapshot.tuning.stages.total_us, snapshot.tuning.frame_budget_us));
+
+  display_->drawRect(bar_x, render_y, bar_w, 7, DebugFrameColor);
+  display_->fillRect(bar_x + 1, render_y + 1,
+                     clamp_bar_width(snapshot.tuning.stages.render_us, snapshot.tuning.frame_budget_us, bar_w - 2), 5,
+                     bar_color_for_ratio(snapshot.tuning.stages.render_us, snapshot.tuning.frame_budget_us));
+
+  display_->drawRect(bar_x, dirty_y, bar_w, 7, DebugFrameColor);
+  display_->fillRect(bar_x + 1, dirty_y + 1,
+                     clamp_bar_width(snapshot.tuning.dirty_area_px, dirty_budget_px, bar_w - 2), 5,
+                     bar_color_for_ratio(snapshot.tuning.dirty_area_px, dirty_budget_px));
+
+  display_->setTextColor(EyeColor, DebugPanelColor);
+  display_->setTextSize(1);
+  display_->setCursor(92, total_y - 1);
+  display_->printf("T%lu/%lu", static_cast<unsigned long>(snapshot.tuning.stages.total_us),
+                   static_cast<unsigned long>(snapshot.tuning.frame_budget_us));
+  display_->setCursor(92, render_y - 1);
+  display_->printf("R%lu A%lu", static_cast<unsigned long>(snapshot.tuning.stages.render_us),
+                   static_cast<unsigned long>(snapshot.tuning.avg_frame_time_us));
+  display_->setCursor(92, dirty_y - 1);
+  display_->printf("D%lu S%lu", static_cast<unsigned long>(snapshot.tuning.dirty_area_px),
+                   static_cast<unsigned long>(snapshot.tuning.skipped_duplicate_frames));
+
+  const struct {
+    bool active;
+    uint16_t color;
+  } flags[] = {
+      {snapshot.clip_active, AccentColor},
+      {snapshot.tuning.full_redraw, DebugWarnColor},
+      {snapshot.tuning.high_contrast_motion, DebugHotColor},
+      {ncos::services::face::has_face_visual_degradation(
+           snapshot.tuning.degradation, ncos::services::face::FaceVisualDegradationFlag::kDiagonalMotion),
+       0x001F},
+      {ncos::services::face::has_face_visual_degradation(
+           snapshot.tuning.degradation, ncos::services::face::FaceVisualDegradationFlag::kFrameOverBudget),
+       DebugHotColor},
+  };
+
+  int16_t flag_x = static_cast<int16_t>(display_->width() - 38);
+  const int16_t flag_y = static_cast<int16_t>(panel_y + 14);
+  for (const auto& flag : flags) {
+    display_->drawRect(flag_x, flag_y, 6, 6, DebugFrameColor);
+    if (flag.active) {
+      display_->fillRect(flag_x + 1, flag_y + 1, 4, 4, flag.color);
+    }
+    flag_x = static_cast<int16_t>(flag_x + 7);
+  }
+
+  display_->endWrite();
 }
 
 void DisplayDiagnosticsRunner::render_static_primaries() {

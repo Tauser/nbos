@@ -3,7 +3,20 @@
 #include "config/system_config.hpp"
 #include "drivers/display/display_runtime.hpp"
 
+#include <chrono>
+
 namespace {
+
+uint64_t monotonic_time_us() {
+  const auto now = std::chrono::steady_clock::now().time_since_epoch();
+  return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+}
+
+bool is_diagonal_direction(ncos::models::face::GazeDirection direction) {
+  using ncos::models::face::GazeDirection;
+  return direction == GazeDirection::kUpLeft || direction == GazeDirection::kUpRight ||
+         direction == GazeDirection::kDownLeft || direction == GazeDirection::kDownRight;
+}
 
 constexpr ncos::models::face::FaceClipKeyframe SignatureClipFrames[] = {
     {0, {ncos::models::face::GazeAnchor::kUser, ncos::models::face::GazeDirection::kCenter, 54, 96}},
@@ -91,6 +104,16 @@ ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
 
 namespace ncos::services::face {
 
+void FaceGraphicsPipeline::schedule_next_render(uint64_t now_ms) {
+  if (next_render_ms_ == 0) {
+    next_render_ms_ = now_ms + RenderPeriodMs;
+    return;
+  }
+
+  const uint64_t next_slot_ms = next_render_ms_ + RenderPeriodMs;
+  next_render_ms_ = next_slot_ms > now_ms ? next_slot_ms : now_ms + RenderPeriodMs;
+}
+
 bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   if (initialized_) {
     return true;
@@ -106,10 +129,13 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   diagnostics_runner_.set_mode(diagnostics_mode_);
 
   state_ = ncos::core::contracts::make_face_render_state_baseline();
-  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms);
+  tuning_ = FaceTuningTelemetry{};
+  tuning_.frame_budget_us = ncos::config::kGlobalConfig.runtime.face_frame_budget_us;
+  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms, tuning_);
   motion_signal_ = ncos::core::contracts::MotionFaceSignal{};
 
-  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff) {
+  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff &&
+      diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kFaceVisualDebug) {
     next_render_ms_ = now_ms;
     initialized_ = true;
     return true;
@@ -153,7 +179,7 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
     return false;
   }
 
-  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms);
+  preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms, tuning_);
   motion_signal_ = face_direction_to_motion_signal(state_.eyes.direction, false);
   next_render_ms_ = now_ms;
   next_gaze_target_ms_ = now_ms;
@@ -168,13 +194,20 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     return;
   }
 
-  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff) {
+  if (diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kOff &&
+      diagnostics_mode_ != ncos::config::DisplayDiagnosticsMode::kFaceVisualDebug) {
     diagnostics_runner_.tick(now_ms);
-    next_render_ms_ = now_ms + RenderPeriodMs;
+    schedule_next_render(now_ms);
     return;
   }
 
+  tuning_.frame_budget_us = ncos::config::kGlobalConfig.runtime.face_frame_budget_us;
+  tuning_.degradation = FaceVisualDegradationFlag::kNone;
+  const uint64_t total_start_us = monotonic_time_us();
+
+  const uint64_t compositor_start_us = monotonic_time_us();
   compositor_.tick(now_ms);
+  tuning_.stages.compositor_us = static_cast<uint32_t>(monotonic_time_us() - compositor_start_us);
 
   const FaceOfficialPresetId target_preset = select_official_preset_for_input(multimodal);
   if (target_preset != official_preset_ && !clip_player_.active()) {
@@ -198,8 +231,11 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     next_clip_start_ms_ = now_ms + 6200;
   }
 
+  const uint64_t clip_start_us = monotonic_time_us();
   const bool clip_updated = clip_player_.tick(now_ms, &compositor_, &state_);
+  tuning_.stages.clip_us = static_cast<uint32_t>(monotonic_time_us() - clip_start_us);
 
+  const uint64_t gaze_start_us = monotonic_time_us();
   if (!clip_player_.active()) {
     if (now_ms >= next_gaze_target_ms_) {
       FaceLayerRequest gaze_request{};
@@ -229,17 +265,63 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   } else if (!clip_updated) {
     (void)clip_player_.tick(now_ms, &compositor_, &state_);
   }
+  tuning_.stages.gaze_us = static_cast<uint32_t>(monotonic_time_us() - gaze_start_us);
 
+  const uint64_t modulation_start_us = monotonic_time_us();
   (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, ModulationOwnerServiceId, now_ms);
+  tuning_.stages.modulation_us = static_cast<uint32_t>(monotonic_time_us() - modulation_start_us);
 
   FaceFrame frame{};
-  if (composer_.compose(state_, &frame)) {
+  const uint64_t compose_start_us = monotonic_time_us();
+  const bool composed = composer_.compose(state_, &frame);
+  tuning_.stages.compose_us = static_cast<uint32_t>(monotonic_time_us() - compose_start_us);
+
+  if (composed) {
+    const uint64_t render_start_us = monotonic_time_us();
     (void)renderer_.render(frame);
+    tuning_.stages.render_us = static_cast<uint32_t>(monotonic_time_us() - render_start_us);
+  } else {
+    tuning_.stages.render_us = 0;
   }
 
-  preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms);
+  tuning_.stages.total_us = static_cast<uint32_t>(monotonic_time_us() - total_start_us);
+
+  const auto render_stats = renderer_.render_stats();
+  const auto render_plan = renderer_.last_render_plan();
+  tuning_.dirty_area_px = render_stats.last_dirty_area_px;
+  tuning_.avg_frame_time_us = render_stats.avg_frame_time_us;
+  tuning_.peak_frame_time_us = render_stats.peak_frame_time_us;
+  tuning_.rendered_frames = render_stats.rendered_frames;
+  tuning_.skipped_duplicate_frames = render_stats.skipped_duplicate_frames;
+  tuning_.frame_skipped = render_stats.last_frame_skipped;
+  tuning_.full_redraw = render_stats.last_frame_full_redraw;
+  tuning_.high_contrast_motion = render_plan.high_contrast_motion;
+
+  if (tuning_.stages.total_us > tuning_.frame_budget_us) {
+    tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kFrameOverBudget;
+  }
+  if (tuning_.full_redraw) {
+    tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kFullRedraw;
+  }
+  if (tuning_.high_contrast_motion) {
+    tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kHighContrastMotion;
+  }
+  const auto* shared_display = ncos::drivers::display::acquire_shared_display();
+  const uint32_t large_dirty_budget_px =
+      shared_display != nullptr ? static_cast<uint32_t>(shared_display->width()) * 24u : 5760u;
+  if (tuning_.dirty_area_px > large_dirty_budget_px) {
+    tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kLargeDirtyRect;
+  }
+  if (is_diagonal_direction(state_.eyes.direction)) {
+    tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kDiagonalMotion;
+  }
+
+  preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms, tuning_);
+  if (diagnostics_mode_ == ncos::config::DisplayDiagnosticsMode::kFaceVisualDebug) {
+    diagnostics_runner_.render_face_visual_debug(preview_snapshot_);
+  }
   motion_signal_ = face_direction_to_motion_signal(state_.eyes.direction, clip_player_.active());
-  next_render_ms_ = now_ms + RenderPeriodMs;
+  schedule_next_render(now_ms);
 }
 
 bool FaceGraphicsPipeline::initialized() const {
@@ -252,6 +334,10 @@ size_t FaceGraphicsPipeline::export_preview_json(char* out_buffer, size_t out_bu
 
 ncos::core::contracts::MotionFaceSignal FaceGraphicsPipeline::motion_signal() const {
   return motion_signal_;
+}
+
+FaceRenderStats FaceGraphicsPipeline::render_stats() const {
+  return renderer_.render_stats();
 }
 
 }  // namespace ncos::services::face

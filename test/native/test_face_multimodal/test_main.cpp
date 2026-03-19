@@ -83,15 +83,30 @@ void test_face_tooling_exports_preview_json_snapshot() {
   state.owner_service = 34;
   state.eyes.focus_percent = 61;
 
-  const auto snapshot = ncos::services::face::make_face_preview_snapshot(state, false, 5000);
+  ncos::services::face::FaceTuningTelemetry tuning{};
+  tuning.frame_budget_us = 14000;
+  tuning.stages.total_us = 9100;
+  tuning.stages.render_us = 5300;
+  tuning.dirty_area_px = 1824;
+  tuning.avg_frame_time_us = 6200;
+  tuning.peak_frame_time_us = 9800;
+  tuning.rendered_frames = 12;
+  tuning.skipped_duplicate_frames = 4;
+  tuning.degradation = ncos::services::face::FaceVisualDegradationFlag::kHighContrastMotion |
+                       ncos::services::face::FaceVisualDegradationFlag::kDiagonalMotion;
 
-  char json[256] = {};
+  const auto snapshot = ncos::services::face::make_face_preview_snapshot(state, false, 5000, tuning);
+
+  char json[512] = {};
   const size_t written = ncos::services::face::export_face_preview_json(snapshot, json, sizeof(json));
 
   TEST_ASSERT_GREATER_THAN_UINT32(0, static_cast<uint32_t>(written));
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"tooling\":\"exploratory\""));
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"state_revision\":42"));
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"focus\":61"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"total_us\":9100"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"render_us\":5300"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"degradation\":\"high_contrast_motion|diagonal_motion\""));
 }
 
 int main() {

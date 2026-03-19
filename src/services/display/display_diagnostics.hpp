@@ -5,6 +5,7 @@
 #include "config/system_config.hpp"
 #include "drivers/display/display_driver.hpp"
 #include "services/face/face_display_renderer.hpp"
+#include "services/face/face_tooling.hpp"
 #include "services/face/face_frame.hpp"
 
 namespace ncos::services::display {
@@ -15,6 +16,7 @@ class DisplayDiagnosticsRunner final {
             ncos::services::face::FaceDisplayRenderer* renderer);
   void set_mode(ncos::config::DisplayDiagnosticsMode mode);
   void tick(uint64_t now_ms);
+  void render_face_visual_debug(const ncos::services::face::FacePreviewSnapshot& snapshot);
   ncos::config::DisplayDiagnosticsMode mode() const;
 
  private:
