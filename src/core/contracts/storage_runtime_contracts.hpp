@@ -1,10 +1,15 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace ncos::core::contracts {
 
 enum class PersistedRuntimeConfigSchemaVersion : uint8_t {
+  kV1 = 1,
+};
+
+enum class PersistedStorageEnvelopeVersion : uint8_t {
   kV1 = 1,
 };
 
@@ -52,11 +57,28 @@ struct PersistedRuntimeConfigRecord {
   uint32_t telemetry_interval_ms = 8000;
 };
 
+struct PersistedRuntimeConfigEnvelope {
+  uint32_t magic = 0;
+  PersistedStorageEnvelopeVersion envelope_version = PersistedStorageEnvelopeVersion::kV1;
+  uint8_t reserved = 0;
+  uint16_t payload_size = 0;
+  uint32_t generation = 0;
+  uint32_t checksum = 0;
+  PersistedRuntimeConfigRecord payload{};
+};
+
 PersistedRuntimeConfigRecord make_default_persisted_runtime_config();
 bool sanitize_persisted_runtime_config(PersistedRuntimeConfigRecord* record);
 bool is_valid_persisted_runtime_config(const PersistedRuntimeConfigRecord& record);
 bool is_importable_persisted_runtime_config(const PersistedRuntimeConfigRecord& record);
 const StorageDataPolicy& storage_data_policy(StorageDataClass data_class);
 bool storage_data_is_portable(StorageDataClass data_class);
+uint32_t persisted_runtime_config_checksum(const PersistedRuntimeConfigRecord& record);
+PersistedRuntimeConfigEnvelope make_persisted_runtime_config_envelope(
+    const PersistedRuntimeConfigRecord& record,
+    uint32_t generation);
+bool sanitize_persisted_runtime_config_envelope(PersistedRuntimeConfigEnvelope* envelope);
+bool is_valid_persisted_runtime_config_envelope(const PersistedRuntimeConfigEnvelope& envelope);
+size_t persisted_runtime_config_envelope_size();
 
 }  // namespace ncos::core::contracts

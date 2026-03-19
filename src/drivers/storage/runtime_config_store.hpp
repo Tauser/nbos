@@ -29,6 +29,10 @@ class RuntimeConfigStore final : public ncos::interfaces::state::RuntimeConfigPe
       const ncos::core::contracts::PersistedRuntimeConfigRecord& record,
       ncos::config::RuntimeConfig* runtime_config);
 
+  static const char* primary_slot_key();
+  static const char* backup_slot_key();
+  static const char* legacy_slot_key();
+
  private:
   LocalPersistence owned_persistence_{};
   LocalPersistence* persistence_ = nullptr;

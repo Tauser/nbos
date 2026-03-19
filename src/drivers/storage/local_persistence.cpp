@@ -21,7 +21,8 @@ struct HostPersistenceSlot {
   uint8_t data[128] = {};
 };
 
-HostPersistenceSlot s_host_slot{};
+constexpr size_t HostPersistenceSlotCount = 8;
+HostPersistenceSlot s_host_slots[HostPersistenceSlotCount]{};
 #endif
 
 bool copy_token(const char* source, char* dest, size_t capacity) {
@@ -37,6 +38,26 @@ bool copy_token(const char* source, char* dest, size_t capacity) {
   memcpy(dest, source, len + 1);
   return true;
 }
+
+#if !defined(ESP_PLATFORM)
+HostPersistenceSlot* find_host_slot(const char* ns, const char* key) {
+  for (auto& slot : s_host_slots) {
+    if (slot.occupied && strcmp(slot.ns, ns) == 0 && strcmp(slot.key, key) == 0) {
+      return &slot;
+    }
+  }
+  return nullptr;
+}
+
+HostPersistenceSlot* find_free_host_slot() {
+  for (auto& slot : s_host_slots) {
+    if (!slot.occupied) {
+      return &slot;
+    }
+  }
+  return nullptr;
+}
+#endif
 
 }  // namespace
 
@@ -110,16 +131,17 @@ LocalPersistenceStatus LocalPersistence::read_blob(const char* ns,
   }
   return LocalPersistenceStatus::kOk;
 #else
-  if (!s_host_slot.occupied || strcmp(s_host_slot.ns, ns) != 0 || strcmp(s_host_slot.key, key) != 0) {
+  const auto* slot = find_host_slot(ns, key);
+  if (slot == nullptr) {
     return LocalPersistenceStatus::kNotFound;
   }
-  if (s_host_slot.size > out_capacity) {
+  if (slot->size > out_capacity) {
     return LocalPersistenceStatus::kIoError;
   }
 
-  memcpy(out_data, s_host_slot.data, s_host_slot.size);
+  memcpy(out_data, slot->data, slot->size);
   if (out_size != nullptr) {
-    *out_size = s_host_slot.size;
+    *out_size = slot->size;
   }
   return LocalPersistenceStatus::kOk;
 #endif
@@ -151,15 +173,23 @@ LocalPersistenceStatus LocalPersistence::write_blob(const char* ns,
   nvs_close(handle);
   return err == ESP_OK ? LocalPersistenceStatus::kOk : LocalPersistenceStatus::kIoError;
 #else
-  memset(&s_host_slot, 0, sizeof(s_host_slot));
-  s_host_slot.occupied = copy_token(ns, s_host_slot.ns, sizeof(s_host_slot.ns)) &&
-                         copy_token(key, s_host_slot.key, sizeof(s_host_slot.key));
-  if (!s_host_slot.occupied) {
-    memset(&s_host_slot, 0, sizeof(s_host_slot));
+  auto* slot = find_host_slot(ns, key);
+  if (slot == nullptr) {
+    slot = find_free_host_slot();
+  }
+  if (slot == nullptr) {
     return LocalPersistenceStatus::kIoError;
   }
-  memcpy(s_host_slot.data, data, size);
-  s_host_slot.size = size;
+
+  memset(slot, 0, sizeof(*slot));
+  slot->occupied = copy_token(ns, slot->ns, sizeof(slot->ns)) &&
+                   copy_token(key, slot->key, sizeof(slot->key));
+  if (!slot->occupied) {
+    memset(slot, 0, sizeof(*slot));
+    return LocalPersistenceStatus::kIoError;
+  }
+  memcpy(slot->data, data, size);
+  slot->size = size;
   return LocalPersistenceStatus::kOk;
 #endif
 }
@@ -193,10 +223,11 @@ LocalPersistenceStatus LocalPersistence::erase_key(const char* ns, const char* k
   nvs_close(handle);
   return err == ESP_OK ? LocalPersistenceStatus::kOk : LocalPersistenceStatus::kIoError;
 #else
-  if (!s_host_slot.occupied || strcmp(s_host_slot.ns, ns) != 0 || strcmp(s_host_slot.key, key) != 0) {
+  auto* slot = find_host_slot(ns, key);
+  if (slot == nullptr) {
     return LocalPersistenceStatus::kNotFound;
   }
-  memset(&s_host_slot, 0, sizeof(s_host_slot));
+  memset(slot, 0, sizeof(*slot));
   return LocalPersistenceStatus::kOk;
 #endif
 }

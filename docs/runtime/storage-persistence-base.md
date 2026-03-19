@@ -10,6 +10,7 @@ The goal is to keep storage:
 - small in scope
 - safe to evolve
 - easy to reset and reason about
+- resilient across interrupted writes
 
 ## Scope
 
@@ -18,6 +19,7 @@ This checkpoint covers only:
 - local blob persistence for small records
 - isolated persisted runtime configuration
 - official policy for retention, reset, erase, export, and import
+- versioned envelope, integrity validation, and atomic write semantics for persisted config
 
 This checkpoint does **not** yet include:
 - adaptive memory persistence
@@ -43,7 +45,7 @@ It defines:
 For the current board baseline:
 - backend: `NVS`
 - namespace: `ncos`
-- key: `runtime_cfg`
+- legacy key: `runtime_cfg`
 
 ### Low-level local persistence
 
@@ -58,7 +60,7 @@ Responsibilities:
 
 Behavior:
 - on ESP: uses `nvs_flash`
-- on native tests: uses a fixed in-memory slot
+- on native tests: uses fixed in-memory slots keyed by namespace and key
 - no dynamic allocation in the hot path
 
 ### Typed runtime config persistence
@@ -78,7 +80,8 @@ Responsibilities:
 - isolate load/save/reset of persisted runtime config
 - sanitize and validate stored values
 - expose a strict manual export/import path for the portable record
-- erase corrupt records when policy allows
+- use a dual-slot versioned envelope with checksum for local durability
+- preserve the last-known-good config when a newer slot is corrupt or incomplete
 
 ## Persisted data policy
 
@@ -97,7 +100,7 @@ Current persisted runtime fields:
 Policy for `runtime_config`:
 - local persistence: allowed
 - retention: until overwrite or explicit reset
-- integrity: schema checked and sanitized
+- integrity: schema checked, sanitized, and checksum protected in the local envelope
 - erase on schema mismatch/corruption: allowed by policy
 - erase on user reset: yes
 - erase on factory reset: yes
@@ -119,6 +122,33 @@ Policy for these classes:
 
 This is intentional so the product does not silently turn short-lived context into historical storage.
 
+## Versioning, atomicity, and last-known-good
+
+The persisted runtime config now uses a versioned local envelope with:
+- envelope magic
+- envelope version
+- payload schema version
+- payload size
+- monotonic generation counter
+- checksum over header + payload
+
+Local write model:
+- slot A: `runtime_cfg_a`
+- slot B: `runtime_cfg_b`
+- legacy fallback read: `runtime_cfg`
+
+Write rule:
+- new config is written to the opposite slot from the current valid winner
+- previous valid slot is left intact
+- legacy single-slot data is erased only after a successful new-format save
+
+Read rule:
+- if both slots are valid, highest generation wins
+- if the newest slot is corrupt, the older valid slot becomes the last-known-good
+- if no envelope slot is valid, the store still accepts the legacy single-slot record while migration is in progress
+
+This gives the runtime-config path logical atomicity without opening a new storage subsystem.
+
 ## Retention and integrity rules
 
 The persistence base now follows these rules:
@@ -129,17 +159,18 @@ The persistence base now follows these rules:
 - absence of a record is not treated as corruption
 - imported records must already match the known schema before sanitation is accepted
 - only the portable runtime-config subset can cross export/import boundaries
+- local envelope checksum must validate before a slot can become authoritative
 
 ## Reset and erase rules
 
 Reset behavior is now explicit:
 - soft reboot: keeps local persisted runtime config
-- user config reset: erases only the persisted runtime-config record
+- user config reset: erases runtime-config slot A, slot B, and the legacy key
 - factory reset: should erase the full local persistence namespace
-- corrupt record handling: record may be erased automatically when the board policy allows it
+- corrupt record handling: corrupt slot may be erased automatically when the board policy allows it
 
 Current implementation in this checkpoint:
-- `RuntimeConfigStore::reset()` covers the user-facing config erase path
+- `RuntimeConfigStore::reset()` covers the user-facing config erase path for all runtime-config keys
 - local corruption erase is already supported through the BSP policy
 - full factory-reset flow remains a higher-level operation for a later stage
 
@@ -148,7 +179,7 @@ Current implementation in this checkpoint:
 Portable export/import is intentionally narrow:
 - only `runtime_config` is exportable/importable
 - transfer mode is manual, not automatic background sync
-- exported data must stay small, typed, and schema-versioned
+- exported data stays as the typed payload record, not the local dual-slot envelope
 - import rejects unknown schema revisions
 - import sanitizes safe ranges before applying them to runtime
 
@@ -162,5 +193,6 @@ Accepted trade-offs for this stage:
 - the runtime is not automatically overlaid from persistence yet
 - factory reset is policy-defined here, but still needs its own orchestration step later
 - telemetry and session continuity remain intentionally ephemeral for now
+- dual-slot durability is implemented only for runtime config, not yet for every future data class
 
 This keeps the checkpoint small, reviewable, and safe before the next memory/storage stages.
