@@ -72,8 +72,12 @@ void test_runtime_config_store_roundtrips_sanitized_record() {
                           static_cast<uint8_t>(store.save(record)));
 
   ncos::core::contracts::PersistedRuntimeConfigRecord loaded{};
+  const auto load_result = store.load_with_recovery(&loaded);
   TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
-                          static_cast<uint8_t>(store.load(&loaded)));
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::RuntimeConfigRecoveryPath::kDirectLoad),
+                          static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_FALSE(load_result.repaired_storage);
   TEST_ASSERT_FALSE(loaded.diagnostics_enabled);
   TEST_ASSERT_TRUE(loaded.cloud_sync_enabled);
   TEST_ASSERT_TRUE(loaded.cloud_bridge_enabled);
@@ -82,7 +86,7 @@ void test_runtime_config_store_roundtrips_sanitized_record() {
   TEST_ASSERT_EQUAL_UINT32(1000U, loaded.telemetry_interval_ms);
 }
 
-void test_runtime_config_store_keeps_last_known_good_when_new_slot_is_corrupted() {
+void test_runtime_config_store_recovers_last_known_good_and_repairs_storage() {
   ncos::drivers::storage::LocalPersistence persistence;
   ncos::drivers::storage::RuntimeConfigStore store(&persistence);
 
@@ -109,15 +113,25 @@ void test_runtime_config_store_keeps_last_known_good_when_new_slot_is_corrupted(
                                                   sizeof(garbage))));
 
   ncos::core::contracts::PersistedRuntimeConfigRecord loaded{};
+  const auto load_result = store.load_with_recovery(&loaded);
   TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
-                          static_cast<uint8_t>(store.load(&loaded)));
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::RuntimeConfigRecoveryPath::kRecoveredLastKnownGood),
+      static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_TRUE(load_result.repaired_storage);
   TEST_ASSERT_FALSE(loaded.diagnostics_enabled);
   TEST_ASSERT_TRUE(loaded.cloud_sync_enabled);
   TEST_ASSERT_EQUAL_UINT32(4200U, loaded.cloud_sync_interval_ms);
   TEST_ASSERT_FALSE(loaded.telemetry_enabled);
+
+  ncos::core::contracts::PersistedRuntimeConfigRecord reloaded{};
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
+                          static_cast<uint8_t>(store.load(&reloaded)));
+  TEST_ASSERT_EQUAL_UINT32(4200U, reloaded.cloud_sync_interval_ms);
 }
 
-void test_runtime_config_store_loads_legacy_single_slot_record() {
+void test_runtime_config_store_loads_legacy_single_slot_record_and_migrates() {
   ncos::drivers::storage::LocalPersistence persistence;
   ncos::drivers::storage::RuntimeConfigStore store(&persistence);
 
@@ -134,11 +148,83 @@ void test_runtime_config_store_loads_legacy_single_slot_record() {
                                                   sizeof(legacy))));
 
   ncos::core::contracts::PersistedRuntimeConfigRecord loaded{};
+  const auto load_result = store.load_with_recovery(&loaded);
   TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
-                          static_cast<uint8_t>(store.load(&loaded)));
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::RuntimeConfigRecoveryPath::kRecoveredLegacy),
+                          static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_TRUE(load_result.repaired_storage);
   TEST_ASSERT_TRUE(loaded.cloud_extension_enabled);
   TEST_ASSERT_TRUE(loaded.telemetry_enabled);
   TEST_ASSERT_EQUAL_UINT32(22000U, loaded.telemetry_interval_ms);
+
+  uint8_t legacy_raw[sizeof(legacy)] = {};
+  size_t legacy_size = 0;
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kNotFound),
+      static_cast<uint8_t>(persistence.read_blob("ncos",
+                                                 ncos::drivers::storage::RuntimeConfigStore::legacy_slot_key(),
+                                                 legacy_raw,
+                                                 sizeof(legacy_raw),
+                                                 &legacy_size)));
+}
+
+void test_runtime_config_store_resets_profile_to_default_when_no_valid_snapshot_remains() {
+  ncos::drivers::storage::LocalPersistence persistence;
+  ncos::drivers::storage::RuntimeConfigStore store(&persistence);
+
+  uint8_t garbage[sizeof(ncos::core::contracts::PersistedRuntimeConfigEnvelope)] = {};
+  memset(garbage, 0x5AU, sizeof(garbage));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kOk),
+      static_cast<uint8_t>(persistence.write_blob("ncos",
+                                                  ncos::drivers::storage::RuntimeConfigStore::primary_slot_key(),
+                                                  garbage,
+                                                  sizeof(garbage))));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kOk),
+      static_cast<uint8_t>(persistence.write_blob("ncos",
+                                                  ncos::drivers::storage::RuntimeConfigStore::backup_slot_key(),
+                                                  garbage,
+                                                  sizeof(garbage))));
+
+  ncos::core::contracts::PersistedRuntimeConfigRecord loaded{};
+  const auto load_result = store.load_with_recovery(&loaded);
+  const auto defaults = ncos::drivers::storage::RuntimeConfigStore::default_profile_record();
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::RuntimeConfigRecoveryPath::kResetProfileBaseline),
+      static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_TRUE(load_result.repaired_storage);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(defaults.schema_version), static_cast<uint8_t>(loaded.schema_version));
+  TEST_ASSERT_EQUAL(defaults.diagnostics_enabled, loaded.diagnostics_enabled);
+  TEST_ASSERT_EQUAL(defaults.cloud_sync_enabled, loaded.cloud_sync_enabled);
+  TEST_ASSERT_EQUAL_UINT32(defaults.cloud_sync_interval_ms, loaded.cloud_sync_interval_ms);
+  TEST_ASSERT_EQUAL_UINT32(defaults.telemetry_interval_ms, loaded.telemetry_interval_ms);
+}
+
+void test_runtime_config_store_reset_profile_writes_default_record() {
+  ncos::drivers::storage::RuntimeConfigStore store;
+  ncos::core::contracts::PersistedRuntimeConfigRecord record{};
+  record.diagnostics_enabled = false;
+  record.cloud_sync_enabled = true;
+  record.telemetry_enabled = true;
+  record.cloud_sync_interval_ms = 4200U;
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
+                          static_cast<uint8_t>(store.save(record)));
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
+                          static_cast<uint8_t>(store.reset_profile()));
+
+  ncos::core::contracts::PersistedRuntimeConfigRecord loaded{};
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk),
+                          static_cast<uint8_t>(store.load(&loaded)));
+  const auto defaults = ncos::drivers::storage::RuntimeConfigStore::default_profile_record();
+  TEST_ASSERT_EQUAL(defaults.diagnostics_enabled, loaded.diagnostics_enabled);
+  TEST_ASSERT_EQUAL(defaults.cloud_sync_enabled, loaded.cloud_sync_enabled);
+  TEST_ASSERT_EQUAL(defaults.telemetry_enabled, loaded.telemetry_enabled);
+  TEST_ASSERT_EQUAL_UINT32(defaults.cloud_sync_interval_ms, loaded.cloud_sync_interval_ms);
 }
 
 void test_runtime_config_store_resets_all_slots_to_not_found() {
@@ -212,11 +298,16 @@ int main() {
   RUN_TEST(test_storage_policy_limits_persistence_to_runtime_config_baseline);
   RUN_TEST(test_runtime_config_envelope_is_versioned_and_checksum_protected);
   RUN_TEST(test_runtime_config_store_roundtrips_sanitized_record);
-  RUN_TEST(test_runtime_config_store_keeps_last_known_good_when_new_slot_is_corrupted);
-  RUN_TEST(test_runtime_config_store_loads_legacy_single_slot_record);
+  RUN_TEST(test_runtime_config_store_recovers_last_known_good_and_repairs_storage);
+  RUN_TEST(test_runtime_config_store_loads_legacy_single_slot_record_and_migrates);
+  RUN_TEST(test_runtime_config_store_resets_profile_to_default_when_no_valid_snapshot_remains);
+  RUN_TEST(test_runtime_config_store_reset_profile_writes_default_record);
   RUN_TEST(test_runtime_config_store_resets_all_slots_to_not_found);
   RUN_TEST(test_runtime_config_store_applies_persisted_subset_over_runtime_config);
   RUN_TEST(test_runtime_config_store_export_import_policy_stays_manual_and_sanitized);
   RUN_TEST(test_runtime_config_store_rejects_import_with_unknown_schema);
   return UNITY_END();
 }
+
+
+

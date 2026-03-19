@@ -82,6 +82,7 @@ Responsibilities:
 - expose a strict manual export/import path for the portable record
 - use a dual-slot versioned envelope with checksum for local durability
 - preserve the last-known-good config when a newer slot is corrupt or incomplete
+- expose explicit recovery and profile-reset semantics for the runtime config
 
 ## Persisted data policy
 
@@ -149,6 +150,18 @@ Read rule:
 
 This gives the runtime-config path logical atomicity without opening a new storage subsystem.
 
+## Recovery and profile reset
+
+Runtime-config recovery is now explicit:
+- direct load: valid current snapshot, no repair needed
+- last-known-good fallback: a valid older slot wins when the newer slot is corrupt
+- legacy migration: a valid legacy single-slot record is accepted and migrated forward
+- profile reset: if no valid snapshot remains, the store rewrites the persisted runtime profile with the safe product baseline
+
+This profile reset is intentionally narrow:
+- it resets only persisted `runtime_config`
+- it does not touch short session memory, adaptive personality, or the fixed identity baseline of the companion
+
 ## Retention and integrity rules
 
 The persistence base now follows these rules:
@@ -171,6 +184,7 @@ Reset behavior is now explicit:
 
 Current implementation in this checkpoint:
 - `RuntimeConfigStore::reset()` covers the user-facing config erase path for all runtime-config keys
+- `RuntimeConfigStore::reset_profile()` rewrites the persisted runtime profile with the safe product baseline, instead of only erasing storage
 - local corruption erase is already supported through the BSP policy
 - full factory-reset flow remains a higher-level operation for a later stage
 

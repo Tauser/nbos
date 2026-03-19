@@ -75,6 +75,10 @@ const StoredEnvelopeSlot* choose_best_slot(const StoredEnvelopeSlot& primary,
   return nullptr;
 }
 
+bool slot_corrupted(const StoredEnvelopeSlot& slot) {
+  return slot.present && !slot.valid;
+}
+
 }  // namespace
 
 namespace ncos::drivers::storage {
@@ -84,22 +88,26 @@ RuntimeConfigStore::RuntimeConfigStore() : persistence_(&owned_persistence_) {}
 RuntimeConfigStore::RuntimeConfigStore(LocalPersistence* persistence)
     : persistence_(persistence != nullptr ? persistence : &owned_persistence_) {}
 
-ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load(
+RuntimeConfigLoadResult RuntimeConfigStore::load_with_recovery(
     ncos::core::contracts::PersistedRuntimeConfigRecord* out_record) {
+  RuntimeConfigLoadResult result{};
   if (out_record == nullptr) {
-    return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kInvalidData;
+    result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kInvalidData;
+    return result;
   }
 
   const auto& bsp = active_storage_platform_bsp();
   if (!bsp.persistence.allow_runtime_config_persistence ||
       bsp.config_backend == StorageBackendId::kUnavailable) {
-    return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kUnavailable;
+    result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kUnavailable;
+    return result;
   }
 
   const auto primary = read_slot(persistence_, bsp.config_namespace, primary_slot_key(),
                                  bsp.persistence.erase_corrupt_records);
   const auto backup = read_slot(persistence_, bsp.config_namespace, backup_slot_key(),
                                 bsp.persistence.erase_corrupt_records);
+  const bool corruption_seen = slot_corrupted(primary) || slot_corrupted(backup);
 
   if (primary.needs_erase) {
     (void)persistence_->erase_key(bsp.config_namespace, primary.key);
@@ -110,7 +118,14 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load
 
   if (const auto* best = choose_best_slot(primary, backup); best != nullptr) {
     *out_record = best->envelope.payload;
-    return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    result.recovery_path = corruption_seen ? RuntimeConfigRecoveryPath::kRecoveredLastKnownGood
+                                           : RuntimeConfigRecoveryPath::kDirectLoad;
+    if (corruption_seen) {
+      result.repaired_storage =
+          save(*out_record) == ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    }
+    return result;
   }
 
   ncos::core::contracts::PersistedRuntimeConfigRecord legacy{};
@@ -121,10 +136,21 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load
                                                      sizeof(legacy),
                                                      &legacy_size);
   if (legacy_status == LocalPersistenceStatus::kNotFound) {
-    return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kNotFound;
+    if (!corruption_seen) {
+      result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kNotFound;
+      return result;
+    }
+
+    *out_record = default_profile_record();
+    result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    result.recovery_path = RuntimeConfigRecoveryPath::kResetProfileBaseline;
+    result.repaired_storage =
+        reset_profile() == ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    return result;
   }
   if (legacy_status != LocalPersistenceStatus::kOk) {
-    return map_status(legacy_status);
+    result.status = map_status(legacy_status);
+    return result;
   }
 
   if (legacy_size != sizeof(legacy) ||
@@ -132,11 +158,25 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load
     if (bsp.persistence.erase_corrupt_records) {
       (void)persistence_->erase_key(bsp.config_namespace, legacy_slot_key());
     }
-    return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kInvalidData;
+    *out_record = default_profile_record();
+    result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    result.recovery_path = RuntimeConfigRecoveryPath::kResetProfileBaseline;
+    result.repaired_storage =
+        reset_profile() == ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+    return result;
   }
 
   *out_record = legacy;
-  return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+  result.status = ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+  result.recovery_path = RuntimeConfigRecoveryPath::kRecoveredLegacy;
+  result.repaired_storage =
+      save(legacy) == ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
+  return result;
+}
+
+ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load(
+    ncos::core::contracts::PersistedRuntimeConfigRecord* out_record) {
+  return load_with_recovery(out_record).status;
 }
 
 ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::save(
@@ -157,8 +197,7 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::save
   const auto backup = read_slot(persistence_, bsp.config_namespace, backup_slot_key(), false);
   const auto* best = choose_best_slot(primary, backup);
 
-  const uint32_t next_generation =
-      best != nullptr ? best->envelope.generation + 1U : 1U;
+  const uint32_t next_generation = best != nullptr ? best->envelope.generation + 1U : 1U;
   const char* target_key = primary_slot_key();
   if (best != nullptr && best->key == primary_slot_key()) {
     target_key = backup_slot_key();
@@ -196,6 +235,10 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::rese
                    : ncos::interfaces::state::RuntimeConfigPersistenceStatus::kOk;
 }
 
+ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::reset_profile() {
+  return save(default_profile_record());
+}
+
 ncos::core::contracts::PersistedRuntimeConfigRecord RuntimeConfigStore::capture_runtime_config(
     const ncos::config::RuntimeConfig& runtime_config) {
   ncos::core::contracts::PersistedRuntimeConfigRecord record{};
@@ -209,6 +252,10 @@ ncos::core::contracts::PersistedRuntimeConfigRecord RuntimeConfigStore::capture_
   record.telemetry_interval_ms = runtime_config.telemetry_interval_ms;
   ncos::core::contracts::sanitize_persisted_runtime_config(&record);
   return record;
+}
+
+ncos::core::contracts::PersistedRuntimeConfigRecord RuntimeConfigStore::default_profile_record() {
+  return ncos::core::contracts::make_default_persisted_runtime_config();
 }
 
 bool RuntimeConfigStore::is_exportable_record(

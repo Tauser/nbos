@@ -7,19 +7,38 @@
 
 namespace ncos::drivers::storage {
 
+enum class RuntimeConfigRecoveryPath : uint8_t {
+  kNone = 0,
+  kDirectLoad,
+  kRecoveredLastKnownGood,
+  kRecoveredLegacy,
+  kResetProfileBaseline,
+};
+
+struct RuntimeConfigLoadResult {
+  ncos::interfaces::state::RuntimeConfigPersistenceStatus status =
+      ncos::interfaces::state::RuntimeConfigPersistenceStatus::kNotFound;
+  RuntimeConfigRecoveryPath recovery_path = RuntimeConfigRecoveryPath::kNone;
+  bool repaired_storage = false;
+};
+
 class RuntimeConfigStore final : public ncos::interfaces::state::RuntimeConfigPersistencePort {
  public:
   RuntimeConfigStore();
   explicit RuntimeConfigStore(LocalPersistence* persistence);
 
+  RuntimeConfigLoadResult load_with_recovery(
+      ncos::core::contracts::PersistedRuntimeConfigRecord* out_record);
   ncos::interfaces::state::RuntimeConfigPersistenceStatus load(
       ncos::core::contracts::PersistedRuntimeConfigRecord* out_record) override;
   ncos::interfaces::state::RuntimeConfigPersistenceStatus save(
       const ncos::core::contracts::PersistedRuntimeConfigRecord& record) override;
   ncos::interfaces::state::RuntimeConfigPersistenceStatus reset() override;
+  ncos::interfaces::state::RuntimeConfigPersistenceStatus reset_profile();
 
   static ncos::core::contracts::PersistedRuntimeConfigRecord capture_runtime_config(
       const ncos::config::RuntimeConfig& runtime_config);
+  static ncos::core::contracts::PersistedRuntimeConfigRecord default_profile_record();
   static bool is_exportable_record(
       const ncos::core::contracts::PersistedRuntimeConfigRecord& record);
   static bool apply_import_record_to_runtime_config(
