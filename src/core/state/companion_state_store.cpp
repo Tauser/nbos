@@ -10,6 +10,10 @@ bool CompanionStateStore::initialize(const ncos::core::contracts::CompanionStruc
   }
 
   snapshot_.structural = structural;
+  snapshot_.runtime.last_transition_cause =
+      ncos::core::contracts::CompanionStateTransitionCause::kBootstrap;
+  snapshot_.runtime.last_state_change_ms = now_ms;
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -28,7 +32,6 @@ bool CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionR
   snapshot_.runtime.safe_mode = runtime.safe_mode;
   snapshot_.runtime.scheduler_tasks = runtime.scheduler_tasks;
   snapshot_.runtime.fault_count = runtime.fault_count;
-  snapshot_.runtime.presence_mode = presence_from_runtime(runtime);
 
   snapshot_.governance.allowed_total = runtime.governance_allowed_total;
   snapshot_.governance.preempted_total = runtime.governance_preempted_total;
@@ -37,7 +40,6 @@ bool CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionR
       runtime.governance_allowed_total, runtime.governance_preempted_total,
       runtime.governance_rejected_total);
 
-  // Runtime safety has primacy over energetic/interacional expression.
   if (runtime.safe_mode) {
     snapshot_.energetic.mode = ncos::core::contracts::EnergyMode::kCritical;
     snapshot_.interactional.phase = ncos::core::contracts::InteractionPhase::kIdle;
@@ -50,6 +52,7 @@ bool CompanionStateStore::ingest_runtime(const ncos::core::contracts::CompanionR
     snapshot_.interactional.phase = ncos::core::contracts::InteractionPhase::kIdle;
   }
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -78,6 +81,7 @@ bool CompanionStateStore::ingest_emotional(
   snapshot_.emotional.intensity_percent = emotion_model.intensity_percent;
   snapshot_.emotional.stability_percent = emotion_model.stability_percent;
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -100,6 +104,7 @@ bool CompanionStateStore::ingest_attentional(
     snapshot_.interactional.session_active = true;
   }
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -117,6 +122,7 @@ bool CompanionStateStore::ingest_energetic(
   snapshot_.energetic.thermal_load_percent = energetic.thermal_load_percent;
   snapshot_.energetic.external_power = energetic.external_power;
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -134,6 +140,7 @@ bool CompanionStateStore::ingest_interactional(
   snapshot_.interactional.session_active = interactional.session_active;
   snapshot_.interactional.response_pending = interactional.response_pending;
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -160,6 +167,7 @@ bool CompanionStateStore::ingest_governance_decision(
     snapshot_.transient.last_transition_ms = now_ms;
   }
 
+  refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
   return true;
@@ -170,17 +178,115 @@ ncos::core::contracts::CompanionSnapshot CompanionStateStore::snapshot_for(
   return ncos::core::contracts::redact_snapshot_for_reader(snapshot_, reader);
 }
 
-ncos::core::contracts::CompanionPresenceMode CompanionStateStore::presence_from_runtime(
-    const ncos::core::contracts::CompanionRuntimeSignal& runtime) {
-  if (!runtime.started || runtime.safe_mode) {
+ncos::core::contracts::CompanionPresenceMode CompanionStateStore::derive_presence_mode(
+    const ncos::core::contracts::CompanionSnapshot& snapshot) {
+  if (!snapshot.runtime.started || snapshot.runtime.safe_mode ||
+      snapshot.energetic.mode == ncos::core::contracts::EnergyMode::kCritical) {
     return ncos::core::contracts::CompanionPresenceMode::kDormant;
   }
 
-  if (runtime.scheduler_tasks > 1) {
-    return ncos::core::contracts::CompanionPresenceMode::kAttending;
+  switch (derive_product_state(snapshot)) {
+    case ncos::core::contracts::CompanionProductState::kAttendUser:
+    case ncos::core::contracts::CompanionProductState::kAlertScan:
+    case ncos::core::contracts::CompanionProductState::kResponding:
+      return ncos::core::contracts::CompanionPresenceMode::kAttending;
+    case ncos::core::contracts::CompanionProductState::kBooting:
+    case ncos::core::contracts::CompanionProductState::kEnergyProtect:
+      return ncos::core::contracts::CompanionPresenceMode::kDormant;
+    case ncos::core::contracts::CompanionProductState::kIdleObserve:
+    default:
+      return ncos::core::contracts::CompanionPresenceMode::kIdle;
+  }
+}
+
+ncos::core::contracts::CompanionProductState CompanionStateStore::derive_product_state(
+    const ncos::core::contracts::CompanionSnapshot& snapshot) {
+  if (!snapshot.runtime.initialized || !snapshot.runtime.started) {
+    return ncos::core::contracts::CompanionProductState::kBooting;
   }
 
-  return ncos::core::contracts::CompanionPresenceMode::kIdle;
+  if (snapshot.runtime.safe_mode || snapshot.energetic.mode == ncos::core::contracts::EnergyMode::kCritical ||
+      (snapshot.energetic.mode == ncos::core::contracts::EnergyMode::kConstrained &&
+       snapshot.energetic.battery_percent <= 18 && !snapshot.energetic.external_power)) {
+    return ncos::core::contracts::CompanionProductState::kEnergyProtect;
+  }
+
+  if (snapshot.interactional.phase == ncos::core::contracts::InteractionPhase::kResponding ||
+      snapshot.interactional.turn_owner == ncos::core::contracts::TurnOwner::kCompanion ||
+      snapshot.interactional.response_pending) {
+    return ncos::core::contracts::CompanionProductState::kResponding;
+  }
+
+  if (snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kStimulus &&
+      snapshot.attentional.focus_confidence_percent >= 50) {
+    return ncos::core::contracts::CompanionProductState::kAlertScan;
+  }
+
+  if (snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
+      (snapshot.attentional.lock_active || snapshot.attentional.focus_confidence_percent >= 45 ||
+       snapshot.interactional.session_active)) {
+    return ncos::core::contracts::CompanionProductState::kAttendUser;
+  }
+
+  return ncos::core::contracts::CompanionProductState::kIdleObserve;
+}
+
+ncos::core::contracts::CompanionStateTransitionCause CompanionStateStore::derive_transition_cause(
+    ncos::core::contracts::CompanionProductState previous_state,
+    ncos::core::contracts::CompanionProductState next_state) {
+  if (next_state == ncos::core::contracts::CompanionProductState::kBooting) {
+    return previous_state == ncos::core::contracts::CompanionProductState::kBooting
+               ? ncos::core::contracts::CompanionStateTransitionCause::kBootstrap
+               : ncos::core::contracts::CompanionStateTransitionCause::kRuntimeStopped;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kEnergyProtect) {
+    return ncos::core::contracts::CompanionStateTransitionCause::kEnergyGuard;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kResponding) {
+    return ncos::core::contracts::CompanionStateTransitionCause::kCompanionResponding;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kAlertScan) {
+    return ncos::core::contracts::CompanionStateTransitionCause::kStimulusObserved;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kAttendUser) {
+    return ncos::core::contracts::CompanionStateTransitionCause::kUserTrigger;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kIdleObserve) {
+    if (previous_state == ncos::core::contracts::CompanionProductState::kBooting) {
+      return ncos::core::contracts::CompanionStateTransitionCause::kRuntimeStarted;
+    }
+
+    if (previous_state == ncos::core::contracts::CompanionProductState::kAttendUser) {
+      return ncos::core::contracts::CompanionStateTransitionCause::kUserRelease;
+    }
+
+    return ncos::core::contracts::CompanionStateTransitionCause::kRecoveryToIdle;
+  }
+
+  return ncos::core::contracts::CompanionStateTransitionCause::kRecoveryToIdle;
+}
+
+void CompanionStateStore::refresh_derived_runtime_state(uint64_t now_ms) {
+  const auto previous_state = snapshot_.runtime.product_state;
+  const auto next_state = derive_product_state(snapshot_);
+
+  snapshot_.runtime.presence_mode = derive_presence_mode(snapshot_);
+  snapshot_.runtime.product_state = next_state;
+
+  if (snapshot_.runtime.last_state_change_ms == 0) {
+    snapshot_.runtime.last_state_change_ms = now_ms;
+  }
+
+  if (next_state != previous_state) {
+    snapshot_.runtime.last_transition_cause = derive_transition_cause(previous_state, next_state);
+    snapshot_.runtime.last_state_change_ms = now_ms;
+    ++snapshot_.runtime.state_transition_total;
+  }
 }
 
 bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateWriter writer,
@@ -189,4 +295,3 @@ bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateW
 }
 
 }  // namespace ncos::core::state
-

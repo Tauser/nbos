@@ -35,9 +35,15 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
       ncos::core::contracts::CompanionStateReader reader) const override;
 
  private:
-  static ncos::core::contracts::CompanionPresenceMode presence_from_runtime(
-      const ncos::core::contracts::CompanionRuntimeSignal& runtime);
+  static ncos::core::contracts::CompanionPresenceMode derive_presence_mode(
+      const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static ncos::core::contracts::CompanionProductState derive_product_state(
+      const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static ncos::core::contracts::CompanionStateTransitionCause derive_transition_cause(
+      ncos::core::contracts::CompanionProductState previous_state,
+      ncos::core::contracts::CompanionProductState next_state);
 
+  void refresh_derived_runtime_state(uint64_t now_ms);
   bool authorize_write(ncos::core::contracts::CompanionStateWriter writer,
                        ncos::core::contracts::CompanionStateDomain domain) const;
 
