@@ -8,7 +8,7 @@ DisplayDriver::DisplayDriver() {
 
   {
     auto cfg = bus_.config();
-    cfg.spi_host = bsp.bus_flags.spi_host;
+    cfg.spi_host = static_cast<spi_host_device_t>(bsp.bus_flags.spi_host);
     cfg.spi_mode = bsp.bus_flags.spi_mode;
     cfg.freq_write = profile.timing.spi_write_hz;
     cfg.freq_read = profile.timing.spi_read_hz;
@@ -69,3 +69,4 @@ uint32_t DisplayDriver::write_clock_hz() const {
 }
 
 }  // namespace ncos::drivers::display
+
