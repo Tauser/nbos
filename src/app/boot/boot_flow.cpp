@@ -8,6 +8,8 @@
 #include "drivers/storage/sd_bringup.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
+#include "drivers/ttlinker/ttlinker_transport_bsp.hpp"
+#include "hal/platform/reset_reason.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -33,7 +35,10 @@ bool step_config_gate() {
     ESP_LOGE(kTag, "Build profile invalido");
     return false;
   }
-  ESP_LOGI(kTag, "Board=%s Profile=%s", ncos::config::kBoardName, ncos::config::build_profile_name());
+
+  const auto& reset = ncos::hal::platform::active_reset_reason();
+  ESP_LOGI(kTag, "Board=%s Profile=%s Reset=%s unstable=%d", ncos::config::kBoardName,
+           ncos::config::build_profile_name(), reset.name, reset.unstable_boot_context ? 1 : 0);
   return true;
 }
 
@@ -208,8 +213,10 @@ bool step_ttlinker() {
     return false;
   }
 
+  const auto& transport = ncos::drivers::ttlinker::active_ttlinker_transport_bsp();
   if (motion->has_console_pin_conflict()) {
-    ESP_LOGW(kTag, "TTLinker adiado: pinos 43/44 compartilhados com console no perfil atual");
+    ESP_LOGW(kTag, "TTLinker adiado: transporte UART em conflito com console (%d/%d)",
+             transport.wiring.tx_gpio, transport.wiring.rx_gpio);
     return false;
   }
 

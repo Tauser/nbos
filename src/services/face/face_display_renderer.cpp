@@ -1,14 +1,10 @@
 #include "services/face/face_display_renderer.hpp"
 
 #include <algorithm>
-#include <chrono>
+
+#include "hal/platform/monotonic_clock.hpp"
 
 namespace {
-
-uint64_t monotonic_time_us() {
-  const auto now = std::chrono::steady_clock::now().time_since_epoch();
-  return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
-}
 
 int16_t min_i16(int16_t a, int16_t b) {
   return a < b ? a : b;
@@ -168,7 +164,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 
   const EyeGeometry left_eye = resolve_eye_geometry(frame, true);
   const EyeGeometry right_eye = resolve_eye_geometry(frame, false);
-  const uint64_t frame_start_us = monotonic_time_us();
+  const uint64_t frame_start_us = ncos::hal::platform::monotonic_time_us();
   uint16_t frame_flushes = 0;
 
   display_->setRotation(1);
@@ -257,7 +253,7 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 
   display_->endWrite();
 
-  const uint64_t frame_end_us = monotonic_time_us();
+  const uint64_t frame_end_us = ncos::hal::platform::monotonic_time_us();
   const uint32_t frame_time_us = static_cast<uint32_t>(frame_end_us - frame_start_us);
   const uint32_t dirty_area_px = rect_area(last_render_plan_.dirty_rect) + rect_area(last_render_plan_.dirty_rect_secondary);
 
@@ -294,3 +290,6 @@ FaceRenderStats FaceDisplayRenderer::render_stats() const {
 }
 
 }  // namespace ncos::services::face
+
+
+

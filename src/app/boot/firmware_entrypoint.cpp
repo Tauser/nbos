@@ -23,9 +23,9 @@
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
 #include "drivers/update/update_local_port.hpp"
+#include "hal/platform/monotonic_clock.hpp"
 
 #include "esp_log.h"
-#include "esp_timer.h"
 
 namespace {
 constexpr uint16_t BehaviorServiceId = 61;
@@ -40,10 +40,6 @@ constexpr uint16_t TelemetryServiceId = 69;
 constexpr const char* Tag = "NCOS_ENTRY";
 constexpr const char* PolishTag = "NCOS_POLISH";
 constexpr uint32_t PolishReviewIntervalMs = 5000;
-
-uint64_t monotonic_ms() {
-  return static_cast<uint64_t>(esp_timer_get_time() / 1000ULL);
-}
 
 bool decision_allows(const ncos::core::contracts::GovernanceDecision& decision) {
   return decision.kind == ncos::core::contracts::GovernanceDecisionKind::kAllow ||
@@ -177,7 +173,7 @@ void FirmwareEntrypoint::run() {
     return;
   }
 
-  const uint64_t now = monotonic_ms();
+  const uint64_t now = ncos::hal::platform::monotonic_time_ms();
   system_manager_.start(now);
   next_polish_review_ms_ = now + PolishReviewIntervalMs;
 
@@ -279,7 +275,7 @@ void FirmwareEntrypoint::run() {
 }
 
 void FirmwareEntrypoint::tick() {
-  const uint64_t now = monotonic_ms();
+  const uint64_t now = ncos::hal::platform::monotonic_time_ms();
   system_manager_.tick(now);
   audio_service_.tick(now);
   touch_service_.tick(now);
@@ -445,6 +441,9 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
+
+
 
 
 

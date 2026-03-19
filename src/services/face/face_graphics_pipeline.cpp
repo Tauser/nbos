@@ -2,15 +2,9 @@
 
 #include "config/system_config.hpp"
 #include "drivers/display/display_runtime.hpp"
-
-#include <chrono>
+#include "hal/platform/monotonic_clock.hpp"
 
 namespace {
-
-uint64_t monotonic_time_us() {
-  const auto now = std::chrono::steady_clock::now().time_since_epoch();
-  return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
-}
 
 bool is_diagonal_direction(ncos::models::face::GazeDirection direction) {
   using ncos::models::face::GazeDirection;
@@ -207,11 +201,11 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
 
   tuning_.frame_budget_us = ncos::config::kGlobalConfig.runtime.face_frame_budget_us;
   tuning_.degradation = FaceVisualDegradationFlag::kNone;
-  const uint64_t total_start_us = monotonic_time_us();
+  const uint64_t total_start_us = ncos::hal::platform::monotonic_time_us();
 
-  const uint64_t compositor_start_us = monotonic_time_us();
+  const uint64_t compositor_start_us = ncos::hal::platform::monotonic_time_us();
   compositor_.tick(now_ms);
-  tuning_.stages.compositor_us = static_cast<uint32_t>(monotonic_time_us() - compositor_start_us);
+  tuning_.stages.compositor_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - compositor_start_us);
 
   const FaceOfficialPresetId target_preset = select_official_preset_for_input(multimodal);
   if (target_preset != official_preset_ && !clip_player_.active()) {
@@ -235,11 +229,11 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     next_clip_start_ms_ = now_ms + 6200;
   }
 
-  const uint64_t clip_start_us = monotonic_time_us();
+  const uint64_t clip_start_us = ncos::hal::platform::monotonic_time_us();
   const bool clip_updated = clip_player_.tick(now_ms, &compositor_, &state_);
-  tuning_.stages.clip_us = static_cast<uint32_t>(monotonic_time_us() - clip_start_us);
+  tuning_.stages.clip_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - clip_start_us);
 
-  const uint64_t gaze_start_us = monotonic_time_us();
+  const uint64_t gaze_start_us = ncos::hal::platform::monotonic_time_us();
   if (!clip_player_.active()) {
     if (now_ms >= next_gaze_target_ms_) {
       FaceLayerRequest gaze_request{};
@@ -269,29 +263,29 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   } else if (!clip_updated) {
     (void)clip_player_.tick(now_ms, &compositor_, &state_);
   }
-  tuning_.stages.gaze_us = static_cast<uint32_t>(monotonic_time_us() - gaze_start_us);
+  tuning_.stages.gaze_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - gaze_start_us);
 
-  const uint64_t modulation_start_us = monotonic_time_us();
+  const uint64_t modulation_start_us = ncos::hal::platform::monotonic_time_us();
   (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, ModulationOwnerServiceId, now_ms);
-  tuning_.stages.modulation_us = static_cast<uint32_t>(monotonic_time_us() - modulation_start_us);
+  tuning_.stages.modulation_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - modulation_start_us);
 
   motion_safety_result_ = FaceMotionSafetyResult{};
   (void)apply_face_motion_safety(&state_, &motion_safety_status_, now_ms, &motion_safety_result_);
 
   FaceFrame frame{};
-  const uint64_t compose_start_us = monotonic_time_us();
+  const uint64_t compose_start_us = ncos::hal::platform::monotonic_time_us();
   const bool composed = composer_.compose(state_, &frame);
-  tuning_.stages.compose_us = static_cast<uint32_t>(monotonic_time_us() - compose_start_us);
+  tuning_.stages.compose_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - compose_start_us);
 
   if (composed) {
-    const uint64_t render_start_us = monotonic_time_us();
+    const uint64_t render_start_us = ncos::hal::platform::monotonic_time_us();
     (void)renderer_.render(frame);
-    tuning_.stages.render_us = static_cast<uint32_t>(monotonic_time_us() - render_start_us);
+    tuning_.stages.render_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - render_start_us);
   } else {
     tuning_.stages.render_us = 0;
   }
 
-  tuning_.stages.total_us = static_cast<uint32_t>(monotonic_time_us() - total_start_us);
+  tuning_.stages.total_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - total_start_us);
 
   const auto render_stats = renderer_.render_stats();
   const auto render_plan = renderer_.last_render_plan();
@@ -371,5 +365,8 @@ FaceRenderStats FaceGraphicsPipeline::render_stats() const {
 }
 
 }  // namespace ncos::services::face
+
+
+
 
 

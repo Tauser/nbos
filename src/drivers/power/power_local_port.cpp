@@ -1,8 +1,7 @@
 #include "drivers/power/power_local_port.hpp"
 
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_timer.h"
-#endif
+#include "drivers/power/power_platform_bsp.hpp"
+#include "hal/platform/monotonic_clock.hpp"
 
 namespace ncos::drivers::power {
 
@@ -15,21 +14,19 @@ bool PowerLocalPort::read_sample(ncos::interfaces::power::PowerSampleRaw* out_sa
     return false;
   }
 
+  const auto& bsp = active_power_platform_bsp();
   ncos::interfaces::power::PowerSampleRaw sample{};
   sample.valid = true;
-  sample.external_power_detected = false;
-  sample.thermal_load_percent = 30;
+  sample.external_power_detected = bsp.fallback.external_power_detected;
+  sample.thermal_load_percent = bsp.fallback.baseline_thermal_load_percent;
+  sample.measured_from_sensor = bsp.fallback.measured_from_sensor;
 
-#ifdef NCOS_NATIVE_TESTS
-  sample.measured_from_sensor = false;
-  sample.battery_mv = 3920;
-#else
-  // Placeholder until ADC/charger telemetry is wired on board.
-  sample.measured_from_sensor = false;
-  const uint64_t seconds = static_cast<uint64_t>(esp_timer_get_time() / 1000000ULL);
-  const uint16_t ripple = static_cast<uint16_t>((seconds % 90ULL) / 6ULL);
-  sample.battery_mv = static_cast<uint16_t>(3920U - ripple);
-#endif
+  const uint64_t seconds = ncos::hal::platform::monotonic_time_ms() / 1000ULL;
+  const uint16_t ripple = bsp.fallback.ripple_period_seconds == 0
+                              ? 0
+                              : static_cast<uint16_t>((seconds % bsp.fallback.ripple_period_seconds) / 6ULL);
+  const uint16_t ripple_drop = ripple > bsp.fallback.ripple_drop_mv ? bsp.fallback.ripple_drop_mv : ripple;
+  sample.battery_mv = static_cast<uint16_t>(bsp.fallback.baseline_battery_mv - ripple_drop);
 
   *out_sample = sample;
   return true;

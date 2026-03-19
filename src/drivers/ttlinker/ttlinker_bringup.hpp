@@ -25,3 +25,4 @@ class TtlinkerBringup final {
 };
 
 }  // namespace ncos::drivers::ttlinker
+

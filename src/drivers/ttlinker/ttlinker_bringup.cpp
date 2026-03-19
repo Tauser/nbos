@@ -1,6 +1,6 @@
 #include "drivers/ttlinker/ttlinker_bringup.hpp"
 
-#include "config/pins/board_pins.hpp"
+#include "drivers/ttlinker/ttlinker_transport_bsp.hpp"
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -9,24 +9,12 @@
 
 namespace {
 constexpr const char* kTag = "NCOS_TTLINKER";
-constexpr uart_port_t kUartPort = UART_NUM_1;
-constexpr int kBaudRate = 115200;
-constexpr int kRxBufferSize = 512;
-constexpr int kTxBufferSize = 512;
 }
 
 namespace ncos::drivers::ttlinker {
 
 bool TtlinkerBringup::can_run_probe_with_console() const {
-#if defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
-  constexpr int tx_gpio = CONFIG_ESP_CONSOLE_UART_TX_GPIO;
-  constexpr int rx_gpio = CONFIG_ESP_CONSOLE_UART_RX_GPIO;
-  if (tx_gpio == ncos::config::pins::kServoTx || tx_gpio == ncos::config::pins::kServoRx ||
-      rx_gpio == ncos::config::pins::kServoTx || rx_gpio == ncos::config::pins::kServoRx) {
-    return false;
-  }
-#endif
-  return true;
+  return active_ttlinker_transport_bsp().flags.probe_allowed;
 }
 
 bool TtlinkerBringup::init() {
@@ -34,33 +22,37 @@ bool TtlinkerBringup::init() {
     return true;
   }
 
+  const auto& transport = active_ttlinker_transport_bsp();
+  const auto uart_port = static_cast<uart_port_t>(transport.uart.port);
+
   uart_config_t cfg{};
-  cfg.baud_rate = kBaudRate;
+  cfg.baud_rate = transport.uart.baud_rate;
   cfg.data_bits = UART_DATA_8_BITS;
   cfg.parity = UART_PARITY_DISABLE;
   cfg.stop_bits = UART_STOP_BITS_1;
   cfg.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
   cfg.source_clk = UART_SCLK_DEFAULT;
 
-  if (uart_driver_install(kUartPort, kRxBufferSize, kTxBufferSize, 0, nullptr, 0) != ESP_OK) {
+  if (uart_driver_install(uart_port, transport.uart.rx_buffer_size, transport.uart.tx_buffer_size, 0, nullptr, 0) !=
+      ESP_OK) {
     ESP_LOGE(kTag, "uart_driver_install failed");
     return false;
   }
 
-  if (uart_param_config(kUartPort, &cfg) != ESP_OK) {
+  if (uart_param_config(uart_port, &cfg) != ESP_OK) {
     ESP_LOGE(kTag, "uart_param_config failed");
-    uart_driver_delete(kUartPort);
+    uart_driver_delete(uart_port);
     return false;
   }
 
-  if (uart_set_pin(kUartPort, ncos::config::pins::kServoTx, ncos::config::pins::kServoRx,
-                   UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) {
+  if (uart_set_pin(uart_port, transport.wiring.tx_gpio, transport.wiring.rx_gpio, UART_PIN_NO_CHANGE,
+                   UART_PIN_NO_CHANGE) != ESP_OK) {
     ESP_LOGE(kTag, "uart_set_pin failed");
-    uart_driver_delete(kUartPort);
+    uart_driver_delete(uart_port);
     return false;
   }
 
-  uart_flush_input(kUartPort);
+  uart_flush_input(uart_port);
   ready_ = true;
   return true;
 }
@@ -70,7 +62,8 @@ bool TtlinkerBringup::send_frame(const uint8_t* frame, size_t len, size_t* out_w
     return false;
   }
 
-  const int written = uart_write_bytes(kUartPort, frame, len);
+  const auto uart_port = static_cast<uart_port_t>(active_ttlinker_transport_bsp().uart.port);
+  const int written = uart_write_bytes(uart_port, frame, len);
   if (out_written != nullptr) {
     *out_written = written > 0 ? static_cast<size_t>(written) : 0;
   }
@@ -92,7 +85,8 @@ bool TtlinkerBringup::run_probe(int read_window_ms, TtlinkerProbeResult* out_res
   }
 
   uint8_t rx_buf[32] = {0};
-  const int read = uart_read_bytes(kUartPort, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(20));
+  const auto uart_port = static_cast<uart_port_t>(active_ttlinker_transport_bsp().uart.port);
+  const int read = uart_read_bytes(uart_port, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(20));
   if (read > 0) {
     result.bytes_read = static_cast<size_t>(read);
     result.first_byte = rx_buf[0];
@@ -107,9 +101,8 @@ void TtlinkerBringup::deinit() {
     return;
   }
 
-  uart_driver_delete(kUartPort);
+  uart_driver_delete(static_cast<uart_port_t>(active_ttlinker_transport_bsp().uart.port));
   ready_ = false;
 }
 
 }  // namespace ncos::drivers::ttlinker
-
