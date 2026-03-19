@@ -17,9 +17,11 @@ void setUp() {
 
 void tearDown() {}
 
-void test_storage_policy_limits_persistence_to_runtime_config_baseline() {
+void test_storage_policy_keeps_runtime_config_portable_and_session_memory_volatile() {
   const auto& runtime_policy =
       ncos::core::contracts::storage_data_policy(ncos::core::contracts::StorageDataClass::kRuntimeConfig);
+  const auto& companion_memory_policy = ncos::core::contracts::storage_data_policy(
+      ncos::core::contracts::StorageDataClass::kPersistentCompanionMemory);
   const auto& session_policy = ncos::core::contracts::storage_data_policy(
       ncos::core::contracts::StorageDataClass::kShortSessionMemory);
   const auto& adaptive_policy = ncos::core::contracts::storage_data_policy(
@@ -34,6 +36,12 @@ void test_storage_policy_limits_persistence_to_runtime_config_baseline() {
                           static_cast<uint8_t>(runtime_policy.retention));
   TEST_ASSERT_TRUE(
       ncos::core::contracts::storage_data_is_portable(ncos::core::contracts::StorageDataClass::kRuntimeConfig));
+
+  TEST_ASSERT_TRUE(companion_memory_policy.persist_locally);
+  TEST_ASSERT_TRUE(companion_memory_policy.integrity_checked);
+  TEST_ASSERT_TRUE(companion_memory_policy.erase_on_user_reset);
+  TEST_ASSERT_FALSE(ncos::core::contracts::storage_data_is_portable(
+      ncos::core::contracts::StorageDataClass::kPersistentCompanionMemory));
 
   TEST_ASSERT_FALSE(session_policy.persist_locally);
   TEST_ASSERT_FALSE(
@@ -415,7 +423,7 @@ void test_runtime_config_store_export_import_roundtrips_after_reset() {
 }
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(test_storage_policy_limits_persistence_to_runtime_config_baseline);
+  RUN_TEST(test_storage_policy_keeps_runtime_config_portable_and_session_memory_volatile);
   RUN_TEST(test_runtime_config_envelope_is_versioned_and_checksum_protected);
   RUN_TEST(test_runtime_config_store_roundtrips_sanitized_record);
   RUN_TEST(test_runtime_config_store_survives_reboot_with_latest_committed_snapshot);
@@ -431,6 +439,8 @@ int main() {
   RUN_TEST(test_runtime_config_store_rejects_import_with_unknown_schema);
   return UNITY_END();
 }
+
+
 
 
 

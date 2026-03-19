@@ -19,6 +19,7 @@ void test_storage_platform_bsp_exposes_local_persistence_defaults() {
   TEST_ASSERT_EQUAL_UINT32(128U, static_cast<uint32_t>(bsp.persistence.max_record_bytes));
   TEST_ASSERT_TRUE(bsp.persistence.erase_corrupt_records);
   TEST_ASSERT_TRUE(bsp.persistence.allow_runtime_config_persistence);
+  TEST_ASSERT_TRUE(bsp.persistence.allow_companion_memory_persistence);
 }
 
 int main() {

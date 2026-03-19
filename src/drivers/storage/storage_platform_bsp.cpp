@@ -13,6 +13,7 @@ const ncos::drivers::storage::StoragePlatformBsp StorageBsp = {
         128U,
         true,
         true,
+        true,
     },
 };
 

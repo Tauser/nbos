@@ -15,6 +15,7 @@ struct StoragePersistenceLimits {
   size_t max_record_bytes = 0;
   bool erase_corrupt_records = false;
   bool allow_runtime_config_persistence = false;
+  bool allow_companion_memory_persistence = false;
 };
 
 struct StoragePlatformBsp {
