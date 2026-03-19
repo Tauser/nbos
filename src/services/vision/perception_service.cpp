@@ -32,6 +32,9 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
     return false;
   }
 
+  const bool had_presence = state_.presence_active;
+  const bool had_attention = state_.attention_active;
+
   *out_attention = ncos::core::contracts::CompanionAttentionalSignal{};
   *out_interaction = ncos::core::contracts::CompanionInteractionSignal{};
 
@@ -47,7 +50,7 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
     state_.attention_target = ncos::core::contracts::AttentionTarget::kNone;
     state_.attention_channel = ncos::core::contracts::AttentionChannel::kVisual;
     state_.stage = ncos::core::contracts::PerceptionStage::Dormant;
-    return false;
+    return had_presence || had_attention;
   }
 
   const uint8_t visual_confidence = visual_presence_confidence(camera, now_ms);
@@ -82,7 +85,7 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
     state_.stage = ncos::core::contracts::PerceptionStage::Dormant;
   }
 
-  return state_.presence_active || state_.attention_active;
+  return state_.presence_active || state_.attention_active || had_presence || had_attention;
 }
 
 const ncos::core::contracts::PerceptionRuntimeState& PerceptionService::state() const {
@@ -125,11 +128,22 @@ uint8_t PerceptionService::auditory_presence_confidence(
 
 uint8_t PerceptionService::touch_presence_confidence(
     const ncos::core::contracts::TouchRuntimeState& touch) {
-  if (!touch.initialized || !touch.last_read_ok) {
+  if (!touch.initialized) {
     return 0;
   }
 
-  return ncos::core::contracts::clamp_percent_u8(touch.normalized_level / 10U);
+  const uint8_t normalized_confidence =
+      ncos::core::contracts::clamp_percent_u8(touch.normalized_level / 10U);
+  if (touch.trigger_active) {
+    return normalized_confidence >= TouchDominantThreshold ? normalized_confidence
+                                                           : TouchDominantThreshold;
+  }
+
+  if (!touch.last_read_ok) {
+    return 0;
+  }
+
+  return normalized_confidence;
 }
 
 void PerceptionService::choose_attention_channel(

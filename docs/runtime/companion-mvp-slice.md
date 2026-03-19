@@ -14,6 +14,7 @@ Definir o fluxo oficial que prova o NC-OS como companion funcional em hardware r
 2. **Trigger oficial**
    - Trigger principal e obrigatorio: touch capacitivo local.
    - O touch deve gerar atencao ao usuario sem depender de internet, wake-word ou camera.
+   - O trigger local usa histerese simples para evitar oscilacao visual e comportamental perto do limiar.
 3. **Resposta oficial**
    - `PerceptionService` promove atencao para `AttentionTarget::kUser`.
    - `BehaviorService` emite `BehaviorProfile::kAttendUser`.
@@ -21,7 +22,7 @@ Definir o fluxo oficial que prova o NC-OS como companion funcional em hardware r
    - `MotionService` acompanha a resposta **somente quando** o transporte TTLinker estiver disponivel e sem conflito.
 4. **Retorno ao idle**
    - Soltar o touch e permanecer sem estimulo novo.
-   - O sistema volta para atencao neutra/idle.
+   - O sistema publica a transicao de retorno para idle no `Companion State`.
    - Face retorna ao estado basal do companion.
    - Motion retorna ao neutro quando disponivel.
 
@@ -74,6 +75,7 @@ Voz e camera continuam como sinais validos do sistema, mas nao sao gate de aceit
 ### Retorno
 - sem touch, sem audio forte e sem camera dominante, o sistema deve voltar ao caminho de idle
 - o retorno precisa ser suave e legivel, sem parecer travado
+- a liberacao do trigger deve gerar uma atualizacao formal de estado, nao apenas silencio
 
 ## Janela temporal de referencia
 - touch probe: conforme `RuntimeConfig::touch_probe_interval_ms`

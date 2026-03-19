@@ -7,13 +7,18 @@ namespace ncos::core::contracts {
 struct TouchRuntimeState {
   bool initialized = false;
   bool last_read_ok = false;
+  bool trigger_active = false;
+  bool trigger_rising_edge = false;
   uint32_t last_raw = 0;
   uint16_t normalized_level = 0;  // 0..1000
   uint32_t baseline_raw = 0;
   uint32_t trigger_delta = 0;
   uint64_t last_read_ms = 0;
+  uint64_t trigger_started_ms = 0;
+  uint64_t last_trigger_ms = 0;
   uint32_t read_success_total = 0;
   uint32_t read_failure_total = 0;
+  uint32_t trigger_activations_total = 0;
 };
 
 struct ImuRuntimeState {

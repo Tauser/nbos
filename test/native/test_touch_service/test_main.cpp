@@ -42,7 +42,7 @@ class FakeTouchPort final : public ncos::interfaces::sensing::TouchPort {
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
 
-void test_touch_service_normalizes_level() {
+void test_touch_service_normalizes_level_and_activates_trigger() {
   FakeTouchPort fake{};
 
   ncos::services::sensing::TouchService service;
@@ -55,10 +55,40 @@ void test_touch_service_normalizes_level() {
   TEST_ASSERT_TRUE(state.last_read_ok);
   TEST_ASSERT_EQUAL_UINT32(3199200, state.last_raw);
   TEST_ASSERT_EQUAL_UINT16(1000, state.normalized_level);
+  TEST_ASSERT_TRUE(state.trigger_active);
+  TEST_ASSERT_TRUE(state.trigger_rising_edge);
+  TEST_ASSERT_EQUAL_UINT64(100, state.trigger_started_ms);
+  TEST_ASSERT_EQUAL_UINT64(100, state.last_trigger_ms);
+  TEST_ASSERT_EQUAL_UINT32(1, state.trigger_activations_total);
+}
+
+void test_touch_service_keeps_trigger_stable_with_hysteresis() {
+  FakeTouchPort fake{};
+
+  ncos::services::sensing::TouchService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(100));
+
+  fake.raw_value = 3199700;  // 375 / 1000
+  service.tick(100);
+  TEST_ASSERT_TRUE(service.state().trigger_active);
+  TEST_ASSERT_TRUE(service.state().trigger_rising_edge);
+
+  fake.raw_value = 3199800;  // 250 / 1000, still active by hysteresis
+  service.tick(220);
+  TEST_ASSERT_TRUE(service.state().trigger_active);
+  TEST_ASSERT_FALSE(service.state().trigger_rising_edge);
+
+  fake.raw_value = 3199900;  // 125 / 1000, releases trigger
+  service.tick(340);
+  TEST_ASSERT_FALSE(service.state().trigger_active);
+  TEST_ASSERT_FALSE(service.state().trigger_rising_edge);
+  TEST_ASSERT_EQUAL_UINT32(1, service.state().trigger_activations_total);
 }
 
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(test_touch_service_normalizes_level);
+  RUN_TEST(test_touch_service_normalizes_level_and_activates_trigger);
+  RUN_TEST(test_touch_service_keeps_trigger_stable_with_hysteresis);
   return UNITY_END();
 }

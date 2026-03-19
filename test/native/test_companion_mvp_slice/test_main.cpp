@@ -25,6 +25,7 @@ void test_companion_mvp_slice_uses_touch_as_official_trigger() {
   ncos::core::contracts::TouchRuntimeState touch{};
   touch.initialized = true;
   touch.last_read_ok = true;
+  touch.trigger_active = true;
   touch.normalized_level = 780;
 
   ncos::core::contracts::CameraRuntimeState camera{};
@@ -72,7 +73,7 @@ void test_companion_mvp_slice_uses_touch_as_official_trigger() {
   TEST_ASSERT_EQUAL_UINT8(58, face_input.behavior_activation_percent);
 }
 
-void test_companion_mvp_slice_returns_to_idle_without_new_stimulus() {
+void test_companion_mvp_slice_emits_idle_transition_on_trigger_release() {
   ncos::services::vision::PerceptionService perception;
   ncos::services::behavior::BehaviorService behavior;
 
@@ -97,20 +98,26 @@ void test_companion_mvp_slice_returns_to_idle_without_new_stimulus() {
   behavior.on_governance_decision(allow, 2310);
 
   ncos::core::contracts::AudioRuntimeState audio{};
-  ncos::core::contracts::TouchRuntimeState touch{};
-  touch.initialized = true;
-  touch.last_read_ok = true;
-  touch.normalized_level = 0;
+  ncos::core::contracts::TouchRuntimeState touch_active{};
+  touch_active.initialized = true;
+  touch_active.last_read_ok = true;
+  touch_active.trigger_active = true;
+  touch_active.normalized_level = 760;
 
   ncos::core::contracts::CameraRuntimeState camera{};
   ncos::core::contracts::CompanionAttentionalSignal attention{};
   ncos::core::contracts::CompanionInteractionSignal interaction{};
 
-  TEST_ASSERT_FALSE(perception.tick(audio, touch, camera, ncos::core::contracts::CompanionSnapshot{}, 2600,
-                                    &attention, &interaction));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::PerceptionStage::Dormant),
-                        static_cast<int>(perception.state().stage));
-  TEST_ASSERT_FALSE(perception.state().presence_active);
+  TEST_ASSERT_TRUE(perception.tick(audio, touch_active, camera, ncos::core::contracts::CompanionSnapshot{}, 2420,
+                                   &attention, &interaction));
+
+  ncos::core::contracts::TouchRuntimeState touch_idle{};
+  touch_idle.initialized = true;
+  touch_idle.last_read_ok = true;
+  touch_idle.normalized_level = 0;
+
+  TEST_ASSERT_TRUE(perception.tick(audio, touch_idle, camera, ncos::core::contracts::CompanionSnapshot{}, 2600,
+                                   &attention, &interaction));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
                         static_cast<int>(attention.target));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kIdle),
@@ -124,6 +131,6 @@ void test_companion_mvp_slice_returns_to_idle_without_new_stimulus() {
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_companion_mvp_slice_uses_touch_as_official_trigger);
-  RUN_TEST(test_companion_mvp_slice_returns_to_idle_without_new_stimulus);
+  RUN_TEST(test_companion_mvp_slice_emits_idle_transition_on_trigger_release);
   return UNITY_END();
 }
