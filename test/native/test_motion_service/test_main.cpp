@@ -353,6 +353,8 @@ void test_motion_service_uses_warm_context_for_soft_attention_pose() {
   companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
   companion.session_warm = true;
   companion.recent_engagement_percent = 66;
+  companion.session_last_activity_ms = 12580;
+  companion.session_last_engagement_ms = 12580;
   companion.recent_stimulus_target = ncos::core::contracts::AttentionTarget::kUser;
   companion.recent_interaction_phase = ncos::core::contracts::InteractionPhase::kResponding;
   companion.recent_turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
@@ -364,6 +366,31 @@ void test_motion_service_uses_warm_context_for_soft_attention_pose() {
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
   TEST_ASSERT_EQUAL_INT16(38, service.state().last_pose.pitch_permille);
   TEST_ASSERT_LESS_THAN_UINT16(40, service.state().last_pose.speed_percent);
+}
+
+void test_motion_service_ignores_stale_warm_context_after_continuity_window() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(13000));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  companion.session_warm = true;
+  companion.recent_engagement_percent = 66;
+  companion.session_last_activity_ms = 13100;
+  companion.session_last_engagement_ms = 13100;
+  companion.recent_stimulus_target = ncos::core::contracts::AttentionTarget::kUser;
+  companion.recent_interaction_phase = ncos::core::contracts::InteractionPhase::kResponding;
+  companion.recent_turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  service.update_companion_signal(companion, 13200);
+
+  service.tick(16650);
+
+  TEST_ASSERT_TRUE(service.state().neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
 }
 
 void test_motion_service_updates_companion_and_face_signals() {
@@ -391,6 +418,8 @@ void test_motion_service_updates_companion_and_face_signals() {
   TEST_ASSERT_TRUE(state.companion_signal.attention_lock);
   TEST_ASSERT_FALSE(state.companion_signal.session_warm);
   TEST_ASSERT_EQUAL_UINT8(78, state.companion_signal.emotional_arousal_percent);
+  TEST_ASSERT_EQUAL_UINT64(0, state.companion_signal.session_last_activity_ms);
+  TEST_ASSERT_EQUAL_UINT64(0, state.companion_signal.session_last_engagement_ms);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAlertScan),
                         static_cast<int>(state.companion_signal.product_state));
   TEST_ASSERT_EQUAL_INT8(40, state.face_signal.gaze_x_percent);
@@ -416,6 +445,7 @@ int main() {
   RUN_TEST(test_motion_service_responding_state_uses_stronger_attend_pose);
   RUN_TEST(test_motion_service_sleep_state_does_not_override_active_face_follow);
   RUN_TEST(test_motion_service_uses_warm_context_for_soft_attention_pose);
+  RUN_TEST(test_motion_service_ignores_stale_warm_context_after_continuity_window);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }

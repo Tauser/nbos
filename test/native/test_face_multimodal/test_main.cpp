@@ -96,6 +96,8 @@ void test_face_multimodal_input_uses_short_context_to_keep_social_warmth() {
   companion.session.recent_stimulus.channel = ncos::core::contracts::AttentionChannel::kTouch;
   companion.session.recent_interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
   companion.session.last_turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  companion.session.last_activity_ms = 1400;
+  companion.session.last_engagement_ms = 1400;
 
   ncos::core::contracts::BehaviorRuntimeState behavior{};
   const auto input =
@@ -112,6 +114,31 @@ void test_face_multimodal_input_uses_short_context_to_keep_social_warmth() {
                         static_cast<int>(input.recent_interaction_phase));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::TurnOwner::kCompanion),
                         static_cast<int>(input.recent_turn_owner));
+  TEST_ASSERT_EQUAL_UINT64(1400, input.session_last_activity_ms);
+  TEST_ASSERT_EQUAL_UINT64(1400, input.session_last_engagement_ms);
+}
+
+void test_face_multimodal_input_keeps_recent_context_but_exposes_age_for_decay() {
+  ncos::core::contracts::AudioRuntimeState audio{};
+  ncos::core::contracts::TouchRuntimeState touch{};
+  ncos::core::contracts::ImuRuntimeState imu{};
+
+  ncos::core::contracts::CompanionSnapshot companion{};
+  companion.runtime.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  companion.session.warm = true;
+  companion.session.engagement_recent_percent = 58;
+  companion.session.recent_stimulus.target = ncos::core::contracts::AttentionTarget::kStimulus;
+  companion.session.last_activity_ms = 1000;
+  companion.session.last_engagement_ms = 1000;
+
+  ncos::core::contracts::BehaviorRuntimeState behavior{};
+  const auto input = ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 4600);
+
+  TEST_ASSERT_TRUE(input.session_warm);
+  TEST_ASSERT_EQUAL_UINT64(1000, input.session_last_activity_ms);
+  TEST_ASSERT_EQUAL_UINT64(1000, input.session_last_engagement_ms);
+  TEST_ASSERT_EQUAL_UINT8(58, input.recent_engagement_percent);
+  TEST_ASSERT_EQUAL_UINT64(4600, input.observed_at_ms);
 }
 
 void test_face_multimodal_sync_applies_modulation_under_ownership() {
@@ -213,6 +240,7 @@ int main() {
   RUN_TEST(test_face_multimodal_input_aggregates_audio_touch_and_motion);
   RUN_TEST(test_face_multimodal_input_ignores_touch_readiness_without_active_trigger);
   RUN_TEST(test_face_multimodal_input_uses_short_context_to_keep_social_warmth);
+  RUN_TEST(test_face_multimodal_input_keeps_recent_context_but_exposes_age_for_decay);
   RUN_TEST(test_face_multimodal_sync_applies_modulation_under_ownership);
   RUN_TEST(test_face_multimodal_sync_generates_full_blink_window_for_engaged_character);
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);

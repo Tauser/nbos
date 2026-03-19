@@ -23,6 +23,8 @@ constexpr uint32_t kSleepHoldMs = 320;
 constexpr int16_t kWarmContextPitchPermille = 38;
 constexpr int16_t kWarmStimulusPitchPermille = 24;
 constexpr uint32_t kWarmContextHoldMs = 180;
+constexpr uint64_t kWarmUserContinuityWindowMs = 3200;
+constexpr uint64_t kWarmStimulusContinuityWindowMs = 2400;
 
 int16_t abs_i16(int16_t v) {
   return v < 0 ? static_cast<int16_t>(-v) : v;
@@ -42,6 +44,20 @@ bool is_guard_allowed_command(const ncos::core::contracts::MotionCommand& comman
   return command.intent == ncos::core::contracts::MotionIntent::kRecovery ||
          command.intent == ncos::core::contracts::MotionIntent::kNeutralHold ||
          command.priority == ncos::core::contracts::MotionPriority::kCritical;
+}
+
+uint64_t session_context_age_ms(const ncos::core::contracts::MotionCompanionSignal& signal, uint64_t now_ms) {
+  if (signal.session_last_activity_ms == 0 || now_ms < signal.session_last_activity_ms) {
+    return UINT64_MAX;
+  }
+
+  return now_ms - signal.session_last_activity_ms;
+}
+
+bool has_fresh_warm_continuity(const ncos::core::contracts::MotionCompanionSignal& signal,
+                               uint64_t now_ms, uint64_t window_ms) {
+  return signal.session_warm && signal.recent_engagement_percent >= 54 &&
+         session_context_age_ms(signal, now_ms) <= window_ms;
 }
 
 }  // namespace
@@ -181,15 +197,16 @@ void MotionService::tick(uint64_t now_ms) {
   const bool attentive_state = product_state == ncos::core::contracts::CompanionProductState::kAttendUser ||
                                product_state == ncos::core::contracts::CompanionProductState::kResponding;
   const bool alert_state = product_state == ncos::core::contracts::CompanionProductState::kAlertScan;
-  const bool warm_context = state_.companion_signal.session_warm &&
-                            state_.companion_signal.recent_engagement_percent >= 54 && !restful_state;
   const bool warm_user_context =
-      warm_context &&
+      !restful_state &&
+      has_fresh_warm_continuity(state_.companion_signal, now_ms, kWarmUserContinuityWindowMs) &&
       (state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kUser ||
        state_.companion_signal.recent_interaction_phase == ncos::core::contracts::InteractionPhase::kResponding ||
        state_.companion_signal.recent_turn_owner != ncos::core::contracts::TurnOwner::kNone);
   const bool warm_stimulus_context =
-      warm_context && state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
+      !restful_state &&
+      has_fresh_warm_continuity(state_.companion_signal, now_ms, kWarmStimulusContinuityWindowMs) &&
+      state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
   const bool attentive_hold_requested = !active_face_expression &&
                                         (state_.companion_signal.attention_lock || attentive_state || alert_state ||
                                          warm_user_context || warm_stimulus_context);

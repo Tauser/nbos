@@ -135,6 +135,8 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
   signal.session_warm = snapshot.session.warm;
   signal.emotional_arousal_percent = map_arousal_percent(snapshot, behavior_state, now_ms);
   signal.recent_engagement_percent = snapshot.session.engagement_recent_percent;
+  signal.session_last_activity_ms = snapshot.session.last_activity_ms;
+  signal.session_last_engagement_ms = snapshot.session.last_engagement_ms;
   signal.product_state = snapshot.runtime.product_state;
   signal.recent_stimulus_target = snapshot.session.recent_stimulus.target;
   signal.recent_interaction_phase = snapshot.session.recent_interaction.phase;

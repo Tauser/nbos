@@ -68,6 +68,8 @@ struct MotionCompanionSignal {
   bool session_warm = false;
   uint8_t emotional_arousal_percent = 0;
   uint8_t recent_engagement_percent = 0;
+  uint64_t session_last_activity_ms = 0;
+  uint64_t session_last_engagement_ms = 0;
   CompanionProductState product_state = CompanionProductState::kBooting;
   AttentionTarget recent_stimulus_target = AttentionTarget::kNone;
   InteractionPhase recent_interaction_phase = InteractionPhase::kIdle;

@@ -29,6 +29,8 @@ struct FaceMultimodalInput {
   uint8_t social_engagement_percent = 0;
   uint8_t behavior_activation_percent = 0;
   uint8_t recent_engagement_percent = 0;
+  uint64_t session_last_activity_ms = 0;
+  uint64_t session_last_engagement_ms = 0;
   uint64_t observed_at_ms = 0;
 };
 

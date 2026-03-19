@@ -85,6 +85,8 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
   input.emotional_arousal_percent = companion.emotional.vector.arousal_percent;
   input.social_engagement_percent = companion.emotional.vector.social_engagement_percent;
   input.recent_engagement_percent = companion.session.engagement_recent_percent;
+  input.session_last_activity_ms = companion.session.last_activity_ms;
+  input.session_last_engagement_ms = companion.session.last_engagement_ms;
   const uint8_t touch_social = touch_social_engagement_percent(touch);
   if (touch_social > input.social_engagement_percent) {
     input.social_engagement_percent = touch_social;
