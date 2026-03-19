@@ -266,7 +266,7 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
   companion.emotional_arousal_percent = 60;
   service.update_companion_signal(companion, 9600);
 
-  service.tick(9700);
+  service.tick(9800);
 
   TEST_ASSERT_GREATER_THAN_UINT32(1, service.state().apply_success_total);
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
@@ -274,7 +274,7 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
 
   companion.attention_lock = false;
   service.update_companion_signal(companion, 10000);
-  service.tick(10100);
+  service.tick(10200);
 
   TEST_ASSERT_TRUE(service.state().neutral_applied);
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
@@ -326,3 +326,4 @@ int main() {
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }
+

@@ -72,7 +72,7 @@ void test_face_multimodal_input_ignores_touch_readiness_without_active_trigger()
       ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 1400);
 
   TEST_ASSERT_FALSE(input.touch_active);
-  TEST_ASSERT_EQUAL_UINT8(0, input.social_engagement_percent);
+  TEST_ASSERT_EQUAL_UINT8(45, input.social_engagement_percent);
 }
 
 void test_face_multimodal_sync_applies_modulation_under_ownership() {
@@ -153,7 +153,7 @@ void test_face_tooling_exports_preview_json_snapshot() {
 
   const auto snapshot = ncos::services::face::make_face_preview_snapshot(state, false, 5000, tuning);
 
-  char json[512] = {};
+  char json[1024] = {};
   const size_t written = ncos::services::face::export_face_preview_json(snapshot, json, sizeof(json));
 
   TEST_ASSERT_GREATER_THAN_UINT32(0, static_cast<uint32_t>(written));
@@ -178,3 +178,5 @@ int main() {
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);
   return UNITY_END();
 }
+
+

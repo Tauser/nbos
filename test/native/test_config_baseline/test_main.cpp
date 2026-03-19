@@ -15,7 +15,7 @@ void test_board_profile_pins_match_baseline() {
   TEST_ASSERT_EQUAL_INT(21, ncos::config::pins::kDisplayMosi);
   TEST_ASSERT_EQUAL_INT(47, ncos::config::pins::kDisplaySck);
   TEST_ASSERT_EQUAL_INT(45, ncos::config::pins::kDisplayDc);
-  TEST_ASSERT_EQUAL_INT(20, ncos::config::pins::kDisplayRst);
+  TEST_ASSERT_EQUAL_INT(-1, ncos::config::pins::kDisplayRst);
   TEST_ASSERT_EQUAL_INT(-1, ncos::config::pins::kDisplayCs);
   TEST_ASSERT_EQUAL_INT(0, ncos::config::pins::kImuSda);
   TEST_ASSERT_EQUAL_INT(19, ncos::config::pins::kImuScl);

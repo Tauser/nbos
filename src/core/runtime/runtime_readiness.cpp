@@ -4,7 +4,7 @@ namespace {
 
 bool is_board_profile_bound(const ncos::config::BoardProfile& board) {
   return board.board_name != nullptr && board.board_name[0] != '\0' && board.display_mosi >= 0 &&
-         board.display_sck >= 0 && board.display_dc >= 0 && board.display_rst >= 0 && board.touch >= 0;
+         board.display_sck >= 0 && board.display_dc >= 0 && board.touch >= 0;
 }
 
 bool is_lifecycle_state_acceptable(ncos::app::lifecycle::SystemState state) {
@@ -66,3 +66,4 @@ RuntimeReadinessReport evaluate_runtime_readiness(const ncos::config::GlobalConf
 }
 
 }  // namespace ncos::core::runtime
+

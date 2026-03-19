@@ -83,7 +83,8 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
   state_.attention_target = out_attention->target;
   state_.attention_channel = out_attention->channel;
   state_.attention_confidence_percent = out_attention->focus_confidence_percent;
-  state_.attention_active = state_.attention_confidence_percent >= AttentionLockedThreshold;
+  state_.attention_active = out_attention->lock_active ||
+                            state_.attention_confidence_percent >= AttentionLockedThreshold;
 
   if (state_.attention_active) {
     state_.stage = ncos::core::contracts::PerceptionStage::AttentionLocked;
@@ -219,3 +220,4 @@ void PerceptionService::choose_attention_channel(
 }
 
 }  // namespace ncos::services::vision
+
