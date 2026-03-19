@@ -25,6 +25,7 @@ void test_behavior_service_emits_energy_protect_when_critical() {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::ActionDomain::kPower),
                         static_cast<int>(proposal.proposal.domain));
   TEST_ASSERT_EQUAL_UINT8(10, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(420, proposal.proposal.ttl_ms);
 }
 
 void test_behavior_service_prefers_alert_scan_over_attend_user() {
@@ -43,6 +44,7 @@ void test_behavior_service_prefers_alert_scan_over_attend_user() {
                         static_cast<int>(proposal.profile));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::ActionDomain::kMotion),
                         static_cast<int>(proposal.proposal.domain));
+  TEST_ASSERT_EQUAL_UINT32(220, proposal.proposal.ttl_ms);
 }
 
 void test_behavior_service_respects_cooldown() {
@@ -103,6 +105,7 @@ void test_behavior_service_raises_attend_priority_on_voice_trigger_context() {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
                         static_cast<int>(proposal.profile));
   TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(220, proposal.proposal.ttl_ms);
 }
 
 void test_behavior_service_uses_short_context_to_avoid_cold_reengagement() {

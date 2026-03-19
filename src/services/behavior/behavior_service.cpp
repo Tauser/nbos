@@ -1,5 +1,7 @@
 #include "services/behavior/behavior_service.hpp"
 
+#include "core/contracts/companion_personality_contracts.hpp"
+
 namespace {
 
 ncos::core::contracts::BehaviorProposal make_behavior_proposal(
@@ -144,7 +146,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_energy_protect(
         ncos::core::contracts::CommandTopic::kPowerModeSet,
         ncos::core::contracts::IntentTopic::kPreserveEnergy,
         10,
-        420,
+        ncos::core::contracts::personality_behavior_ttl_ms(
+            ncos::core::contracts::BehaviorProfile::kEnergyProtect),
         ncos::core::contracts::PreemptionPolicy::kAllowAlways,
         "energy_protect");
   }
@@ -168,7 +171,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_alert_scan(
         ncos::core::contracts::CommandTopic::kMotionExecute,
         ncos::core::contracts::IntentTopic::kInspectStimulus,
         7,
-        260,
+        ncos::core::contracts::personality_behavior_ttl_ms(
+            ncos::core::contracts::BehaviorProfile::kAlertScan),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         "alert_scan");
   }
@@ -194,7 +198,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
         auditory_trigger_context ? 7 : 6,
-        220,
+        ncos::core::contracts::personality_behavior_ttl_ms(
+            ncos::core::contracts::BehaviorProfile::kAttendUser),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user");
   }
