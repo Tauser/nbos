@@ -232,6 +232,7 @@ namespace ncos::app::boot {
 
 BootReport BootFlow::execute() {
   BootReport report{};
+  const bool is_dev_profile = ncos::config::detect_build_profile() == ncos::config::BuildProfile::kDev;
 
   merge_result(&report, step_config_gate(), true);
   merge_result(&report, step_display(), true);
@@ -239,7 +240,11 @@ BootReport BootFlow::execute() {
   merge_result(&report, step_touch(), false);
   merge_result(&report, step_imu(), false);
   merge_result(&report, step_camera(), false);
-  merge_result(&report, step_sd(), false);
+  if (is_dev_profile) {
+    ESP_LOGW(kTag, "[7/8] SD bring-up adiado no profile dev para destravar runtime/diagnostico");
+  } else {
+    merge_result(&report, step_sd(), false);
+  }
   merge_result(&report, step_ttlinker(), false);
 
   return report;
