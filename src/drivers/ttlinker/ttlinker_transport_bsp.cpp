@@ -10,14 +10,22 @@
 namespace {
 
 bool console_conflicts_with_ttlinker() {
-#if defined(ESP_PLATFORM) && defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
-  constexpr int tx_gpio = CONFIG_ESP_CONSOLE_UART_TX_GPIO;
-  constexpr int rx_gpio = CONFIG_ESP_CONSOLE_UART_RX_GPIO;
-  return tx_gpio == ncos::config::pins::kServoTx || tx_gpio == ncos::config::pins::kServoRx ||
-         rx_gpio == ncos::config::pins::kServoTx || rx_gpio == ncos::config::pins::kServoRx;
+#if defined(ESP_PLATFORM)
+#if defined(CONFIG_ESP_CONSOLE_UART) && defined(CONFIG_ESP_CONSOLE_UART_NUM)
+  if (CONFIG_ESP_CONSOLE_UART_NUM == 1) {
+#if defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
+    constexpr int tx_gpio = CONFIG_ESP_CONSOLE_UART_TX_GPIO;
+    constexpr int rx_gpio = CONFIG_ESP_CONSOLE_UART_RX_GPIO;
+    return tx_gpio == ncos::config::pins::kServoTx || tx_gpio == ncos::config::pins::kServoRx ||
+           rx_gpio == ncos::config::pins::kServoTx || rx_gpio == ncos::config::pins::kServoRx;
 #else
-  return false;
+    // Conservative guard: this board profile already documents UART1 console/TTLinker risk.
+    return true;
 #endif
+  }
+#endif
+#endif
+  return false;
 }
 
 ncos::drivers::ttlinker::TtlinkerTransportBsp make_transport_bsp() {
