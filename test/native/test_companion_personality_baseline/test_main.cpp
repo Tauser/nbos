@@ -113,6 +113,38 @@ void test_companion_personality_adaptive_biases_raise_behavior_priority_within_b
                            ncos::core::contracts::personality_reengagement_ttl_ms(personality));
 }
 
+void test_companion_personality_adaptive_variation_stays_inside_identity_band() {
+  auto warm_personality = ncos::core::contracts::make_companion_personality_state();
+  warm_personality.adaptive_social_warmth_bias_percent = 8;
+  warm_personality.adaptive_response_energy_bias_percent = 6;
+  warm_personality.adaptive_continuity_window_bias_ms = 400;
+
+  auto calm_personality = ncos::core::contracts::make_companion_personality_state();
+  calm_personality.adaptive_social_warmth_bias_percent = -6;
+  calm_personality.adaptive_response_energy_bias_percent = -6;
+  calm_personality.adaptive_continuity_window_bias_ms = -300;
+
+  const auto warm_user = ncos::core::contracts::personality_face_profile(
+      warm_personality, ncos::core::contracts::PersonalityFaceMode::kWarmUser);
+  const auto calm_user = ncos::core::contracts::personality_face_profile(
+      calm_personality, ncos::core::contracts::PersonalityFaceMode::kWarmUser);
+  const auto warm_response = ncos::core::contracts::personality_motion_profile(
+      warm_personality, ncos::core::contracts::PersonalityMotionMode::kResponding);
+  const auto calm_response = ncos::core::contracts::personality_motion_profile(
+      calm_personality, ncos::core::contracts::PersonalityMotionMode::kResponding);
+
+  TEST_ASSERT_LESS_OR_EQUAL_UINT8(16,
+                                  static_cast<uint8_t>(warm_user.salience_percent -
+                                                       calm_user.salience_percent));
+  TEST_ASSERT_LESS_OR_EQUAL_UINT16(120,
+                                   static_cast<uint16_t>(warm_user.hold_ms - calm_user.hold_ms));
+  TEST_ASSERT_LESS_OR_EQUAL_UINT16(12,
+                                   static_cast<uint16_t>(warm_response.base_speed_percent -
+                                                         calm_response.base_speed_percent));
+  TEST_ASSERT_LESS_OR_EQUAL_UINT16(80,
+                                   static_cast<uint16_t>(warm_response.hold_ms -
+                                                         calm_response.hold_ms));
+}
 void test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits() {
   auto warm_personality = ncos::core::contracts::make_companion_personality_state();
   warm_personality.adaptive_social_warmth_bias_percent = 8;
@@ -162,11 +194,7 @@ int main() {
   RUN_TEST(test_companion_personality_timing_keeps_continuity_short_and_predictable);
   RUN_TEST(test_companion_personality_adaptive_layer_is_bounded_and_separate_from_fixed_traits);
   RUN_TEST(test_companion_personality_adaptive_biases_raise_behavior_priority_within_bounds);
+  RUN_TEST(test_companion_personality_adaptive_variation_stays_inside_identity_band);
   RUN_TEST(test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits);
   return UNITY_END();
 }
-
-
-
-
-

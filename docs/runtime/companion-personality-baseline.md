@@ -120,6 +120,25 @@ Baseline oficial de continuidade perceptivel:
 - usuario recente: `56%` de engajamento curto
 - estimulo recente: `50%` de engajamento curto
 
+## Cenarios oficiais de validacao contra ruido
+
+Perfis operacionais que agora devem continuar coerentes:
+
+- usuario breve e respeitoso
+  - pode aquecer continuidade curta, mas nao deve escalar rapido para um companion pegajoso
+- usuario engajado e recorrente
+  - pode aquecer calor social, prioridade de `AttendUser` e `ttl` curta dentro do envelope bounded
+- estimulo externo saliente
+  - pode aquecer curiosidade e energia de resposta, mas sem copiar o calor social do perfil de usuario
+- retorno de contexto ou troca de perfil
+  - biases devem migrar por passos pequenos, sem overshoot abrupto nem flip de identidade
+
+Criterios praticos desta fase:
+
+- perfis de usuario e estimulo continuam distinguiveis
+- variacao adaptativa maxima continua pequena o bastante para nao parecer outra personalidade
+- troca de contexto nao pode saltar mais do que o passo bounded por refresh
+- sem contexto quente, o baseline continua recuperando para o neutro
 ## Trade-offs assumidos
 
 - a personalidade ainda nao dirige rotina ou autonomia rica; ela so consolida o tom-base onde ja ha resposta operacional
@@ -146,5 +165,3 @@ Baseline oficial de continuidade perceptivel:
   - continuidade com estimulo: `2,4 s`
   - reengajamento curto: `190 ms`
   - `AttendUser` e `AlertScan` continuam curtos por design, para nao deixar o companion pegajoso
-
-

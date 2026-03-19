@@ -340,7 +340,9 @@ bool CompanionStateStore::user_session_continuity_active(
          snapshot.session.engagement_recent_percent >=
              ncos::core::contracts::personality_continuity_engagement_threshold_percent(
                  snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kUser) &&
-         (now_ms - snapshot.session.last_activity_ms) <= snapshot.personality.user_continuity_window_ms;
+         (now_ms - snapshot.session.last_activity_ms) <=
+             ncos::core::contracts::personality_continuity_window_ms(
+                 snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kUser);
 }
 
 bool CompanionStateStore::stimulus_session_continuity_active(
@@ -355,7 +357,8 @@ bool CompanionStateStore::stimulus_session_continuity_active(
              ncos::core::contracts::personality_continuity_engagement_threshold_percent(
                  snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus) &&
          (now_ms - snapshot.session.last_activity_ms) <=
-             snapshot.personality.stimulus_continuity_window_ms;
+             ncos::core::contracts::personality_continuity_window_ms(
+                 snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus);
 }
 
 int8_t CompanionStateStore::derive_target_social_warmth_bias_percent(
