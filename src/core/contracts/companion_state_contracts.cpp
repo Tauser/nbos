@@ -150,17 +150,20 @@ bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEmotional ||
              domain == CompanionStateDomain::kAttentional ||
-             domain == CompanionStateDomain::kInteractional;
+             domain == CompanionStateDomain::kInteractional ||
+             domain == CompanionStateDomain::kSessionMemory;
     case CompanionStateReader::kMotionService:
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kAttentional ||
              domain == CompanionStateDomain::kEnergetic ||
-             domain == CompanionStateDomain::kInteractional;
+             domain == CompanionStateDomain::kInteractional ||
+             domain == CompanionStateDomain::kSessionMemory;
     case CompanionStateReader::kVoiceService:
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kEmotional ||
              domain == CompanionStateDomain::kAttentional ||
              domain == CompanionStateDomain::kEnergetic ||
-             domain == CompanionStateDomain::kInteractional;
+             domain == CompanionStateDomain::kInteractional ||
+             domain == CompanionStateDomain::kSessionMemory;
     case CompanionStateReader::kPowerService:
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEnergetic;
@@ -168,7 +171,8 @@ bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain
       return domain == CompanionStateDomain::kStructural || domain == CompanionStateDomain::kRuntime ||
              domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEnergetic ||
-             domain == CompanionStateDomain::kTransient;
+             domain == CompanionStateDomain::kTransient ||
+             domain == CompanionStateDomain::kSessionMemory;
     case CompanionStateReader::kCloudBridge:
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kInteractional;
@@ -204,6 +208,9 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
   }
   if (!can_reader_observe_domain(reader, CompanionStateDomain::kTransient)) {
     redacted.transient = CompanionTransientState{};
+  }
+  if (!can_reader_observe_domain(reader, CompanionStateDomain::kSessionMemory)) {
+    redacted.session = CompanionSessionMemoryState{};
   }
 
   return redacted;

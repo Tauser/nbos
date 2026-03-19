@@ -484,6 +484,130 @@ void test_companion_state_energy_protect_preempts_active_state_and_returns_to_id
                         static_cast<int>(snap.runtime.last_transition_cause));
 }
 
+void test_companion_state_keeps_short_session_memory_separate_from_instant_idle() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  attentional.focus_confidence_percent = 78;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1200));
+
+  attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 0;
+  attentional.lock_active = false;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 2600));
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kNone;
+  interaction.session_active = false;
+  interaction.response_pending = false;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 2605));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 2805));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_TRUE(snap.session.warm);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(snap.session.anchor_target));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
+                        static_cast<int>(snap.session.anchor_channel));
+  TEST_ASSERT_EQUAL_UINT16(1, snap.session.user_trigger_count);
+  TEST_ASSERT_EQUAL_UINT16(0, snap.session.companion_response_count);
+  TEST_ASSERT_EQUAL_UINT64(1200, snap.session.last_user_trigger_ms);
+  TEST_ASSERT_GREATER_THAN_UINT64(2805, snap.session.retention_until_ms);
+}
+
+void test_companion_state_short_session_memory_expires_after_retention_window() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  attentional.focus_confidence_percent = 80;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1200));
+
+  attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 0;
+  attentional.lock_active = false;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 2600));
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kNone;
+  interaction.session_active = false;
+  interaction.response_pending = false;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 2605));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 22000));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_FALSE(snap.session.warm);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
+                        static_cast<int>(snap.session.anchor_target));
+  TEST_ASSERT_EQUAL_UINT16(0, snap.session.user_trigger_count);
+  TEST_ASSERT_EQUAL_UINT64(0, snap.session.last_user_trigger_ms);
+  TEST_ASSERT_EQUAL_UINT64(0, snap.session.retention_until_ms);
+}
+
+void test_companion_state_redacts_short_session_memory_for_cloud_reader() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  attentional.focus_confidence_percent = 84;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1200));
+
+  const auto runtime_view = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  const auto cloud_view = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
+
+  TEST_ASSERT_TRUE(runtime_view.session.warm);
+  TEST_ASSERT_FALSE(cloud_view.session.warm);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
+                        static_cast<int>(cloud_view.session.anchor_target));
+  TEST_ASSERT_EQUAL_UINT16(0, cloud_view.session.user_trigger_count);
+}
+
 void test_companion_state_redacts_by_reader_profile() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -529,6 +653,9 @@ int main() {
   RUN_TEST(test_companion_state_keeps_responding_during_hold_and_then_recovers);
   RUN_TEST(test_companion_state_wakes_from_sleep_on_user_trigger_and_returns_to_idle);
   RUN_TEST(test_companion_state_energy_protect_preempts_active_state_and_returns_to_idle);
+  RUN_TEST(test_companion_state_keeps_short_session_memory_separate_from_instant_idle);
+  RUN_TEST(test_companion_state_short_session_memory_expires_after_retention_window);
+  RUN_TEST(test_companion_state_redacts_short_session_memory_for_cloud_reader);
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }

@@ -5,6 +5,7 @@ constexpr uint64_t AttendUserHoldMs = 1400;
 constexpr uint64_t AlertScanHoldMs = 1600;
 constexpr uint64_t RespondingHoldMs = 900;
 constexpr uint64_t IdleToSleepMs = 12000;
+constexpr uint64_t SessionMemoryRetentionMs = 18000;
 }
 
 namespace ncos::core::state {
@@ -245,6 +246,78 @@ uint64_t CompanionStateStore::hold_duration_for_state(
   }
 }
 
+bool CompanionStateStore::session_activity_present(
+    const ncos::core::contracts::CompanionSnapshot& snapshot) {
+  return user_attention_active(snapshot) || stimulus_attention_active(snapshot) ||
+         response_active(snapshot) || snapshot.interactional.session_active;
+}
+
+void CompanionStateStore::refresh_session_memory(
+    uint64_t now_ms,
+    ncos::core::contracts::CompanionProductState previous_state,
+    ncos::core::contracts::CompanionProductState next_state,
+    bool user_now,
+    bool stimulus_now,
+    bool response_now) {
+  auto& session = snapshot_.session;
+
+  if (!snapshot_.runtime.initialized || !snapshot_.runtime.started || energy_protect_active(snapshot_)) {
+    session = ncos::core::contracts::CompanionSessionMemoryState{};
+    return;
+  }
+
+  const bool active_context = session_activity_present(snapshot_);
+  if (!active_context) {
+    if (session.warm && session.retention_until_ms > 0 && now_ms >= session.retention_until_ms) {
+      session = ncos::core::contracts::CompanionSessionMemoryState{};
+    }
+    return;
+  }
+
+  if (!session.warm || (session.retention_until_ms > 0 && now_ms >= session.retention_until_ms)) {
+    session = ncos::core::contracts::CompanionSessionMemoryState{};
+    session.opened_at_ms = now_ms;
+  } else if (session.opened_at_ms == 0) {
+    session.opened_at_ms = now_ms;
+  }
+
+  session.warm = true;
+  session.last_activity_ms = now_ms;
+  session.retention_until_ms = now_ms + SessionMemoryRetentionMs;
+
+  if (snapshot_.attentional.target != ncos::core::contracts::AttentionTarget::kNone) {
+    session.anchor_target = snapshot_.attentional.target;
+    session.anchor_channel = snapshot_.attentional.channel;
+  }
+
+  if (snapshot_.emotional.intensity_percent > 0) {
+    session.anchor_tone = snapshot_.emotional.tone;
+  }
+
+  if (next_state != ncos::core::contracts::CompanionProductState::kBooting &&
+      next_state != ncos::core::contracts::CompanionProductState::kIdleObserve &&
+      next_state != ncos::core::contracts::CompanionProductState::kSleep &&
+      next_state != ncos::core::contracts::CompanionProductState::kEnergyProtect) {
+    session.anchor_state = next_state;
+  }
+
+  if (snapshot_.interactional.turn_owner != ncos::core::contracts::TurnOwner::kNone) {
+    session.last_turn_owner = snapshot_.interactional.turn_owner;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kAttendUser &&
+      previous_state != ncos::core::contracts::CompanionProductState::kAttendUser) {
+    ++session.user_trigger_count;
+    session.last_user_trigger_ms = now_ms;
+  }
+
+  if (next_state == ncos::core::contracts::CompanionProductState::kResponding &&
+      previous_state != ncos::core::contracts::CompanionProductState::kResponding) {
+    ++session.companion_response_count;
+    session.last_companion_response_ms = now_ms;
+  }
+}
+
 ncos::core::contracts::CompanionProductState CompanionStateStore::derive_product_state(
     const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
   const auto previous_state = snapshot.runtime.product_state;
@@ -347,6 +420,7 @@ void CompanionStateStore::refresh_derived_runtime_state(uint64_t now_ms) {
   const auto next_state = derive_product_state(snapshot_, now_ms);
   snapshot_.runtime.product_state = next_state;
   snapshot_.runtime.presence_mode = derive_presence_mode(snapshot_);
+  refresh_session_memory(now_ms, previous_state, next_state, user_now, stimulus_now, response_now);
 
   if (snapshot_.runtime.last_state_change_ms == 0) {
     snapshot_.runtime.last_state_change_ms = now_ms;

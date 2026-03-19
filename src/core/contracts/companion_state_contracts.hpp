@@ -98,6 +98,7 @@ enum class CompanionStateDomain : uint8_t {
   kEnergetic = 6,
   kInteractional = 7,
   kTransient = 8,
+  kSessionMemory = 9,
 };
 
 enum class CompanionStateWriter : uint8_t {
@@ -189,6 +190,22 @@ struct CompanionInteractionState {
   bool response_pending = false;
 };
 
+struct CompanionSessionMemoryState {
+  bool warm = false;
+  AttentionTarget anchor_target = AttentionTarget::kNone;
+  AttentionChannel anchor_channel = AttentionChannel::kVisual;
+  EmotionalTone anchor_tone = EmotionalTone::kNeutral;
+  CompanionProductState anchor_state = CompanionProductState::kBooting;
+  TurnOwner last_turn_owner = TurnOwner::kNone;
+  uint16_t user_trigger_count = 0;
+  uint16_t companion_response_count = 0;
+  uint64_t opened_at_ms = 0;
+  uint64_t last_activity_ms = 0;
+  uint64_t last_user_trigger_ms = 0;
+  uint64_t last_companion_response_ms = 0;
+  uint64_t retention_until_ms = 0;
+};
+
 struct CompanionSnapshot {
   CompanionStructuralState structural{};
   CompanionRuntimeState runtime{};
@@ -198,6 +215,7 @@ struct CompanionSnapshot {
   CompanionEnergeticState energetic{};
   CompanionInteractionState interactional{};
   CompanionTransientState transient{};
+  CompanionSessionMemoryState session{};
   uint32_t revision = 0;
   uint64_t captured_at_ms = 0;
 };
