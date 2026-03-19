@@ -65,8 +65,13 @@ struct MotionCommand {
 struct MotionCompanionSignal {
   bool safe_mode = false;
   bool attention_lock = false;
+  bool session_warm = false;
   uint8_t emotional_arousal_percent = 0;
+  uint8_t recent_engagement_percent = 0;
   CompanionProductState product_state = CompanionProductState::kBooting;
+  AttentionTarget recent_stimulus_target = AttentionTarget::kNone;
+  InteractionPhase recent_interaction_phase = InteractionPhase::kIdle;
+  TurnOwner recent_turn_owner = TurnOwner::kNone;
 };
 
 struct MotionFaceSignal {

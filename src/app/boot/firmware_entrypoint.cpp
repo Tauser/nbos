@@ -132,8 +132,13 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
                           snapshot.attentional.focus_confidence_percent >= 70 ||
                           behavior_attention_lock ||
                           snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding;
+  signal.session_warm = snapshot.session.warm;
   signal.emotional_arousal_percent = map_arousal_percent(snapshot, behavior_state, now_ms);
+  signal.recent_engagement_percent = snapshot.session.engagement_recent_percent;
   signal.product_state = snapshot.runtime.product_state;
+  signal.recent_stimulus_target = snapshot.session.recent_stimulus.target;
+  signal.recent_interaction_phase = snapshot.session.recent_interaction.phase;
+  signal.recent_turn_owner = snapshot.session.last_turn_owner;
   return signal;
 }
 }  // namespace

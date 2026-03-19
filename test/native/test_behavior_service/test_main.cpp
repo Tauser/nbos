@@ -105,6 +105,29 @@ void test_behavior_service_raises_attend_priority_on_voice_trigger_context() {
   TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
 }
 
+void test_behavior_service_uses_short_context_to_avoid_cold_reengagement() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 5600));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.runtime.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  snapshot.session.warm = true;
+  snapshot.session.last_activity_ms = 5900;
+  snapshot.session.anchor_target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.session.recent_stimulus.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.session.recent_interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  snapshot.session.recent_interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  snapshot.session.engagement_recent_percent = 72;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 6100, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(5, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_STRING("attend_user_continuity", proposal.rationale);
+}
+
 void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
   ncos::services::behavior::BehaviorService service;
   TEST_ASSERT_TRUE(service.initialize(61, 6000));
@@ -142,6 +165,7 @@ int main() {
   RUN_TEST(test_behavior_service_respects_cooldown);
   RUN_TEST(test_behavior_service_tracks_governance_preemption_and_rejection);
   RUN_TEST(test_behavior_service_raises_attend_priority_on_voice_trigger_context);
+  RUN_TEST(test_behavior_service_uses_short_context_to_avoid_cold_reengagement);
   RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }

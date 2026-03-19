@@ -22,10 +22,28 @@ ncos::core::contracts::BehaviorProposal make_behavior_proposal(
   return out;
 }
 
-bool should_return_to_idle(const ncos::core::contracts::CompanionSnapshot& snapshot) {
+constexpr uint64_t WarmContinuityWindowMs = 3200;
+
+bool has_warm_user_continuity(const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
+  if (!snapshot.session.warm || snapshot.runtime.safe_mode || snapshot.session.last_activity_ms == 0 ||
+      now_ms < snapshot.session.last_activity_ms ||
+      (now_ms - snapshot.session.last_activity_ms) > WarmContinuityWindowMs) {
+    return false;
+  }
+
+  const bool user_anchored =
+      snapshot.session.anchor_target == ncos::core::contracts::AttentionTarget::kUser ||
+      snapshot.session.recent_stimulus.target == ncos::core::contracts::AttentionTarget::kUser ||
+      snapshot.session.recent_interaction.phase == ncos::core::contracts::InteractionPhase::kResponding ||
+      snapshot.session.recent_interaction.turn_owner != ncos::core::contracts::TurnOwner::kNone;
+
+  return user_anchored && snapshot.session.engagement_recent_percent >= 55;
+}
+
+bool should_return_to_idle(const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
   return snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kNone &&
          snapshot.interactional.phase == ncos::core::contracts::InteractionPhase::kIdle &&
-         !snapshot.interactional.session_active;
+         !snapshot.interactional.session_active && !has_warm_user_continuity(snapshot, now_ms);
 }
 
 }  // namespace
@@ -63,11 +81,11 @@ bool BehaviorService::tick(const ncos::core::contracts::CompanionSnapshot& snaps
     proposal = propose_alert_scan(snapshot);
   }
   if (!proposal.valid) {
-    proposal = propose_attend_user(snapshot);
+    proposal = propose_attend_user(snapshot, now_ms);
   }
 
   if (!proposal.valid) {
-    if (should_return_to_idle(snapshot)) {
+    if (should_return_to_idle(snapshot, now_ms)) {
       state_.active_profile = ncos::core::contracts::BehaviorProfile::kIdleObserve;
     }
     return false;
@@ -159,12 +177,15 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_alert_scan(
 }
 
 ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
-    const ncos::core::contracts::CompanionSnapshot& snapshot) const {
+    const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) const {
   const bool user_attention = snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
                               snapshot.attentional.focus_confidence_percent >= 45;
   const bool auditory_trigger_context =
       snapshot.attentional.channel == ncos::core::contracts::AttentionChannel::kAuditory &&
       snapshot.interactional.response_pending;
+  const bool warm_user_context =
+      snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kIdleObserve &&
+      has_warm_user_continuity(snapshot, now_ms);
 
   if (user_attention && !snapshot.runtime.safe_mode) {
     return make_behavior_proposal(
@@ -176,6 +197,18 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         220,
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user");
+  }
+
+  if (warm_user_context && !snapshot.runtime.safe_mode) {
+    return make_behavior_proposal(
+        ncos::core::contracts::BehaviorProfile::kAttendUser, service_id_,
+        ncos::core::contracts::ActionDomain::kFace,
+        ncos::core::contracts::CommandTopic::kFaceRenderExecute,
+        ncos::core::contracts::IntentTopic::kAttendUser,
+        5,
+        180,
+        ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
+        "attend_user_continuity");
   }
 
   return ncos::core::contracts::BehaviorProposal{};

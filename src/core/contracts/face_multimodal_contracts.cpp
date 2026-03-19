@@ -75,13 +75,27 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
   input.touch_intensity_percent = touch_intensity_percent(touch);
   input.motion_intensity_percent = motion_intensity_percent(imu);
   input.motion_active = input.motion_intensity_percent >= 15;
+  input.session_warm = companion.session.warm;
   input.companion_product_state = companion.runtime.product_state;
+  input.recent_stimulus_target = companion.session.recent_stimulus.target;
+  input.recent_stimulus_channel = companion.session.recent_stimulus.channel;
+  input.recent_interaction_phase = companion.session.recent_interaction.phase;
+  input.recent_turn_owner = companion.session.last_turn_owner;
 
   input.emotional_arousal_percent = companion.emotional.vector.arousal_percent;
   input.social_engagement_percent = companion.emotional.vector.social_engagement_percent;
+  input.recent_engagement_percent = companion.session.engagement_recent_percent;
   const uint8_t touch_social = touch_social_engagement_percent(touch);
   if (touch_social > input.social_engagement_percent) {
     input.social_engagement_percent = touch_social;
+  }
+  if (companion.session.warm) {
+    const uint8_t continuity_social = companion.session.engagement_recent_percent > 12
+                                          ? static_cast<uint8_t>(companion.session.engagement_recent_percent - 12)
+                                          : companion.session.engagement_recent_percent;
+    if (continuity_social > input.social_engagement_percent) {
+      input.social_engagement_percent = continuity_social;
+    }
   }
   input.behavior_activation_percent = behavior_activation_percent(behavior, now_ms);
   input.behavior_active = input.behavior_activation_percent > 0;

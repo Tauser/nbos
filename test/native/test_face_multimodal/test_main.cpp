@@ -83,6 +83,37 @@ void test_face_multimodal_input_ignores_touch_readiness_without_active_trigger()
                         static_cast<int>(input.companion_product_state));
 }
 
+void test_face_multimodal_input_uses_short_context_to_keep_social_warmth() {
+  ncos::core::contracts::AudioRuntimeState audio{};
+  ncos::core::contracts::TouchRuntimeState touch{};
+  ncos::core::contracts::ImuRuntimeState imu{};
+
+  ncos::core::contracts::CompanionSnapshot companion{};
+  companion.runtime.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  companion.session.warm = true;
+  companion.session.engagement_recent_percent = 72;
+  companion.session.recent_stimulus.target = ncos::core::contracts::AttentionTarget::kUser;
+  companion.session.recent_stimulus.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  companion.session.recent_interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  companion.session.last_turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+
+  ncos::core::contracts::BehaviorRuntimeState behavior{};
+  const auto input =
+      ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 1800);
+
+  TEST_ASSERT_TRUE(input.session_warm);
+  TEST_ASSERT_EQUAL_UINT8(72, input.recent_engagement_percent);
+  TEST_ASSERT_EQUAL_UINT8(60, input.social_engagement_percent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(input.recent_stimulus_target));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
+                        static_cast<int>(input.recent_stimulus_channel));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kResponding),
+                        static_cast<int>(input.recent_interaction_phase));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::TurnOwner::kCompanion),
+                        static_cast<int>(input.recent_turn_owner));
+}
+
 void test_face_multimodal_sync_applies_modulation_under_ownership() {
   auto state = ncos::core::contracts::make_face_render_state_baseline();
   ncos::services::face::FaceCompositor compositor{};
@@ -181,6 +212,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_multimodal_input_aggregates_audio_touch_and_motion);
   RUN_TEST(test_face_multimodal_input_ignores_touch_readiness_without_active_trigger);
+  RUN_TEST(test_face_multimodal_input_uses_short_context_to_keep_social_warmth);
   RUN_TEST(test_face_multimodal_sync_applies_modulation_under_ownership);
   RUN_TEST(test_face_multimodal_sync_generates_full_blink_window_for_engaged_character);
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);

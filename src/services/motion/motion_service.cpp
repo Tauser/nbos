@@ -20,6 +20,9 @@ constexpr int16_t kAlertPitchPermille = 32;
 constexpr int16_t kRespondingPitchPermille = 70;
 constexpr int16_t kSleepPitchPermille = -40;
 constexpr uint32_t kSleepHoldMs = 320;
+constexpr int16_t kWarmContextPitchPermille = 38;
+constexpr int16_t kWarmStimulusPitchPermille = 24;
+constexpr uint32_t kWarmContextHoldMs = 180;
 
 int16_t abs_i16(int16_t v) {
   return v < 0 ? static_cast<int16_t>(-v) : v;
@@ -178,8 +181,18 @@ void MotionService::tick(uint64_t now_ms) {
   const bool attentive_state = product_state == ncos::core::contracts::CompanionProductState::kAttendUser ||
                                product_state == ncos::core::contracts::CompanionProductState::kResponding;
   const bool alert_state = product_state == ncos::core::contracts::CompanionProductState::kAlertScan;
-  const bool attentive_hold_requested =
-      !active_face_expression && (state_.companion_signal.attention_lock || attentive_state || alert_state);
+  const bool warm_context = state_.companion_signal.session_warm &&
+                            state_.companion_signal.recent_engagement_percent >= 54 && !restful_state;
+  const bool warm_user_context =
+      warm_context &&
+      (state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kUser ||
+       state_.companion_signal.recent_interaction_phase == ncos::core::contracts::InteractionPhase::kResponding ||
+       state_.companion_signal.recent_turn_owner != ncos::core::contracts::TurnOwner::kNone);
+  const bool warm_stimulus_context =
+      warm_context && state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
+  const bool attentive_hold_requested = !active_face_expression &&
+                                        (state_.companion_signal.attention_lock || attentive_state || alert_state ||
+                                         warm_user_context || warm_stimulus_context);
 
   if (!active_face_expression && restful_state) {
     ncos::core::contracts::MotionCommand rest{};
@@ -196,17 +209,25 @@ void MotionService::tick(uint64_t now_ms) {
   }
 
   if (attentive_hold_requested) {
+    const bool warm_only = !state_.companion_signal.attention_lock && !attentive_state && !alert_state &&
+                           (warm_user_context || warm_stimulus_context);
     ncos::core::contracts::MotionCommand attend{};
-    attend.intent = alert_state ? ncos::core::contracts::MotionIntent::kObserveStimulus
-                                : ncos::core::contracts::MotionIntent::kAttendUser;
+    attend.intent = (alert_state || warm_stimulus_context)
+                        ? ncos::core::contracts::MotionIntent::kObserveStimulus
+                        : ncos::core::contracts::MotionIntent::kAttendUser;
     attend.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
     attend.priority = ncos::core::contracts::MotionPriority::kLow;
     attend.pose = ncos::core::contracts::make_neutral_pose();
     attend.pose.pitch_permille = product_state == ncos::core::contracts::CompanionProductState::kResponding
                                      ? kRespondingPitchPermille
-                                     : (alert_state ? kAlertPitchPermille : kAttentionPitchPermille);
-    attend.pose.speed_percent = static_cast<uint16_t>(30 + state_.companion_signal.emotional_arousal_percent / 5);
-    attend.hold_ms = kAttentionHoldMs;
+                                     : (alert_state ? kAlertPitchPermille
+                                                    : (warm_stimulus_context ? kWarmStimulusPitchPermille
+                                                                             : (warm_user_context ? kWarmContextPitchPermille
+                                                                                                  : kAttentionPitchPermille)));
+    attend.pose.speed_percent = warm_only
+                                    ? static_cast<uint16_t>(24 + state_.companion_signal.recent_engagement_percent / 6)
+                                    : static_cast<uint16_t>(30 + state_.companion_signal.emotional_arousal_percent / 5);
+    attend.hold_ms = warm_only ? kWarmContextHoldMs : kAttentionHoldMs;
     (void)request_motion(attend, now_ms);
     next_embodiment_ms_ = now_ms + kEmbodimentTickIntervalMs;
     return;

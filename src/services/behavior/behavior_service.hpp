@@ -26,7 +26,7 @@ class BehaviorService final {
   ncos::core::contracts::BehaviorProposal propose_alert_scan(
       const ncos::core::contracts::CompanionSnapshot& snapshot) const;
   ncos::core::contracts::BehaviorProposal propose_attend_user(
-      const ncos::core::contracts::CompanionSnapshot& snapshot) const;
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) const;
 
   uint16_t service_id_ = 0;
   ncos::core::contracts::BehaviorRuntimeState state_{};

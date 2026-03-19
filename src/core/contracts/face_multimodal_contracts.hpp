@@ -15,7 +15,12 @@ struct FaceMultimodalInput {
   bool imu_ready = false;
   bool motion_active = false;
   bool behavior_active = false;
+  bool session_warm = false;
   CompanionProductState companion_product_state = CompanionProductState::kBooting;
+  AttentionTarget recent_stimulus_target = AttentionTarget::kNone;
+  AttentionChannel recent_stimulus_channel = AttentionChannel::kVisual;
+  InteractionPhase recent_interaction_phase = InteractionPhase::kIdle;
+  TurnOwner recent_turn_owner = TurnOwner::kNone;
 
   uint8_t audio_energy_percent = 0;
   uint8_t touch_intensity_percent = 0;
@@ -23,6 +28,7 @@ struct FaceMultimodalInput {
   uint8_t emotional_arousal_percent = 0;
   uint8_t social_engagement_percent = 0;
   uint8_t behavior_activation_percent = 0;
+  uint8_t recent_engagement_percent = 0;
   uint64_t observed_at_ms = 0;
 };
 

@@ -6,7 +6,27 @@
 
 namespace {
 
+using ncos::core::contracts::AttentionTarget;
 using ncos::core::contracts::CompanionProductState;
+using ncos::core::contracts::InteractionPhase;
+using ncos::core::contracts::TurnOwner;
+
+bool has_warm_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return input.session_warm && input.companion_product_state == CompanionProductState::kIdleObserve &&
+         input.recent_engagement_percent >= 48;
+}
+
+bool has_warm_user_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return has_warm_continuity(input) &&
+         (input.recent_stimulus_target == AttentionTarget::kUser ||
+          input.recent_interaction_phase == InteractionPhase::kResponding ||
+          input.recent_turn_owner != TurnOwner::kNone) &&
+         input.recent_engagement_percent >= 58;
+}
+
+bool has_warm_stimulus_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return has_warm_continuity(input) && input.recent_stimulus_target == AttentionTarget::kStimulus;
+}
 
 bool is_diagonal_direction(ncos::models::face::GazeDirection direction) {
   using ncos::models::face::GazeDirection;
@@ -64,6 +84,14 @@ ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
     return ncos::services::face::FaceOfficialPresetId::kCoreLock;
   }
 
+  if (has_warm_user_continuity(input)) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreAttend;
+  }
+
+  if (has_warm_stimulus_continuity(input)) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreCurious;
+  }
+
   if (input.behavior_activation_percent >= 55 || input.social_engagement_percent >= 70) {
     return ncos::services::face::FaceOfficialPresetId::kCoreAttend;
   }
@@ -86,12 +114,13 @@ bool is_attending_user_input(const ncos::core::contracts::FaceMultimodalInput& i
   }
 
   return input.touch_active || input.behavior_active || input.social_engagement_percent >= 70 ||
+         has_warm_user_continuity(input) ||
          input.companion_product_state == CompanionProductState::kAttendUser ||
          input.companion_product_state == CompanionProductState::kResponding;
 }
 
 bool should_run_idle_signature_clip(const ncos::core::contracts::FaceMultimodalInput& input) {
-  return input.companion_product_state == CompanionProductState::kIdleObserve;
+  return input.companion_product_state == CompanionProductState::kIdleObserve && !has_warm_continuity(input);
 }
 
 FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts::FaceMultimodalInput& input,
@@ -157,6 +186,22 @@ FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts
       break;
     case CompanionProductState::kIdleObserve:
     default:
+      if (has_warm_user_continuity(input)) {
+        profile.direction = ncos::models::face::GazeDirection::kCenter;
+        profile.focus_percent = input.recent_interaction_phase == InteractionPhase::kResponding ? 60 : 56;
+        profile.salience_percent = input.recent_interaction_phase == InteractionPhase::kResponding ? 48 : 40;
+        profile.hold_ms = input.recent_interaction_phase == InteractionPhase::kResponding ? 560 : 500;
+        profile.cadence_ms = 520;
+        profile.alternate_lateral = false;
+      } else if (has_warm_stimulus_continuity(input)) {
+        profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
+                                      : ncos::models::face::GazeDirection::kRight;
+        profile.focus_percent = 46;
+        profile.salience_percent = 36;
+        profile.hold_ms = 440;
+        profile.cadence_ms = 560;
+        profile.alternate_lateral = true;
+      }
       break;
   }
 
