@@ -50,6 +50,15 @@ bool is_lateral_direction(ncos::models::face::GazeDirection direction) {
          direction == ncos::models::face::GazeDirection::kRight;
 }
 
+int16_t lateral_yaw_shift_px(ncos::models::face::GazeDirection direction, uint8_t focus_percent) {
+  if (!is_lateral_direction(direction) || focus_percent < 35) {
+    return 0;
+  }
+
+  const int16_t shift = focus_percent >= 75 ? 5 : 3;
+  return direction == ncos::models::face::GazeDirection::kLeft ? static_cast<int16_t>(-shift) : shift;
+}
+
 int16_t lateral_parallax_shift_px(ncos::models::face::GazeDirection direction, uint8_t focus_percent) {
   if (!is_lateral_direction(direction) || focus_percent < 45) {
     return 0;
@@ -63,7 +72,7 @@ int8_t leading_eye_parallax_size_delta_percent(ncos::models::face::GazeDirection
   if (!is_lateral_direction(direction) || focus_percent < 35) {
     return 0;
   }
-  return focus_percent >= 60 ? 7 : 4;
+  return focus_percent >= 60 ? -6 : -3;
 }
 
 int8_t trailing_eye_parallax_size_delta_percent(ncos::models::face::GazeDirection direction,
@@ -71,7 +80,7 @@ int8_t trailing_eye_parallax_size_delta_percent(ncos::models::face::GazeDirectio
   if (!is_lateral_direction(direction) || focus_percent < 35) {
     return 0;
   }
-  return focus_percent >= 60 ? -4 : -2;
+  return focus_percent >= 60 ? 6 : 3;
 }
 
 int8_t compose_size_delta(int8_t manual_delta, int8_t parallax_delta) {
@@ -108,6 +117,7 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
 
   const auto& left_adjust = state.eyes.left_adjust;
   const auto& right_adjust = state.eyes.right_adjust;
+  const int16_t yaw_shift = lateral_yaw_shift_px(state.eyes.direction, state.eyes.focus_percent);
   const int16_t parallax_shift = lateral_parallax_shift_px(state.eyes.direction, state.eyes.focus_percent);
   const int8_t leading_size_delta =
       leading_eye_parallax_size_delta_percent(state.eyes.direction, state.eyes.focus_percent);
@@ -128,12 +138,12 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
   const uint8_t right_openness =
       clamp_percent_frame(static_cast<int32_t>(state.lids.openness_percent) + right_adjust.openness_delta_percent);
 
-  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2 + layout.gaze_dx +
+  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2 + layout.gaze_dx + yaw_shift +
                                           left_adjust.x_offset_px +
                                           (state.eyes.direction == ncos::models::face::GazeDirection::kLeft ?
                                                parallax_shift : 0));
   frame.left_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy + left_adjust.y_offset_px);
-  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2 + layout.gaze_dx +
+  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2 + layout.gaze_dx + yaw_shift +
                                            right_adjust.x_offset_px +
                                            (state.eyes.direction == ncos::models::face::GazeDirection::kRight ?
                                                 parallax_shift : 0));
@@ -171,4 +181,3 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
 }
 
 }  // namespace ncos::services::face
-

@@ -38,6 +38,7 @@ void test_face_frame_composer_maps_baseline_to_renderable_frame() {
 void test_face_frame_composer_applies_gaze_offset_without_renderer_semantics() {
   auto state = ncos::core::contracts::make_face_render_state_baseline();
   state.eyes.direction = ncos::models::face::GazeDirection::kLeft;
+  state.eyes.focus_percent = 100;
 
   ncos::services::face::FaceFrame frame_left{};
   ncos::services::face::FaceFrameComposer composer{};
@@ -72,7 +73,7 @@ void test_face_frame_composer_supports_controlled_eye_asymmetry() {
   TEST_ASSERT_TRUE(frame.left_eye_h < frame.right_eye_h);
 }
 
-void test_face_frame_composer_adds_subtle_lateral_parallax_without_touching_diagonal() {
+void test_face_frame_composer_adds_lateral_yaw_with_gaze_side_smaller() {
   auto right_state = ncos::core::contracts::make_face_render_state_baseline();
   right_state.eyes.direction = ncos::models::face::GazeDirection::kRight;
   right_state.eyes.focus_percent = 100;
@@ -87,7 +88,8 @@ void test_face_frame_composer_adds_subtle_lateral_parallax_without_touching_diag
   TEST_ASSERT_TRUE(composer.compose(right_state, &right_frame));
   TEST_ASSERT_TRUE(composer.compose(diagonal_state, &diagonal_frame));
 
-  TEST_ASSERT_TRUE(right_frame.right_eye_w > right_frame.left_eye_w);
+  TEST_ASSERT_TRUE(right_frame.left_eye_w > right_frame.right_eye_w);
+  TEST_ASSERT_TRUE(right_frame.left_eye_x > diagonal_frame.left_eye_x);
   TEST_ASSERT_TRUE(right_frame.right_eye_x > diagonal_frame.right_eye_x);
   TEST_ASSERT_EQUAL_INT16(diagonal_frame.left_eye_w, diagonal_frame.right_eye_w);
 }
@@ -123,7 +125,7 @@ int main() {
   RUN_TEST(test_face_frame_composer_maps_baseline_to_renderable_frame);
   RUN_TEST(test_face_frame_composer_applies_gaze_offset_without_renderer_semantics);
   RUN_TEST(test_face_frame_composer_supports_controlled_eye_asymmetry);
-  RUN_TEST(test_face_frame_composer_adds_subtle_lateral_parallax_without_touching_diagonal);
+  RUN_TEST(test_face_frame_composer_adds_lateral_yaw_with_gaze_side_smaller);
   RUN_TEST(test_face_official_preset_applies_curated_eye_signature);
   RUN_TEST(test_face_frame_composer_rejects_invalid_render_state);
   return UNITY_END();
