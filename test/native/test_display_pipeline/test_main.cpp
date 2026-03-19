@@ -73,6 +73,10 @@ void test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_direct_flu
   TEST_ASSERT_TRUE(plan.dirty_rect.valid);
   TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect.w);
   TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect.h);
+  TEST_ASSERT_TRUE(plan.dirty_rect_secondary.valid);
+  TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect_secondary.w);
+  TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect_secondary.h);
+  TEST_ASSERT_LESS_THAN_INT(plan.dirty_rect_secondary.x, plan.dirty_rect.x + plan.dirty_rect.w);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::drivers::display::DisplayFlushPath::kDirectPrimitives),
                         static_cast<int>(plan.recommended_flush_path));
 }

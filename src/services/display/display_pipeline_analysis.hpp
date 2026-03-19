@@ -48,6 +48,7 @@ struct DisplayRenderPlan {
   ncos::drivers::display::DisplayFlushPath recommended_flush_path =
       ncos::drivers::display::DisplayFlushPath::kDirectPrimitives;
   DirtyRect dirty_rect{};
+  DirtyRect dirty_rect_secondary{};
 };
 
 DirtyRect compute_eye_dirty_rect(const ncos::services::face::FaceFrame& previous,
