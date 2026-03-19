@@ -40,7 +40,10 @@ bool has_warm_user_continuity(const ncos::core::contracts::CompanionSnapshot& sn
       snapshot.session.recent_interaction.phase == ncos::core::contracts::InteractionPhase::kResponding ||
       snapshot.session.recent_interaction.turn_owner != ncos::core::contracts::TurnOwner::kNone;
 
-  return user_anchored && snapshot.session.engagement_recent_percent >= 55;
+  return user_anchored &&
+         snapshot.session.engagement_recent_percent >=
+             ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                 snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kUser);
 }
 
 bool should_return_to_idle(const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {

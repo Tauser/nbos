@@ -21,8 +21,7 @@ uint64_t session_context_age_ms(const ncos::core::contracts::FaceMultimodalInput
 }
 
 bool has_warm_continuity(const ncos::core::contracts::FaceMultimodalInput& input, uint64_t window_ms) {
-  if (!input.session_warm || input.companion_product_state != CompanionProductState::kIdleObserve ||
-      input.recent_engagement_percent < 48) {
+  if (!input.session_warm || input.companion_product_state != CompanionProductState::kIdleObserve) {
     return false;
   }
 
@@ -37,7 +36,9 @@ bool has_warm_user_continuity(const ncos::core::contracts::FaceMultimodalInput& 
          (input.recent_stimulus_target == AttentionTarget::kUser ||
           input.recent_interaction_phase == InteractionPhase::kResponding ||
           input.recent_turn_owner != TurnOwner::kNone) &&
-         input.recent_engagement_percent >= 58;
+         input.recent_engagement_percent >=
+             ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                 input.personality, ncos::core::contracts::PersonalityContinuityKind::kUser);
 }
 
 bool has_warm_stimulus_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
@@ -45,7 +46,10 @@ bool has_warm_stimulus_continuity(const ncos::core::contracts::FaceMultimodalInp
            input,
            ncos::core::contracts::personality_continuity_window_ms(
                input.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
-         input.recent_stimulus_target == AttentionTarget::kStimulus;
+         input.recent_stimulus_target == AttentionTarget::kStimulus &&
+         input.recent_engagement_percent >=
+             ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                 input.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus);
 }
 
 bool has_warm_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {

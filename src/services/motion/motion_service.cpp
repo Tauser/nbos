@@ -47,8 +47,7 @@ uint64_t session_context_age_ms(const ncos::core::contracts::MotionCompanionSign
 
 bool has_fresh_warm_continuity(const ncos::core::contracts::MotionCompanionSignal& signal,
                                uint64_t now_ms, uint64_t window_ms) {
-  return signal.session_warm && signal.recent_engagement_percent >= 54 &&
-         session_context_age_ms(signal, now_ms) <= window_ms;
+  return signal.session_warm && session_context_age_ms(signal, now_ms) <= window_ms;
 }
 
 }  // namespace
@@ -197,7 +196,11 @@ void MotionService::tick(uint64_t now_ms) {
               ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
       (state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kUser ||
        state_.companion_signal.recent_interaction_phase == ncos::core::contracts::InteractionPhase::kResponding ||
-       state_.companion_signal.recent_turn_owner != ncos::core::contracts::TurnOwner::kNone);
+       state_.companion_signal.recent_turn_owner != ncos::core::contracts::TurnOwner::kNone) &&
+      state_.companion_signal.recent_engagement_percent >=
+          ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+              state_.companion_signal.personality,
+              ncos::core::contracts::PersonalityContinuityKind::kUser);
   const bool warm_stimulus_context =
       !restful_state &&
       has_fresh_warm_continuity(
@@ -205,7 +208,11 @@ void MotionService::tick(uint64_t now_ms) {
           ncos::core::contracts::personality_continuity_window_ms(
               state_.companion_signal.personality,
               ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
-      state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
+      state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus &&
+      state_.companion_signal.recent_engagement_percent >=
+          ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+              state_.companion_signal.personality,
+              ncos::core::contracts::PersonalityContinuityKind::kStimulus);
   const bool attentive_hold_requested = !active_face_expression &&
                                         (state_.companion_signal.attention_lock || attentive_state || alert_state ||
                                          warm_user_context || warm_stimulus_context);

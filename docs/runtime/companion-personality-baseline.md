@@ -48,6 +48,15 @@ Isso mantem a base pequena: sem writer novo, sem maquina paralela e sem misturar
 - `EnergyProtect`
   - mais contido e economico, sem cair em panico
 
+## Consistencia entre canais
+
+A identidade-base agora usa o mesmo gate curto de continuidade em `Behavior`, `Face` e `Motion`. Isso evita um efeito em que um canal ainda parece "quente" enquanto outro ja voltou ao basal.
+
+Baseline oficial de continuidade perceptivel:
+
+- usuario recente: `56%` de engajamento curto
+- estimulo recente: `50%` de engajamento curto
+
 ## Trade-offs assumidos
 
 - a personalidade ainda nao dirige rotina ou autonomia rica; ela so consolida o tom-base onde ja ha resposta operacional

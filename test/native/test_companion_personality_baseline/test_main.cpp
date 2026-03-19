@@ -40,6 +40,20 @@ void test_companion_personality_motion_profiles_preserve_composure_and_sociabili
   TEST_ASSERT_GREATER_THAN_UINT16(attend.base_speed_percent, responding.base_speed_percent);
 }
 
+void test_companion_personality_continuity_gates_stay_consistent_across_channels() {
+  const auto personality = ncos::core::contracts::make_companion_personality_state();
+
+  TEST_ASSERT_GREATER_THAN_UINT8(
+      ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+          personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus),
+      ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+          personality, ncos::core::contracts::PersonalityContinuityKind::kUser));
+  TEST_ASSERT_EQUAL_UINT8(56, ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                                   personality, ncos::core::contracts::PersonalityContinuityKind::kUser));
+  TEST_ASSERT_EQUAL_UINT8(50, ncos::core::contracts::personality_continuity_engagement_threshold_percent(
+                                   personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus));
+}
+
 void test_companion_personality_timing_keeps_continuity_short_and_predictable() {
   TEST_ASSERT_GREATER_THAN_UINT32(
       ncos::core::contracts::personality_continuity_window_ms(
@@ -62,6 +76,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_companion_personality_face_profiles_keep_response_focused_and_warm);
   RUN_TEST(test_companion_personality_motion_profiles_preserve_composure_and_sociability);
+  RUN_TEST(test_companion_personality_continuity_gates_stay_consistent_across_channels);
   RUN_TEST(test_companion_personality_timing_keeps_continuity_short_and_predictable);
   return UNITY_END();
 }

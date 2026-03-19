@@ -79,6 +79,17 @@ constexpr uint64_t personality_continuity_window_ms(const CompanionPersonalitySt
   }
 }
 
+constexpr uint8_t personality_continuity_engagement_threshold_percent(
+    const CompanionPersonalityState& personality, PersonalityContinuityKind kind) {
+  switch (kind) {
+    case PersonalityContinuityKind::kUser:
+      return static_cast<uint8_t>(50 + personality.warmth_percent / 10);
+    case PersonalityContinuityKind::kStimulus:
+    default:
+      return static_cast<uint8_t>(42 + personality.curiosity_percent / 7);
+  }
+}
+
 constexpr uint32_t personality_reengagement_ttl_ms(const CompanionPersonalityState& personality) {
   return personality.reengagement_ttl_ms;
 }
