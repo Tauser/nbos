@@ -82,6 +82,7 @@ Voz e camera continuam como sinais validos do sistema, mas nao sao gate de aceit
 - cooldown de behavior: `220 ms`
 - atualizacao normal do face: conforme pipeline atual
 - stale guard de motion: `1400 ms`
+- desacoplamento curto na soltura do touch: `180 ms`
 
 Essas janelas nao sao SLA de produto final; sao a referencia operacional do slice atual.
 
@@ -92,6 +93,28 @@ O Companion MVP Slice fica aprovado quando, em hardware real:
 - a resposta facial e claramente diferente do idle
 - o sistema volta ao idle ao fim do estimulo
 - isso acontece de forma repetivel sem depender de cloud
+
+## Procedimento oficial de validacao em hardware
+1. subir o firmware em modo normal, sem diagnosticos ativos
+2. aguardar o boot fechar no idle observacional
+3. executar pelo menos 5 ciclos completos de:
+   - toque local sustentado
+   - resposta visual de atencao
+   - soltura do touch
+   - retorno ao idle
+4. considerar o slice aprovado quando, nesses ciclos:
+   - nao houver reboot, freeze ou travamento da face
+   - o attend aparecer de forma perceptivel durante o toque
+   - a liberacao do touch mantiver uma janela curta de desacoplamento, sem flicker
+   - o retorno ao idle acontecer de forma limpa e previsivel
+   - motion, quando disponivel, acompanhar o attend e voltar ao neutro no fim
+
+## Envelope oficial de retorno ao idle
+- a liberacao do touch nao corta a atencao instantaneamente; existe uma janela curta de desacoplamento
+- essa janela serve para evitar flicker comportamental e visual na soltura
+- sem novo estimulo dominante, o companion deve voltar para `idle`
+- o `BehaviorService` deve encerrar o `kAttendUser` e voltar para `kIdleObserve`
+- face e motion devem acompanhar esse retorno sem parecer presos no attend
 
 ## Trade-offs assumidos
 - o slice prova o companion base, nao a experiencia completa de conversa

@@ -5,6 +5,7 @@ constexpr uint8_t PresenceDetectedThreshold = 22;
 constexpr uint8_t AttentionLockedThreshold = 56;
 constexpr uint8_t TouchDominantThreshold = 35;
 constexpr uint64_t CameraFreshnessWindowMs = 1600;
+constexpr uint64_t TouchReleaseHoldMs = 180;
 }
 
 namespace ncos::services::vision {
@@ -50,12 +51,21 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
     state_.attention_target = ncos::core::contracts::AttentionTarget::kNone;
     state_.attention_channel = ncos::core::contracts::AttentionChannel::kVisual;
     state_.stage = ncos::core::contracts::PerceptionStage::Dormant;
+    state_.touch_release_hold_until_ms = 0;
     return had_presence || had_attention;
   }
 
   const uint8_t visual_confidence = visual_presence_confidence(camera, now_ms);
   const uint8_t auditory_confidence = auditory_presence_confidence(audio);
-  const uint8_t touch_confidence = touch_presence_confidence(touch);
+  uint8_t touch_confidence = touch_presence_confidence(touch);
+
+  if (touch.trigger_active) {
+    state_.touch_release_hold_until_ms = now_ms + TouchReleaseHoldMs;
+  } else if (touch_confidence == 0 && state_.touch_release_hold_until_ms > now_ms &&
+             visual_confidence < PresenceDetectedThreshold &&
+             auditory_confidence < PresenceDetectedThreshold) {
+    touch_confidence = TouchDominantThreshold;
+  }
 
   const uint8_t presence_confidence =
       ncos::core::contracts::clamp_percent_u8(static_cast<uint16_t>(
@@ -168,6 +178,8 @@ void PerceptionService::choose_attention_channel(
     out_interaction->response_pending = false;
     return;
   }
+
+  out_interaction->session_active = false;
 
   if (visual_confidence >= auditory_confidence && visual_confidence >= PresenceDetectedThreshold) {
     out_attention->target = ncos::core::contracts::AttentionTarget::kUser;

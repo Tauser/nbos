@@ -105,6 +105,36 @@ void test_behavior_service_raises_attend_priority_on_voice_trigger_context() {
   TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
 }
 
+void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 6000));
+
+  ncos::core::contracts::CompanionSnapshot attend_snapshot{};
+  attend_snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attend_snapshot.attentional.focus_confidence_percent = 80;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(attend_snapshot, 6300, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+
+  ncos::core::contracts::GovernanceDecision allow{};
+  allow.kind = ncos::core::contracts::GovernanceDecisionKind::kAllow;
+  service.on_governance_decision(allow, 6310);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(service.state().active_profile));
+
+  ncos::core::contracts::CompanionSnapshot idle_snapshot{};
+  idle_snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  idle_snapshot.interactional.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  idle_snapshot.interactional.session_active = false;
+
+  ncos::core::contracts::BehaviorProposal idle_proposal{};
+  TEST_ASSERT_FALSE(service.tick(idle_snapshot, 6600, &idle_proposal));
+  TEST_ASSERT_FALSE(idle_proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kIdleObserve),
+                        static_cast<int>(service.state().active_profile));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_behavior_service_emits_energy_protect_when_critical);
@@ -112,8 +142,6 @@ int main() {
   RUN_TEST(test_behavior_service_respects_cooldown);
   RUN_TEST(test_behavior_service_tracks_governance_preemption_and_rejection);
   RUN_TEST(test_behavior_service_raises_attend_priority_on_voice_trigger_context);
+  RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }
-
-
-

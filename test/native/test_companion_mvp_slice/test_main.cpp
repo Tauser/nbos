@@ -117,7 +117,15 @@ void test_companion_mvp_slice_emits_idle_transition_on_trigger_release() {
   touch_idle.last_read_ok = true;
   touch_idle.normalized_level = 0;
 
-  TEST_ASSERT_TRUE(perception.tick(audio, touch_idle, camera, ncos::core::contracts::CompanionSnapshot{}, 2600,
+  TEST_ASSERT_TRUE(perception.tick(audio, touch_idle, camera, ncos::core::contracts::CompanionSnapshot{}, 2560,
+                                   &attention, &interaction));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
+                        static_cast<int>(attention.channel));
+  TEST_ASSERT_TRUE(attention.lock_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kActing),
+                        static_cast<int>(interaction.phase));
+
+  TEST_ASSERT_TRUE(perception.tick(audio, touch_idle, camera, ncos::core::contracts::CompanionSnapshot{}, 2820,
                                    &attention, &interaction));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
                         static_cast<int>(attention.target));
@@ -125,8 +133,10 @@ void test_companion_mvp_slice_emits_idle_transition_on_trigger_release() {
                         static_cast<int>(interaction.phase));
 
   ncos::core::contracts::BehaviorProposal idle_proposal{};
-  TEST_ASSERT_FALSE(behavior.tick(ncos::core::contracts::CompanionSnapshot{}, 2600, &idle_proposal));
+  TEST_ASSERT_FALSE(behavior.tick(ncos::core::contracts::CompanionSnapshot{}, 2820, &idle_proposal));
   TEST_ASSERT_FALSE(idle_proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kIdleObserve),
+                        static_cast<int>(behavior.state().active_profile));
 }
 
 int main() {

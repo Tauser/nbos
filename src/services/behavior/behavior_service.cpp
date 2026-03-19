@@ -22,6 +22,12 @@ ncos::core::contracts::BehaviorProposal make_behavior_proposal(
   return out;
 }
 
+bool should_return_to_idle(const ncos::core::contracts::CompanionSnapshot& snapshot) {
+  return snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kNone &&
+         snapshot.interactional.phase == ncos::core::contracts::InteractionPhase::kIdle &&
+         !snapshot.interactional.session_active;
+}
+
 }  // namespace
 
 namespace ncos::services::behavior {
@@ -61,6 +67,9 @@ bool BehaviorService::tick(const ncos::core::contracts::CompanionSnapshot& snaps
   }
 
   if (!proposal.valid) {
+    if (should_return_to_idle(snapshot)) {
+      state_.active_profile = ncos::core::contracts::BehaviorProfile::kIdleObserve;
+    }
     return false;
   }
 
@@ -173,6 +182,3 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
 }
 
 }  // namespace ncos::services::behavior
-
-
-

@@ -87,7 +87,14 @@ void test_perception_emits_idle_transition_when_touch_releases() {
   touch_idle.last_read_ok = true;
   touch_idle.normalized_level = 0;
 
-  TEST_ASSERT_TRUE(service.tick(audio, touch_idle, camera, companion, 2640, &attention, &interaction));
+  TEST_ASSERT_TRUE(service.tick(audio, touch_idle, camera, companion, 2580, &attention, &interaction));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
+                        static_cast<int>(attention.channel));
+  TEST_ASSERT_TRUE(attention.lock_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kActing),
+                        static_cast<int>(interaction.phase));
+
+  TEST_ASSERT_TRUE(service.tick(audio, touch_idle, camera, companion, 2800, &attention, &interaction));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::PerceptionStage::Dormant),
                         static_cast<int>(service.state().stage));
   TEST_ASSERT_FALSE(service.state().presence_active);

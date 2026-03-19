@@ -30,6 +30,7 @@ struct PerceptionRuntimeState {
   uint64_t last_update_ms = 0;
   uint64_t last_presence_ms = 0;
   uint64_t last_attention_ms = 0;
+  uint64_t touch_release_hold_until_ms = 0;
   uint32_t updates_total = 0;
 };
 
