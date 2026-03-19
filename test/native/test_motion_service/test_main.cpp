@@ -320,6 +320,28 @@ void test_motion_service_responding_state_uses_stronger_attend_pose() {
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
   TEST_ASSERT_EQUAL_INT16(70, service.state().last_pose.pitch_permille);
 }
+
+void test_motion_service_sleep_state_does_not_override_active_face_follow() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(11800));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kSleep;
+  service.update_companion_signal(companion, 11900);
+
+  ncos::core::contracts::MotionFaceSignal face{};
+  face.gaze_x_percent = 30;
+  face.gaze_y_percent = 0;
+  service.update_face_signal(face, 11950);
+
+  service.tick(12100);
+
+  TEST_ASSERT_EQUAL_INT16(140, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
+}
 void test_motion_service_updates_companion_and_face_signals() {
   FakeMotionPort fake{};
 
@@ -367,6 +389,7 @@ int main() {
   RUN_TEST(test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neutral);
   RUN_TEST(test_motion_service_sleep_state_drives_power_save_pose);
   RUN_TEST(test_motion_service_responding_state_uses_stronger_attend_pose);
+  RUN_TEST(test_motion_service_sleep_state_does_not_override_active_face_follow);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }

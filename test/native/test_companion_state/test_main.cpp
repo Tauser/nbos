@@ -385,6 +385,105 @@ void test_companion_state_keeps_responding_during_hold_and_then_recovers() {
                         static_cast<int>(snap.runtime.last_transition_cause));
 }
 
+void test_companion_state_wakes_from_sleep_on_user_trigger_and_returns_to_idle() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 13250));
+
+  auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kSleep),
+                        static_cast<int>(snap.runtime.product_state));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  attentional.focus_confidence_percent = 72;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 13320));
+
+  snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAttendUser),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionStateTransitionCause::kUserTrigger),
+                        static_cast<int>(snap.runtime.last_transition_cause));
+
+  attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 0;
+  attentional.lock_active = false;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 14000));
+
+  TEST_ASSERT_TRUE(store.ingest_runtime(runtime,
+                                        ncos::core::contracts::CompanionStateWriter::kRuntimeCore,
+                                        14750));
+  snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionStateTransitionCause::kUserRelease),
+                        static_cast<int>(snap.runtime.last_transition_cause));
+  TEST_ASSERT_EQUAL_UINT32(4, snap.runtime.state_transition_total);
+}
+
+void test_companion_state_energy_protect_preempts_active_state_and_returns_to_idle() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  interaction.session_active = true;
+  interaction.response_pending = true;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 1200));
+
+  ncos::core::contracts::CompanionEnergeticSignal energetic{};
+  energetic.mode = ncos::core::contracts::EnergyMode::kCritical;
+  energetic.battery_percent = 10;
+  energetic.external_power = false;
+  TEST_ASSERT_TRUE(store.ingest_energetic(
+      energetic, ncos::core::contracts::CompanionStateWriter::kPowerService, 1250));
+
+  auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kEnergyProtect),
+                        static_cast<int>(snap.runtime.product_state));
+
+  interaction.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kNone;
+  interaction.session_active = false;
+  interaction.response_pending = false;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 1300));
+
+  energetic.mode = ncos::core::contracts::EnergyMode::kNominal;
+  energetic.battery_percent = 64;
+  energetic.external_power = true;
+  TEST_ASSERT_TRUE(store.ingest_energetic(
+      energetic, ncos::core::contracts::CompanionStateWriter::kPowerService, 1700));
+
+  snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionStateTransitionCause::kRecoveryToIdle),
+                        static_cast<int>(snap.runtime.last_transition_cause));
+}
+
 void test_companion_state_redacts_by_reader_profile() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -428,6 +527,8 @@ int main() {
   RUN_TEST(test_companion_state_decays_to_sleep_after_stable_idle);
   RUN_TEST(test_companion_state_keeps_attend_user_during_hold_and_then_recovers);
   RUN_TEST(test_companion_state_keeps_responding_during_hold_and_then_recovers);
+  RUN_TEST(test_companion_state_wakes_from_sleep_on_user_trigger_and_returns_to_idle);
+  RUN_TEST(test_companion_state_energy_protect_preempts_active_state_and_returns_to_idle);
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }
