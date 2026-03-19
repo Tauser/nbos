@@ -93,7 +93,7 @@ void test_face_multimodal_sync_generates_full_blink_window_for_engaged_character
   ncos::services::face::FaceMultimodalSyncResult result{};
   TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 20, &result));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kClosing), static_cast<int>(result.target_blink_phase));
-  TEST_ASSERT_LESS_THAN_UINT8(60, result.target_lid_open_percent);
+  TEST_ASSERT_LESS_THAN_UINT8(40, result.target_lid_open_percent);
 
   TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 80, &result));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kClosed), static_cast<int>(result.target_blink_phase));
@@ -101,7 +101,7 @@ void test_face_multimodal_sync_generates_full_blink_window_for_engaged_character
 
   TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 150, &result));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kOpening), static_cast<int>(result.target_blink_phase));
-  TEST_ASSERT_GREATER_THAN_UINT8(50, result.target_lid_open_percent);
+  TEST_ASSERT_GREATER_THAN_UINT8(25, result.target_lid_open_percent);`r`n  TEST_ASSERT_LESS_THAN_UINT8(55, result.target_lid_open_percent);
 }
 
 void test_face_tooling_exports_preview_json_snapshot() {
@@ -154,3 +154,4 @@ int main() {
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);
   return UNITY_END();
 }
+

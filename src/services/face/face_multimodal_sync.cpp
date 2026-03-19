@@ -23,25 +23,25 @@ BlinkPattern resolve_blink_pattern(const ncos::core::contracts::FaceMultimodalIn
 
   if (engagement >= 55U && cycle < 60U) {
     return {ncos::models::face::BlinkPhase::kClosing,
-            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) / 3U)};
+            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) / 5U)};
   }
   if (engagement >= 55U && cycle < 115U) {
     return {ncos::models::face::BlinkPhase::kClosed, 0};
   }
   if (engagement >= 55U && cycle < 185U) {
     return {ncos::models::face::BlinkPhase::kOpening,
-            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 3U / 4U)};
+            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 9U / 20U)};
   }
 
   const uint32_t micro_period_ms = 1400U + input.audio_energy_percent * 5U;
   const uint32_t micro_cycle = micro_period_ms == 0 ? 0 : static_cast<uint32_t>((now_ms + engagement * 17U) % micro_period_ms);
   if (micro_cycle < 35U) {
     return {ncos::models::face::BlinkPhase::kClosing,
-            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 3U / 5U)};
+            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 2U / 5U)};
   }
   if (micro_cycle < 70U) {
     return {ncos::models::face::BlinkPhase::kOpening,
-            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 4U / 5U)};
+            clamp_percent_sync(static_cast<uint32_t>(baseline_open_percent) * 3U / 5U)};
   }
 
   return {ncos::models::face::BlinkPhase::kOpen, baseline_open_percent};
@@ -114,3 +114,4 @@ bool FaceMultimodalSync::apply(const ncos::core::contracts::FaceMultimodalInput&
 }
 
 }  // namespace ncos::services::face
+
