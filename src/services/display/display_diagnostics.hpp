@@ -23,11 +23,14 @@ class DisplayDiagnosticsRunner final {
   void render_static_primaries();
   void render_static_clip_grid();
   void render_horizontal_sweep(uint64_t now_ms);
-  void render_eye_trail(uint64_t now_ms, ncos::services::display::DisplayRenderMode render_mode);
+  void render_eye_trail(uint64_t now_ms,
+                        ncos::services::display::DisplayRenderMode render_mode,
+                        ncos::services::face::OcularUpdatePattern ocular_pattern);
   void render_sprite_window_trail(uint64_t now_ms);
   void render_panel_polarity_flip(uint64_t now_ms);
 
   ncos::services::face::FaceFrame make_eye_trail_frame(uint64_t now_ms) const;
+  uint32_t current_experiment_spi_hz(uint64_t now_ms) const;
 
   ncos::drivers::display::DisplayDriver* display_ = nullptr;
   ncos::services::face::FaceDisplayRenderer* renderer_ = nullptr;

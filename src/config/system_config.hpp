@@ -14,6 +14,8 @@ enum class DisplayDiagnosticsMode : uint8_t {
   kHorizontalSweepFullRedraw,
   kEyeTrailFullRedraw,
   kEyeTrailDirtyRect,
+  kEyeTrailBandComposite,
+  kEyeTrailBandRedraw,
   kSpriteWindowTrail,
   kPanelPolarityFlip,
   kFaceVisualDebug,
@@ -149,4 +151,6 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+
+
 

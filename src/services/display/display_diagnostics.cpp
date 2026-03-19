@@ -16,6 +16,8 @@ constexpr uint16_t DebugHotColor = 0xF800;
 constexpr uint16_t DebugCoolColor = 0x07E0;
 constexpr uint16_t DebugFallbackColor = 0xFFE0;
 constexpr int16_t SweepWidth = 24;
+constexpr uint32_t ExperimentSpiWriteHz[] = {40000000u, 27000000u, 20000000u};
+constexpr uint32_t SpiStepWindowMs = 3200u;
 
 uint16_t bar_color_for_ratio(uint32_t value, uint32_t budget) {
   if (budget == 0) {
@@ -90,6 +92,10 @@ ncos::config::DisplayDiagnosticsMode DisplayDiagnosticsRunner::mode() const {
   return mode_;
 }
 
+uint32_t DisplayDiagnosticsRunner::current_experiment_spi_hz(uint64_t now_ms) const {
+  return ExperimentSpiWriteHz[(now_ms / SpiStepWindowMs) % (sizeof(ExperimentSpiWriteHz) / sizeof(ExperimentSpiWriteHz[0]))];
+}
+
 void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
   if (display_ == nullptr || renderer_ == nullptr || mode_ == ncos::config::DisplayDiagnosticsMode::kOff) {
     return;
@@ -106,10 +112,20 @@ void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
       render_horizontal_sweep(now_ms);
       break;
     case ncos::config::DisplayDiagnosticsMode::kEyeTrailFullRedraw:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceFullRedraw);
+      render_eye_trail(now_ms, DisplayRenderMode::kForceFullRedraw,
+                       ncos::services::face::OcularUpdatePattern::kDirtyPerEye);
       break;
     case ncos::config::DisplayDiagnosticsMode::kEyeTrailDirtyRect:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect);
+      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
+                       ncos::services::face::OcularUpdatePattern::kDirtyPerEye);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kEyeTrailBandComposite:
+      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
+                       ncos::services::face::OcularUpdatePattern::kFixedBandComposite);
+      break;
+    case ncos::config::DisplayDiagnosticsMode::kEyeTrailBandRedraw:
+      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
+                       ncos::services::face::OcularUpdatePattern::kFixedBandRedraw);
       break;
     case ncos::config::DisplayDiagnosticsMode::kSpriteWindowTrail:
       render_sprite_window_trail(now_ms);
@@ -267,7 +283,8 @@ ncos::services::face::FaceFrame DisplayDiagnosticsRunner::make_eye_trail_frame(u
 }
 
 void DisplayDiagnosticsRunner::render_eye_trail(uint64_t now_ms,
-                                                ncos::services::display::DisplayRenderMode render_mode) {
+                                                ncos::services::display::DisplayRenderMode render_mode,
+                                                ncos::services::face::OcularUpdatePattern ocular_pattern) {
   const uint16_t period_ms = render_mode == DisplayRenderMode::kForceFullRedraw
                                  ? full_redraw_period_ms(display_)
                                  : partial_redraw_period_ms(display_);
@@ -276,7 +293,9 @@ void DisplayDiagnosticsRunner::render_eye_trail(uint64_t now_ms,
   }
 
   last_step_ms_ = now_ms;
+  display_->set_write_clock_hz(current_experiment_spi_hz(now_ms));
   renderer_->set_render_mode(render_mode);
+  renderer_->set_ocular_update_pattern(ocular_pattern);
   (void)renderer_->render(make_eye_trail_frame(now_ms));
 }
 

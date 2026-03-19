@@ -57,4 +57,12 @@ const DisplayPanelCapabilityProfile& DisplayDriver::capability_profile() const {
   return active_panel_capability_profile();
 }
 
+void DisplayDriver::set_write_clock_hz(uint32_t hz) {
+  bus_.setClock(hz);
+}
+
+uint32_t DisplayDriver::write_clock_hz() const {
+  return bus_.getClock();
+}
+
 }  // namespace ncos::drivers::display
