@@ -130,8 +130,10 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
 
   signal.attention_lock = snapshot.attentional.lock_active ||
                           snapshot.attentional.focus_confidence_percent >= 70 ||
-                          behavior_attention_lock;
+                          behavior_attention_lock ||
+                          snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding;
   signal.emotional_arousal_percent = map_arousal_percent(snapshot, behavior_state, now_ms);
+  signal.product_state = snapshot.runtime.product_state;
   return signal;
 }
 }  // namespace

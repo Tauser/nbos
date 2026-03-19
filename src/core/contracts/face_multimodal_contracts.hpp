@@ -15,6 +15,7 @@ struct FaceMultimodalInput {
   bool imu_ready = false;
   bool motion_active = false;
   bool behavior_active = false;
+  CompanionProductState companion_product_state = CompanionProductState::kBooting;
 
   uint8_t audio_energy_percent = 0;
   uint8_t touch_intensity_percent = 0;

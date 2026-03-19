@@ -16,6 +16,10 @@ constexpr int16_t kMaxStepPitchPermille = 120;
 constexpr uint32_t kMaxHoldMs = 900;
 constexpr int16_t kAttentionPitchPermille = 55;
 constexpr uint32_t kAttentionHoldMs = 220;
+constexpr int16_t kAlertPitchPermille = 32;
+constexpr int16_t kRespondingPitchPermille = 70;
+constexpr int16_t kSleepPitchPermille = -40;
+constexpr uint32_t kSleepHoldMs = 320;
 
 int16_t abs_i16(int16_t v) {
   return v < 0 ? static_cast<int16_t>(-v) : v;
@@ -167,16 +171,40 @@ void MotionService::tick(uint64_t now_ms) {
 
   const bool gaze_has_shift = abs_i16(state_.face_signal.gaze_x_percent) >= 12 ||
                               abs_i16(state_.face_signal.gaze_y_percent) >= 10;
+  const bool active_face_expression = gaze_has_shift || state_.face_signal.clip_active;
+  const auto product_state = state_.companion_signal.product_state;
+  const bool restful_state = product_state == ncos::core::contracts::CompanionProductState::kSleep ||
+                             product_state == ncos::core::contracts::CompanionProductState::kEnergyProtect;
+  const bool attentive_state = product_state == ncos::core::contracts::CompanionProductState::kAttendUser ||
+                               product_state == ncos::core::contracts::CompanionProductState::kResponding;
+  const bool alert_state = product_state == ncos::core::contracts::CompanionProductState::kAlertScan;
   const bool attentive_hold_requested =
-      state_.companion_signal.attention_lock && !gaze_has_shift && !state_.face_signal.clip_active;
+      !active_face_expression && (state_.companion_signal.attention_lock || attentive_state || alert_state);
+
+  if (!active_face_expression && restful_state) {
+    ncos::core::contracts::MotionCommand rest{};
+    rest.intent = ncos::core::contracts::MotionIntent::kPowerSave;
+    rest.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
+    rest.priority = ncos::core::contracts::MotionPriority::kLow;
+    rest.pose = ncos::core::contracts::make_neutral_pose();
+    rest.pose.pitch_permille = kSleepPitchPermille;
+    rest.pose.speed_percent = static_cast<uint16_t>(18 + state_.companion_signal.emotional_arousal_percent / 10);
+    rest.hold_ms = kSleepHoldMs;
+    (void)request_motion(rest, now_ms);
+    next_embodiment_ms_ = now_ms + kSleepHoldMs;
+    return;
+  }
 
   if (attentive_hold_requested) {
     ncos::core::contracts::MotionCommand attend{};
-    attend.intent = ncos::core::contracts::MotionIntent::kAttendUser;
+    attend.intent = alert_state ? ncos::core::contracts::MotionIntent::kObserveStimulus
+                                : ncos::core::contracts::MotionIntent::kAttendUser;
     attend.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
     attend.priority = ncos::core::contracts::MotionPriority::kLow;
     attend.pose = ncos::core::contracts::make_neutral_pose();
-    attend.pose.pitch_permille = kAttentionPitchPermille;
+    attend.pose.pitch_permille = product_state == ncos::core::contracts::CompanionProductState::kResponding
+                                     ? kRespondingPitchPermille
+                                     : (alert_state ? kAlertPitchPermille : kAttentionPitchPermille);
     attend.pose.speed_percent = static_cast<uint16_t>(30 + state_.companion_signal.emotional_arousal_percent / 5);
     attend.hold_ms = kAttentionHoldMs;
     (void)request_motion(attend, now_ms);
@@ -184,7 +212,7 @@ void MotionService::tick(uint64_t now_ms) {
     return;
   }
 
-  if (!gaze_has_shift && !state_.face_signal.clip_active) {
+  if (!active_face_expression) {
     if ((state_.last_pose.yaw_permille != 0 || state_.last_pose.pitch_permille != 0) &&
         !state_.companion_signal.attention_lock) {
       (void)enforce_neutral_guard(now_ms, false);

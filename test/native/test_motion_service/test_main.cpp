@@ -264,6 +264,7 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
   ncos::core::contracts::MotionCompanionSignal companion{};
   companion.attention_lock = true;
   companion.emotional_arousal_percent = 60;
+  companion.product_state = ncos::core::contracts::CompanionProductState::kAttendUser;
   service.update_companion_signal(companion, 9600);
 
   service.tick(9800);
@@ -273,6 +274,7 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
   TEST_ASSERT_EQUAL_INT16(55, service.state().last_pose.pitch_permille);
 
   companion.attention_lock = false;
+  companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
   service.update_companion_signal(companion, 10000);
   service.tick(10200);
 
@@ -281,6 +283,43 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
 }
 
+void test_motion_service_sleep_state_drives_power_save_pose() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(10400));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kSleep;
+  companion.emotional_arousal_percent = 20;
+  service.update_companion_signal(companion, 10500);
+
+  service.tick(10700);
+
+  TEST_ASSERT_FALSE(service.state().neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(-40, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_LESS_THAN_UINT16(25, service.state().last_pose.speed_percent);
+}
+
+void test_motion_service_responding_state_uses_stronger_attend_pose() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(11200));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kResponding;
+  companion.emotional_arousal_percent = 60;
+  service.update_companion_signal(companion, 11300);
+
+  service.tick(11500);
+
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(70, service.state().last_pose.pitch_permille);
+}
 void test_motion_service_updates_companion_and_face_signals() {
   FakeMotionPort fake{};
 
@@ -292,6 +331,7 @@ void test_motion_service_updates_companion_and_face_signals() {
   companion.safe_mode = true;
   companion.attention_lock = true;
   companion.emotional_arousal_percent = 78;
+  companion.product_state = ncos::core::contracts::CompanionProductState::kAlertScan;
   service.update_companion_signal(companion, 9100);
 
   ncos::core::contracts::MotionFaceSignal face{};
@@ -304,6 +344,8 @@ void test_motion_service_updates_companion_and_face_signals() {
   TEST_ASSERT_TRUE(state.companion_signal.safe_mode);
   TEST_ASSERT_TRUE(state.companion_signal.attention_lock);
   TEST_ASSERT_EQUAL_UINT8(78, state.companion_signal.emotional_arousal_percent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAlertScan),
+                        static_cast<int>(state.companion_signal.product_state));
   TEST_ASSERT_EQUAL_INT8(40, state.face_signal.gaze_x_percent);
   TEST_ASSERT_EQUAL_INT8(-10, state.face_signal.gaze_y_percent);
   TEST_ASSERT_TRUE(state.face_signal.clip_active);
@@ -323,6 +365,8 @@ int main() {
   RUN_TEST(test_motion_service_stale_face_signal_guard_returns_to_neutral);
   RUN_TEST(test_motion_service_fail_safe_guard_blocks_non_recovery_until_neutral);
   RUN_TEST(test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neutral);
+  RUN_TEST(test_motion_service_sleep_state_drives_power_save_pose);
+  RUN_TEST(test_motion_service_responding_state_uses_stronger_attend_pose);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }

@@ -6,6 +6,8 @@
 
 namespace {
 
+using ncos::core::contracts::CompanionProductState;
+
 bool is_diagonal_direction(ncos::models::face::GazeDirection direction) {
   using ncos::models::face::GazeDirection;
   return direction == GazeDirection::kUpLeft || direction == GazeDirection::kUpRight ||
@@ -31,8 +33,33 @@ constexpr ncos::models::face::FaceClip SignatureClip = {
     280,
 };
 
+struct FaceAutonomyGazeProfile {
+  ncos::models::face::GazeDirection direction = ncos::models::face::GazeDirection::kCenter;
+  uint8_t focus_percent = 48;
+  uint8_t salience_percent = 30;
+  uint16_t hold_ms = 420;
+  uint16_t cadence_ms = 700;
+  bool alternate_lateral = false;
+};
+
 ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
     const ncos::core::contracts::FaceMultimodalInput& input) {
+  switch (input.companion_product_state) {
+    case CompanionProductState::kResponding:
+      return ncos::services::face::FaceOfficialPresetId::kCoreLock;
+    case CompanionProductState::kAttendUser:
+      return ncos::services::face::FaceOfficialPresetId::kCoreAttend;
+    case CompanionProductState::kAlertScan:
+      return ncos::services::face::FaceOfficialPresetId::kCoreCurious;
+    case CompanionProductState::kSleep:
+    case CompanionProductState::kEnergyProtect:
+      return ncos::services::face::FaceOfficialPresetId::kCoreCalm;
+    case CompanionProductState::kBooting:
+    case CompanionProductState::kIdleObserve:
+    default:
+      break;
+  }
+
   if (input.behavior_activation_percent >= 75 || input.emotional_arousal_percent >= 80) {
     return ncos::services::face::FaceOfficialPresetId::kCoreLock;
   }
@@ -53,7 +80,87 @@ ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
 }
 
 bool is_attending_user_input(const ncos::core::contracts::FaceMultimodalInput& input) {
-  return input.touch_active || input.behavior_active || input.social_engagement_percent >= 70;
+  if (input.companion_product_state == CompanionProductState::kSleep ||
+      input.companion_product_state == CompanionProductState::kEnergyProtect) {
+    return false;
+  }
+
+  return input.touch_active || input.behavior_active || input.social_engagement_percent >= 70 ||
+         input.companion_product_state == CompanionProductState::kAttendUser ||
+         input.companion_product_state == CompanionProductState::kResponding;
+}
+
+bool should_run_idle_signature_clip(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return input.companion_product_state == CompanionProductState::kIdleObserve;
+}
+
+FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts::FaceMultimodalInput& input,
+                                                     bool gaze_left) {
+  FaceAutonomyGazeProfile profile{};
+  profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
+                                : ncos::models::face::GazeDirection::kRight;
+  profile.focus_percent = 48;
+  profile.salience_percent = 30;
+  profile.hold_ms = 420;
+  profile.cadence_ms = 700;
+  profile.alternate_lateral = true;
+
+  switch (input.companion_product_state) {
+    case CompanionProductState::kResponding:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = 68;
+      profile.salience_percent = 62;
+      profile.hold_ms = 560;
+      profile.cadence_ms = 420;
+      profile.alternate_lateral = false;
+      break;
+    case CompanionProductState::kAttendUser:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = 62;
+      profile.salience_percent = 54;
+      profile.hold_ms = 520;
+      profile.cadence_ms = 420;
+      profile.alternate_lateral = false;
+      break;
+    case CompanionProductState::kAlertScan:
+      profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
+                                    : ncos::models::face::GazeDirection::kRight;
+      profile.focus_percent = 56;
+      profile.salience_percent = 44;
+      profile.hold_ms = 420;
+      profile.cadence_ms = 480;
+      profile.alternate_lateral = true;
+      break;
+    case CompanionProductState::kSleep:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = 24;
+      profile.salience_percent = 16;
+      profile.hold_ms = 900;
+      profile.cadence_ms = 980;
+      profile.alternate_lateral = false;
+      break;
+    case CompanionProductState::kEnergyProtect:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = 30;
+      profile.salience_percent = 20;
+      profile.hold_ms = 820;
+      profile.cadence_ms = 880;
+      profile.alternate_lateral = false;
+      break;
+    case CompanionProductState::kBooting:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = 36;
+      profile.salience_percent = 24;
+      profile.hold_ms = 700;
+      profile.cadence_ms = 760;
+      profile.alternate_lateral = false;
+      break;
+    case CompanionProductState::kIdleObserve:
+    default:
+      break;
+  }
+
+  return profile;
 }
 
 ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
@@ -101,6 +208,7 @@ ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
 }  // namespace
 
 namespace ncos::services::face {
+
 
 void FaceGraphicsPipeline::schedule_next_render(uint64_t now_ms) {
   if (next_render_ms_ == 0) {
@@ -229,7 +337,8 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     }
   }
 
-  if (!fallback_status_.active && !clip_player_.active() && !attending_user && now_ms >= next_clip_start_ms_) {
+  if (!fallback_status_.active && !clip_player_.active() && should_run_idle_signature_clip(multimodal) &&
+      !attending_user && now_ms >= next_clip_start_ms_) {
     (void)clip_player_.play(SignatureClip, &compositor_, &state_, now_ms);
     next_clip_start_ms_ = now_ms + 6200;
   }
@@ -248,29 +357,25 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
       gaze_request.priority = 5;
 
       if (compositor_.request_layer(gaze_request, now_ms).granted) {
+        const FaceAutonomyGazeProfile profile = select_autonomy_gaze_profile(multimodal, gaze_left_);
+
         ncos::models::face::FaceGazeTarget target{};
         target.anchor = ncos::models::face::GazeAnchor::kUser;
-        if (attending_user) {
-          target.direction = ncos::models::face::GazeDirection::kCenter;
-          target.focus_percent = 62;
-          target.salience_percent = 54;
-          target.hold_ms = 520;
-        } else {
-          target.direction = gaze_left_ ? ncos::models::face::GazeDirection::kLeft
-                                        : ncos::models::face::GazeDirection::kRight;
-          target.focus_percent = 48;
-          target.salience_percent = 30;
-          target.hold_ms = 420;
-        }
+        target.direction = profile.direction;
+        target.focus_percent = profile.focus_percent;
+        target.salience_percent = profile.salience_percent;
+        target.hold_ms = profile.hold_ms;
         target.origin = ncos::models::face::FaceGazeTargetOrigin::kSystem;
 
         (void)gaze_controller_.set_target(target, now_ms);
-        if (!attending_user) {
+        if (profile.alternate_lateral) {
           gaze_left_ = !gaze_left_;
         }
-      }
 
-      next_gaze_target_ms_ = now_ms + (attending_user ? 420 : 700);
+        next_gaze_target_ms_ = now_ms + profile.cadence_ms;
+      } else {
+        next_gaze_target_ms_ = now_ms + (attending_user ? 420 : 700);
+      }
     }
 
     (void)gaze_controller_.tick(now_ms, &state_);

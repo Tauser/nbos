@@ -39,6 +39,7 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   imu.gz_dps = 40;
 
   ncos::core::contracts::CompanionSnapshot companion{};
+  companion.runtime.product_state = ncos::core::contracts::CompanionProductState::kAttendUser;
   ncos::core::contracts::BehaviorRuntimeState behavior{};
 
   const auto input =
@@ -52,6 +53,8 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   TEST_ASSERT_GREATER_THAN_UINT8(0, input.touch_intensity_percent);
   TEST_ASSERT_GREATER_THAN_UINT8(0, input.motion_intensity_percent);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT8(70, input.social_engagement_percent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAttendUser),
+                        static_cast<int>(input.companion_product_state));
   TEST_ASSERT_EQUAL_UINT64(1234, input.observed_at_ms);
 }
 
@@ -66,13 +69,18 @@ void test_face_multimodal_input_ignores_touch_readiness_without_active_trigger()
 
   ncos::core::contracts::ImuRuntimeState imu{};
   ncos::core::contracts::CompanionSnapshot companion{};
+  companion.runtime.product_state = ncos::core::contracts::CompanionProductState::kAttendUser;
   ncos::core::contracts::BehaviorRuntimeState behavior{};
+
+  companion.runtime.product_state = ncos::core::contracts::CompanionProductState::kSleep;
 
   const auto input =
       ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 1400);
 
   TEST_ASSERT_FALSE(input.touch_active);
   TEST_ASSERT_EQUAL_UINT8(45, input.social_engagement_percent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kSleep),
+                        static_cast<int>(input.companion_product_state));
 }
 
 void test_face_multimodal_sync_applies_modulation_under_ownership() {

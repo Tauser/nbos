@@ -75,6 +75,7 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
   input.touch_intensity_percent = touch_intensity_percent(touch);
   input.motion_intensity_percent = motion_intensity_percent(imu);
   input.motion_active = input.motion_intensity_percent >= 15;
+  input.companion_product_state = companion.runtime.product_state;
 
   input.emotional_arousal_percent = companion.emotional.vector.arousal_percent;
   input.social_engagement_percent = companion.emotional.vector.social_engagement_percent;

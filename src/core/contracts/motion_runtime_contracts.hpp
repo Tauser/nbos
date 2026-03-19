@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "core/contracts/companion_state_contracts.hpp"
+
 namespace ncos::core::contracts {
 
 enum class MotionIntent : uint8_t {
@@ -64,6 +66,7 @@ struct MotionCompanionSignal {
   bool safe_mode = false;
   bool attention_lock = false;
   uint8_t emotional_arousal_percent = 0;
+  CompanionProductState product_state = CompanionProductState::kBooting;
 };
 
 struct MotionFaceSignal {
