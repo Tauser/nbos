@@ -83,11 +83,31 @@ void test_face_geometry_scales_gaze_displacement_with_focus_percent() {
   TEST_ASSERT_TRUE(high_layout.gaze_dy < low_layout.gaze_dy);
 }
 
+void test_face_geometry_keeps_diagonal_displacement_under_lateral_envelope() {
+  auto lateral_state = ncos::core::contracts::make_face_render_state_baseline();
+  lateral_state.eyes.direction = ncos::models::face::GazeDirection::kRight;
+  lateral_state.eyes.focus_percent = 100;
+
+  auto diagonal_state = lateral_state;
+  diagonal_state.eyes.direction = ncos::models::face::GazeDirection::kUpRight;
+
+  ncos::services::face::FaceGeometryLayout lateral_layout{};
+  ncos::services::face::FaceGeometryLayout diagonal_layout{};
+
+  TEST_ASSERT_TRUE(ncos::services::face::make_face_geometry_layout(lateral_state, &lateral_layout));
+  TEST_ASSERT_TRUE(ncos::services::face::make_face_geometry_layout(diagonal_state, &diagonal_layout));
+
+  TEST_ASSERT_TRUE(diagonal_layout.gaze_dx < lateral_layout.gaze_dx);
+  TEST_ASSERT_TRUE(diagonal_layout.gaze_dy < 0);
+  TEST_ASSERT_TRUE(-diagonal_layout.gaze_dy < lateral_layout.gaze_dx);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_geometry_profiles_are_semantic_and_valid);
   RUN_TEST(test_face_geometry_keeps_incremental_compatibility_with_render_state);
   RUN_TEST(test_face_geometry_changes_silhouette_without_renderer_semantics);
   RUN_TEST(test_face_geometry_scales_gaze_displacement_with_focus_percent);
+  RUN_TEST(test_face_geometry_keeps_diagonal_displacement_under_lateral_envelope);
   return UNITY_END();
 }

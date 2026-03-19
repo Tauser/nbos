@@ -22,9 +22,9 @@ int16_t gaze_scale_percent(uint8_t focus_percent) {
     return static_cast<int16_t>(focus * 2);
   }
   if (focus <= 50) {
-    return static_cast<int16_t>(40 + (static_cast<int32_t>(focus - 20) * 50) / 30);
+    return static_cast<int16_t>(40 + (static_cast<int32_t>(focus - 20) * 44) / 30);
   }
-  return static_cast<int16_t>(90 + (static_cast<int32_t>(focus - 50) * 10) / 50);
+  return static_cast<int16_t>(84 + (static_cast<int32_t>(focus - 50) * 8) / 50);
 }
 
 int16_t scale_component(int16_t base, uint8_t focus_percent, bool diagonal) {
@@ -34,7 +34,7 @@ int16_t scale_component(int16_t base, uint8_t focus_percent, bool diagonal) {
 
   int32_t scale = gaze_scale_percent(focus_percent);
   if (diagonal) {
-    scale = (scale * 75) / 100;
+    scale = (scale * 70) / 100;
   }
 
   const int32_t magnitude = base < 0 ? -base : base;

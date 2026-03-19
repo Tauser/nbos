@@ -130,6 +130,8 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
 
   state_ = ncos::core::contracts::make_face_render_state_baseline();
   state_.safety_mode = ncos::core::contracts::FaceRenderSafetyMode::kNominal;
+  motion_safety_result_ = FaceMotionSafetyResult{};
+  reset_face_motion_safety_status(&motion_safety_status_, state_, now_ms);
   fallback_status_ = FaceVisualFallbackStatus{};
   tuning_ = FaceTuningTelemetry{};
   tuning_.frame_budget_us = ncos::config::kGlobalConfig.runtime.face_frame_budget_us;
@@ -273,6 +275,9 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   (void)multimodal_sync_.apply(multimodal, &compositor_, &state_, ModulationOwnerServiceId, now_ms);
   tuning_.stages.modulation_us = static_cast<uint32_t>(monotonic_time_us() - modulation_start_us);
 
+  motion_safety_result_ = FaceMotionSafetyResult{};
+  (void)apply_face_motion_safety(&state_, &motion_safety_status_, now_ms, &motion_safety_result_);
+
   FaceFrame frame{};
   const uint64_t compose_start_us = monotonic_time_us();
   const bool composed = composer_.compose(state_, &frame);
@@ -330,7 +335,9 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   if (fallback_status_.active) {
     apply_face_visual_fallback(&state_);
   } else {
-    state_.safety_mode = ncos::core::contracts::FaceRenderSafetyMode::kNominal;
+    state_.safety_mode = motion_safety_result_.active
+                             ? ncos::core::contracts::FaceRenderSafetyMode::kSafeFallback
+                             : ncos::core::contracts::FaceRenderSafetyMode::kNominal;
   }
 
   tuning_.safe_visual_mode = fallback_status_.active;
@@ -364,3 +371,5 @@ FaceRenderStats FaceGraphicsPipeline::render_stats() const {
 }
 
 }  // namespace ncos::services::face
+
+

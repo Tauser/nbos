@@ -14,6 +14,7 @@
 #include "services/face/face_frame_composer.hpp"
 #include "services/face/face_gaze_controller.hpp"
 #include "services/face/face_multimodal_sync.hpp"
+#include "services/face/face_motion_safety.hpp"
 #include "services/face/face_preset_library.hpp"
 #include "services/face/face_tooling.hpp"
 #include "services/face/face_visual_fallback.hpp"
@@ -50,6 +51,8 @@ class FaceGraphicsPipeline final {
   FaceClipPlayer clip_player_{ClipOwnerServiceId};
   FaceGazeController gaze_controller_{GazeOwnerServiceId};
   FaceMultimodalSync multimodal_sync_{};
+  FaceMotionSafetyStatus motion_safety_status_{};
+  FaceMotionSafetyResult motion_safety_result_{};
   FacePreviewSnapshot preview_snapshot_{};
   FaceTuningTelemetry tuning_{};
   FaceVisualFallbackStatus fallback_status_{};
@@ -61,3 +64,5 @@ class FaceGraphicsPipeline final {
 };
 
 }  // namespace ncos::services::face
+
+
