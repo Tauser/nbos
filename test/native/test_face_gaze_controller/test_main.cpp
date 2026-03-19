@@ -42,12 +42,15 @@ void test_face_gaze_controller_runs_saccade_overshoot_settle_and_fixation() {
   TEST_ASSERT_TRUE(controller.set_target(target, 1000));
 
   TEST_ASSERT_TRUE(controller.tick(1020, &state));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kCenter),
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kRight),
                         static_cast<int>(state.eyes.direction));
+  TEST_ASSERT_TRUE(state.eyes.focus_percent > 0);
+  TEST_ASSERT_TRUE(state.eyes.focus_percent < target.focus_percent);
 
   TEST_ASSERT_TRUE(controller.tick(1065, &state));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kUpRight),
                         static_cast<int>(state.eyes.direction));
+  TEST_ASSERT_TRUE(state.eyes.focus_percent > target.focus_percent);
 
   TEST_ASSERT_TRUE(controller.tick(1110, &state));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kRight),
@@ -70,10 +73,10 @@ void test_face_gaze_controller_uses_longer_saccade_for_larger_transition() {
   short_target.hold_ms = 250;
 
   TEST_ASSERT_TRUE(controller.set_target(short_target, 1000));
-  TEST_ASSERT_TRUE(controller.tick(1070, &state));
-  const auto previous_direction = state.eyes.direction;
-  TEST_ASSERT_NOT_EQUAL(static_cast<int>(ncos::models::face::GazeDirection::kCenter),
-                        static_cast<int>(previous_direction));
+  TEST_ASSERT_TRUE(controller.tick(1040, &state));
+  const auto short_focus = state.eyes.focus_percent;
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kRight),
+                        static_cast<int>(state.eyes.direction));
 
   ncos::models::face::FaceGazeTarget long_target{};
   long_target.direction = ncos::models::face::GazeDirection::kUpLeft;
@@ -81,8 +84,33 @@ void test_face_gaze_controller_uses_longer_saccade_for_larger_transition() {
   long_target.hold_ms = 250;
 
   TEST_ASSERT_TRUE(controller.set_target(long_target, 2000));
-  TEST_ASSERT_TRUE(controller.tick(2070, &state));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(previous_direction), static_cast<int>(state.eyes.direction));
+  TEST_ASSERT_TRUE(controller.tick(2040, &state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kUpLeft),
+                        static_cast<int>(state.eyes.direction));
+  TEST_ASSERT_TRUE(state.eyes.focus_percent < short_focus);
+  TEST_ASSERT_TRUE(state.eyes.focus_percent < long_target.focus_percent);
+}
+
+void test_face_gaze_controller_skips_overshoot_for_diagonal_target() {
+  auto state = make_state_with_gaze_owner();
+  ncos::services::face::FaceGazeController controller{kOwnerService};
+
+  ncos::models::face::FaceGazeTarget target{};
+  target.direction = ncos::models::face::GazeDirection::kUpRight;
+  target.focus_percent = 64;
+  target.hold_ms = 250;
+
+  TEST_ASSERT_TRUE(controller.set_target(target, 1000));
+  TEST_ASSERT_TRUE(controller.tick(1065, &state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kUpRight),
+                        static_cast<int>(state.eyes.direction));
+  TEST_ASSERT_TRUE(state.eyes.focus_percent < target.focus_percent);
+
+  TEST_ASSERT_TRUE(controller.tick(1100, &state));
+  TEST_ASSERT_EQUAL_UINT8(target.focus_percent, state.eyes.focus_percent);
+  TEST_ASSERT_FALSE(controller.tick(1110, &state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::GazeDirection::kUpRight),
+                        static_cast<int>(state.eyes.direction));
 }
 
 void test_face_gaze_controller_refuses_write_without_gaze_ownership() {
@@ -128,6 +156,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_gaze_controller_runs_saccade_overshoot_settle_and_fixation);
   RUN_TEST(test_face_gaze_controller_uses_longer_saccade_for_larger_transition);
+  RUN_TEST(test_face_gaze_controller_skips_overshoot_for_diagonal_target);
   RUN_TEST(test_face_gaze_controller_refuses_write_without_gaze_ownership);
   RUN_TEST(test_face_gaze_controller_expires_target_after_fixation_window);
   RUN_TEST(test_face_gaze_controller_rejects_zero_hold_target);

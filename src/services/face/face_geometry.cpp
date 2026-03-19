@@ -2,6 +2,10 @@
 
 namespace {
 
+uint8_t clamp_percent(uint8_t value) {
+  return value > 100 ? 100 : value;
+}
+
 int16_t clamp_i16(int32_t value, int16_t min_v, int16_t max_v) {
   if (value < min_v) {
     return min_v;
@@ -12,31 +16,65 @@ int16_t clamp_i16(int32_t value, int16_t min_v, int16_t max_v) {
   return static_cast<int16_t>(value);
 }
 
-int16_t gaze_dx(ncos::models::face::GazeDirection direction) {
+int16_t gaze_scale_percent(uint8_t focus_percent) {
+  const uint8_t focus = clamp_percent(focus_percent);
+  if (focus <= 20) {
+    return static_cast<int16_t>(focus * 2);
+  }
+  if (focus <= 50) {
+    return static_cast<int16_t>(40 + (static_cast<int32_t>(focus - 20) * 50) / 30);
+  }
+  return static_cast<int16_t>(90 + (static_cast<int32_t>(focus - 50) * 10) / 50);
+}
+
+int16_t scale_component(int16_t base, uint8_t focus_percent, bool diagonal) {
+  if (base == 0) {
+    return 0;
+  }
+
+  int32_t scale = gaze_scale_percent(focus_percent);
+  if (diagonal) {
+    scale = (scale * 75) / 100;
+  }
+
+  const int32_t magnitude = base < 0 ? -base : base;
+  int32_t scaled = (magnitude * scale + 50) / 100;
+  if (scaled == 0) {
+    scaled = 1;
+  }
+
+  return static_cast<int16_t>(base < 0 ? -scaled : scaled);
+}
+
+int16_t gaze_dx(ncos::models::face::GazeDirection direction, uint8_t focus_percent) {
   switch (direction) {
     case ncos::models::face::GazeDirection::kLeft:
+      return scale_component(-8, focus_percent, false);
+    case ncos::models::face::GazeDirection::kRight:
+      return scale_component(8, focus_percent, false);
     case ncos::models::face::GazeDirection::kUpLeft:
     case ncos::models::face::GazeDirection::kDownLeft:
-      return -8;
-    case ncos::models::face::GazeDirection::kRight:
+      return scale_component(-8, focus_percent, true);
     case ncos::models::face::GazeDirection::kUpRight:
     case ncos::models::face::GazeDirection::kDownRight:
-      return 8;
+      return scale_component(8, focus_percent, true);
     default:
       return 0;
   }
 }
 
-int16_t gaze_dy(ncos::models::face::GazeDirection direction) {
+int16_t gaze_dy(ncos::models::face::GazeDirection direction, uint8_t focus_percent) {
   switch (direction) {
     case ncos::models::face::GazeDirection::kUp:
+      return scale_component(-5, focus_percent, false);
+    case ncos::models::face::GazeDirection::kDown:
+      return scale_component(5, focus_percent, false);
     case ncos::models::face::GazeDirection::kUpLeft:
     case ncos::models::face::GazeDirection::kUpRight:
-      return -5;
-    case ncos::models::face::GazeDirection::kDown:
+      return scale_component(-5, focus_percent, true);
     case ncos::models::face::GazeDirection::kDownLeft:
     case ncos::models::face::GazeDirection::kDownRight:
-      return 5;
+      return scale_component(5, focus_percent, true);
     default:
       return 0;
   }
@@ -75,13 +113,12 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
   layout.eye_radius = openness > 80 ? base_eye_radius : (openness > 40 ? base_eye_radius / 2 : 2);
 
   layout.eye_w = clamp_i16(66 + (static_cast<int32_t>(state.geometry.eye_size_percent) - 50) / 2, 50, 90);
-  const int16_t base_eye_h = layout.eye_w;  // Open-eye baseline must be square.
+  const int16_t base_eye_h = layout.eye_w;
   layout.eye_h = clamp_i16(base_eye_h * static_cast<int32_t>(openness) / 100, 2, base_eye_h);
 
-  layout.gaze_dx = gaze_dx(state.eyes.direction);
-  layout.gaze_dy = gaze_dy(state.eyes.direction);
+  layout.gaze_dx = gaze_dx(state.eyes.direction, state.eyes.focus_percent);
+  layout.gaze_dy = gaze_dy(state.eyes.direction, state.eyes.focus_percent);
 
-  // Base style requested: no mouth.
   layout.mouth_w = 0;
   layout.mouth_h = 0;
   layout.mouth_y = 0;
@@ -91,7 +128,3 @@ bool make_face_geometry_layout(const ncos::core::contracts::FaceRenderState& sta
 }
 
 }  // namespace ncos::services::face
-
-
-
-

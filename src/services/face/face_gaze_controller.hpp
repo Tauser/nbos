@@ -38,6 +38,7 @@ class FaceGazeController final {
   ncos::models::face::GazeDirection overshoot_direction_ = ncos::models::face::GazeDirection::kCenter;
 
   FaceGazeMotionPhase phase_ = FaceGazeMotionPhase::kIdle;
+  uint64_t saccade_start_ms_ = 0;
   uint64_t saccade_end_ms_ = 0;
   uint64_t overshoot_end_ms_ = 0;
   uint64_t settle_end_ms_ = 0;

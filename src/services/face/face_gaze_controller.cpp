@@ -11,6 +11,17 @@ uint8_t clamp_percent(uint8_t value) {
   return value > 100 ? 100 : value;
 }
 
+uint8_t lerp_u8(uint8_t from, uint8_t to, uint64_t elapsed, uint64_t duration) {
+  if (duration == 0 || elapsed >= duration) {
+    return to;
+  }
+
+  const int32_t delta = static_cast<int32_t>(to) - static_cast<int32_t>(from);
+  return clamp_percent(static_cast<uint8_t>(static_cast<int32_t>(from) +
+                                            static_cast<int32_t>((delta * static_cast<int64_t>(elapsed)) /
+                                                                 static_cast<int64_t>(duration))));
+}
+
 DirVec direction_to_vec(ncos::models::face::GazeDirection direction) {
   switch (direction) {
     case ncos::models::face::GazeDirection::kLeft:
@@ -34,32 +45,9 @@ DirVec direction_to_vec(ncos::models::face::GazeDirection direction) {
   }
 }
 
-ncos::models::face::GazeDirection vec_to_direction(const DirVec vec) {
-  if (vec.x == -1 && vec.y == 0) {
-    return ncos::models::face::GazeDirection::kLeft;
-  }
-  if (vec.x == 1 && vec.y == 0) {
-    return ncos::models::face::GazeDirection::kRight;
-  }
-  if (vec.x == 0 && vec.y == -1) {
-    return ncos::models::face::GazeDirection::kUp;
-  }
-  if (vec.x == 0 && vec.y == 1) {
-    return ncos::models::face::GazeDirection::kDown;
-  }
-  if (vec.x == -1 && vec.y == -1) {
-    return ncos::models::face::GazeDirection::kUpLeft;
-  }
-  if (vec.x == 1 && vec.y == -1) {
-    return ncos::models::face::GazeDirection::kUpRight;
-  }
-  if (vec.x == -1 && vec.y == 1) {
-    return ncos::models::face::GazeDirection::kDownLeft;
-  }
-  if (vec.x == 1 && vec.y == 1) {
-    return ncos::models::face::GazeDirection::kDownRight;
-  }
-  return ncos::models::face::GazeDirection::kCenter;
+bool is_diagonal(ncos::models::face::GazeDirection direction) {
+  const DirVec vec = direction_to_vec(direction);
+  return vec.x != 0 && vec.y != 0;
 }
 
 int transition_distance(ncos::models::face::GazeDirection from,
@@ -73,12 +61,12 @@ int transition_distance(ncos::models::face::GazeDirection from,
 
 uint16_t saccade_duration_ms(int distance) {
   if (distance <= 1) {
-    return 60;  // short saccade
+    return 60;
   }
   if (distance <= 2) {
-    return 90;  // medium saccade
+    return 90;
   }
-  return 120;  // larger movement supported at this stage
+  return 120;
 }
 
 ncos::models::face::GazeDirection overshoot_for_target(
@@ -103,6 +91,14 @@ ncos::models::face::GazeDirection overshoot_for_target(
     default:
       return ncos::models::face::GazeDirection::kCenter;
   }
+}
+
+uint8_t saccade_entry_focus(uint8_t target_focus_percent) {
+  return clamp_percent(static_cast<uint8_t>(target_focus_percent / 6 + 4));
+}
+
+uint8_t overshoot_focus(uint8_t target_focus_percent) {
+  return clamp_percent(static_cast<uint8_t>(target_focus_percent + 14));
 }
 
 }  // namespace
@@ -130,10 +126,12 @@ bool FaceGazeController::set_target(const ncos::models::face::FaceGazeTarget& ta
 
   const int distance = transition_distance(start_direction_, target_.direction);
   const uint16_t saccade_ms = saccade_duration_ms(distance);
+  const bool allow_overshoot = distance != 0 && !is_diagonal(target_.direction);
 
+  saccade_start_ms_ = now_ms;
   saccade_end_ms_ = now_ms + saccade_ms;
-  overshoot_end_ms_ = saccade_end_ms_ + (distance == 0 ? 0 : 45);
-  settle_end_ms_ = overshoot_end_ms_ + (distance == 0 ? 0 : 70);
+  overshoot_end_ms_ = saccade_end_ms_ + (allow_overshoot ? 45 : 0);
+  settle_end_ms_ = overshoot_end_ms_ + (allow_overshoot ? 70 : 0);
   fixation_end_ms_ = settle_end_ms_ + target_.hold_ms;
 
   phase_ = distance == 0 ? FaceGazeMotionPhase::kFixation : FaceGazeMotionPhase::kSaccade;
@@ -144,6 +142,7 @@ bool FaceGazeController::set_target(const ncos::models::face::FaceGazeTarget& ta
 void FaceGazeController::clear_target() {
   active_target_ = false;
   phase_ = FaceGazeMotionPhase::kIdle;
+  saccade_start_ms_ = 0;
   saccade_end_ms_ = 0;
   overshoot_end_ms_ = 0;
   settle_end_ms_ = 0;
@@ -179,16 +178,18 @@ bool FaceGazeController::tick(uint64_t now_ms, ncos::core::contracts::FaceRender
 
   if (now_ms < saccade_end_ms_) {
     phase_ = FaceGazeMotionPhase::kSaccade;
-    direction = start_direction_;
-    focus = clamp_percent(static_cast<uint8_t>(target_.focus_percent / 2 + 18));
+    direction = target_.direction;
+    focus = lerp_u8(saccade_entry_focus(target_.focus_percent), target_.focus_percent,
+                    now_ms - saccade_start_ms_, saccade_end_ms_ - saccade_start_ms_);
   } else if (now_ms < overshoot_end_ms_) {
     phase_ = FaceGazeMotionPhase::kOvershoot;
     direction = overshoot_direction_;
-    focus = clamp_percent(static_cast<uint8_t>(target_.focus_percent + 14));
+    focus = overshoot_focus(target_.focus_percent);
   } else if (now_ms < settle_end_ms_) {
     phase_ = FaceGazeMotionPhase::kSettle;
     direction = target_.direction;
-    focus = clamp_percent(static_cast<uint8_t>(target_.focus_percent + 6));
+    focus = lerp_u8(overshoot_focus(target_.focus_percent), target_.focus_percent,
+                    now_ms - overshoot_end_ms_, settle_end_ms_ - overshoot_end_ms_);
   } else {
     phase_ = FaceGazeMotionPhase::kFixation;
     direction = target_.direction;
