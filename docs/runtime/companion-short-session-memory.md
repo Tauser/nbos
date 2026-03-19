@@ -7,8 +7,11 @@ A memoria curta de sessao guarda continuidade contextual de curtissimo prazo sem
 ## O que entra
 
 - ancora de atencao recente (`anchor_target` e `anchor_channel`)
+- ultimo estimulo relevante (`recent_stimulus`) com alvo, canal, confianca e timestamp
 - tom emocional recente (`anchor_tone`)
 - estado marcante mais recente (`anchor_state`)
+- contexto imediato da interacao (`recent_interaction`) com fase, dono de turno e `response_pending`
+- engajamento recente (`engagement_recent_percent`) e seu ultimo timestamp
 - ultimo dono de turno (`last_turn_owner`)
 - contagem curta de gatilhos do usuario e respostas do companion
 - timestamps da abertura, ultima atividade e janela de retencao
@@ -30,3 +33,9 @@ A memoria curta de sessao guarda continuidade contextual de curtissimo prazo sem
 ## Leitores autorizados
 
 A memoria curta fica disponivel para runtime, behavior, face, motion, voz e diagnostico. Ela e redatada para superficies que nao precisam desse contexto, como bridge de nuvem.
+
+## Leitura de produto
+
+- `recent_stimulus` responde "o que chamou a atencao ha pouco"
+- `engagement_recent_percent` responde "quao engajado o companion esteve ha pouco"
+- `recent_interaction` responde "em que tipo de troca ele acabou de estar"

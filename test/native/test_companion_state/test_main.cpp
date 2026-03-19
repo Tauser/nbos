@@ -602,10 +602,100 @@ void test_companion_state_redacts_short_session_memory_for_cloud_reader() {
   const auto cloud_view = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
 
   TEST_ASSERT_TRUE(runtime_view.session.warm);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(runtime_view.session.recent_stimulus.target));
   TEST_ASSERT_FALSE(cloud_view.session.warm);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
                         static_cast<int>(cloud_view.session.anchor_target));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kNone),
+                        static_cast<int>(cloud_view.session.recent_stimulus.target));
+  TEST_ASSERT_EQUAL_UINT8(0, cloud_view.session.engagement_recent_percent);
   TEST_ASSERT_EQUAL_UINT16(0, cloud_view.session.user_trigger_count);
+}
+
+void test_companion_state_keeps_recent_stimulus_after_alert_scan_recovers_to_idle() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kStimulus;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kAuditory;
+  attentional.focus_confidence_percent = 67;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1200));
+
+  attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 0;
+  attentional.lock_active = false;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 3000));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 3005));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_TRUE(snap.session.warm);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kStimulus),
+                        static_cast<int>(snap.session.recent_stimulus.target));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kAuditory),
+                        static_cast<int>(snap.session.recent_stimulus.channel));
+  TEST_ASSERT_EQUAL_UINT8(67, snap.session.recent_stimulus.confidence_percent);
+  TEST_ASSERT_EQUAL_UINT64(1200, snap.session.recent_stimulus.observed_at_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAlertScan),
+                        static_cast<int>(snap.session.anchor_state));
+}
+
+void test_companion_state_keeps_recent_engagement_and_interaction_context() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  interaction.session_active = true;
+  interaction.response_pending = true;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 1400));
+
+  interaction.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kNone;
+  interaction.session_active = false;
+  interaction.response_pending = false;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 2200));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 2505));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_TRUE(snap.session.warm);
+  TEST_ASSERT_EQUAL_UINT8(72, snap.session.engagement_recent_percent);
+  TEST_ASSERT_EQUAL_UINT64(1400, snap.session.last_engagement_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kResponding),
+                        static_cast<int>(snap.session.recent_interaction.phase));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::TurnOwner::kCompanion),
+                        static_cast<int>(snap.session.recent_interaction.turn_owner));
+  TEST_ASSERT_TRUE(snap.session.recent_interaction.response_pending);
+  TEST_ASSERT_EQUAL_UINT64(1400, snap.session.recent_interaction.updated_at_ms);
+  TEST_ASSERT_EQUAL_UINT16(1, snap.session.companion_response_count);
 }
 
 void test_companion_state_redacts_by_reader_profile() {
@@ -655,6 +745,8 @@ int main() {
   RUN_TEST(test_companion_state_energy_protect_preempts_active_state_and_returns_to_idle);
   RUN_TEST(test_companion_state_keeps_short_session_memory_separate_from_instant_idle);
   RUN_TEST(test_companion_state_short_session_memory_expires_after_retention_window);
+  RUN_TEST(test_companion_state_keeps_recent_stimulus_after_alert_scan_recovers_to_idle);
+  RUN_TEST(test_companion_state_keeps_recent_engagement_and_interaction_context);
   RUN_TEST(test_companion_state_redacts_short_session_memory_for_cloud_reader);
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();

@@ -190,17 +190,35 @@ struct CompanionInteractionState {
   bool response_pending = false;
 };
 
+struct CompanionRecentStimulusState {
+  AttentionTarget target = AttentionTarget::kNone;
+  AttentionChannel channel = AttentionChannel::kVisual;
+  uint8_t confidence_percent = 0;
+  uint64_t observed_at_ms = 0;
+};
+
+struct CompanionRecentInteractionContextState {
+  InteractionPhase phase = InteractionPhase::kIdle;
+  TurnOwner turn_owner = TurnOwner::kNone;
+  bool response_pending = false;
+  uint64_t updated_at_ms = 0;
+};
+
 struct CompanionSessionMemoryState {
   bool warm = false;
   AttentionTarget anchor_target = AttentionTarget::kNone;
   AttentionChannel anchor_channel = AttentionChannel::kVisual;
   EmotionalTone anchor_tone = EmotionalTone::kNeutral;
   CompanionProductState anchor_state = CompanionProductState::kBooting;
+  CompanionRecentStimulusState recent_stimulus{};
+  CompanionRecentInteractionContextState recent_interaction{};
   TurnOwner last_turn_owner = TurnOwner::kNone;
+  uint8_t engagement_recent_percent = 0;
   uint16_t user_trigger_count = 0;
   uint16_t companion_response_count = 0;
   uint64_t opened_at_ms = 0;
   uint64_t last_activity_ms = 0;
+  uint64_t last_engagement_ms = 0;
   uint64_t last_user_trigger_ms = 0;
   uint64_t last_companion_response_ms = 0;
   uint64_t retention_until_ms = 0;

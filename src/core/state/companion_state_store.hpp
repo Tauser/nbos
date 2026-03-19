@@ -48,6 +48,9 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
       ncos::core::contracts::CompanionProductState next_state);
   static uint64_t hold_duration_for_state(ncos::core::contracts::CompanionProductState state);
   static bool session_activity_present(const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static uint8_t derive_session_engagement_percent(
+      const ncos::core::contracts::CompanionSnapshot& snapshot, bool user_now, bool stimulus_now,
+      bool response_now);
   void refresh_session_memory(uint64_t now_ms,
                               ncos::core::contracts::CompanionProductState previous_state,
                               ncos::core::contracts::CompanionProductState next_state,
