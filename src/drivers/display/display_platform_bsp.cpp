@@ -49,14 +49,13 @@ ncos::drivers::display::DisplayPlatformBsp make_bsp() {
   return bsp;
 }
 
-const ncos::drivers::display::DisplayPlatformBsp DisplayBsp = make_bsp();
-
 }  // namespace
 
 namespace ncos::drivers::display {
 
 const DisplayPlatformBsp& active_display_platform_bsp() {
-  return DisplayBsp;
+  static const DisplayPlatformBsp display_bsp = make_bsp();
+  return display_bsp;
 }
 
 }  // namespace ncos::drivers::display
