@@ -153,6 +153,52 @@ void test_persistent_companion_memory_store_recovers_last_known_good_and_repairs
                           static_cast<uint8_t>(loaded.last_companion_event.kind));
 }
 
+void test_persistent_companion_memory_store_loads_legacy_single_slot_record_and_migrates() {
+  ncos::drivers::storage::LocalPersistence persistence;
+  ncos::drivers::storage::PersistentCompanionMemoryStore store(&persistence);
+
+  auto legacy = ncos::core::contracts::make_default_persisted_companion_memory();
+  legacy.preferences.social_warmth_preference_percent = 61;
+  legacy.habits.preferred_engagement_window = ncos::core::contracts::PersistedHabitWindow::kEvening;
+  legacy.last_companion_event.kind = ncos::core::contracts::PersistedMarkedEventKind::kWarmGreeting;
+  legacy.last_companion_event.target = ncos::core::contracts::AttentionTarget::kUser;
+  legacy.last_companion_event.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  legacy.last_companion_event.salience_percent = 76;
+  legacy.last_companion_event.reinforcement_count = 2;
+  legacy.last_companion_event.last_revision = 3;
+  TEST_ASSERT_TRUE(ncos::core::contracts::sanitize_persisted_companion_memory(&legacy));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kOk),
+      static_cast<uint8_t>(persistence.write_blob("ncos",
+                                                  ncos::drivers::storage::PersistentCompanionMemoryStore::legacy_slot_key(),
+                                                  &legacy,
+                                                  sizeof(legacy))));
+
+  ncos::core::contracts::PersistedCompanionMemoryRecord loaded{};
+  const auto load_result = store.load_with_recovery(&loaded);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryRecoveryPath::kRecoveredLegacy),
+      static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_TRUE(load_result.repaired_storage);
+  TEST_ASSERT_EQUAL_UINT8(61U, loaded.preferences.social_warmth_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedHabitWindow::kEvening),
+                          static_cast<uint8_t>(loaded.habits.preferred_engagement_window));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedMarkedEventKind::kWarmGreeting),
+                          static_cast<uint8_t>(loaded.last_companion_event.kind));
+
+  uint8_t legacy_raw[sizeof(legacy)] = {};
+  size_t legacy_size = 0;
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kNotFound),
+      static_cast<uint8_t>(persistence.read_blob("ncos",
+                                                 ncos::drivers::storage::PersistentCompanionMemoryStore::legacy_slot_key(),
+                                                 legacy_raw,
+                                                 sizeof(legacy_raw),
+                                                 &legacy_size)));
+}
+
 void test_persistent_companion_memory_store_resets_profile_to_default_when_no_valid_snapshot_remains() {
   ncos::drivers::storage::LocalPersistence persistence;
   ncos::drivers::storage::PersistentCompanionMemoryStore store(&persistence);
@@ -189,12 +235,37 @@ void test_persistent_companion_memory_store_resets_profile_to_default_when_no_va
                           static_cast<uint8_t>(loaded.last_user_event.kind));
 }
 
+void test_persistent_companion_memory_store_reset_erases_all_slots_including_legacy() {
+  ncos::drivers::storage::LocalPersistence persistence;
+  ncos::drivers::storage::PersistentCompanionMemoryStore store(&persistence);
+  auto legacy = ncos::core::contracts::make_default_persisted_companion_memory();
+  legacy.preferences.social_warmth_preference_percent = 59;
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(store.save(legacy)));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::LocalPersistenceStatus::kOk),
+      static_cast<uint8_t>(persistence.write_blob("ncos",
+                                                  ncos::drivers::storage::PersistentCompanionMemoryStore::legacy_slot_key(),
+                                                  &legacy,
+                                                  sizeof(legacy))));
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(store.reset()));
+
+  ncos::core::contracts::PersistedCompanionMemoryRecord loaded{};
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kNotFound),
+                          static_cast<uint8_t>(store.load(&loaded)));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_persistent_companion_memory_policy_separates_persistent_memory_from_session_memory);
   RUN_TEST(test_persistent_companion_memory_envelope_is_versioned_and_checksum_protected);
   RUN_TEST(test_persistent_companion_memory_store_roundtrips_sanitized_record);
   RUN_TEST(test_persistent_companion_memory_store_recovers_last_known_good_and_repairs_storage);
+  RUN_TEST(test_persistent_companion_memory_store_loads_legacy_single_slot_record_and_migrates);
   RUN_TEST(test_persistent_companion_memory_store_resets_profile_to_default_when_no_valid_snapshot_remains);
+  RUN_TEST(test_persistent_companion_memory_store_reset_erases_all_slots_including_legacy);
   return UNITY_END();
 }

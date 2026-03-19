@@ -125,15 +125,46 @@ PersistentCompanionMemoryLoadResult PersistentCompanionMemoryStore::load_with_re
     return result;
   }
 
-  if (!corruption_seen) {
-    result.status = PersistentCompanionMemoryStatus::kNotFound;
+  ncos::core::contracts::PersistedCompanionMemoryRecord legacy{};
+  size_t legacy_size = 0;
+  const auto legacy_status = persistence_->read_blob(bsp.config_namespace,
+                                                     legacy_slot_key(),
+                                                     &legacy,
+                                                     sizeof(legacy),
+                                                     &legacy_size);
+  if (legacy_status == LocalPersistenceStatus::kNotFound) {
+    if (!corruption_seen) {
+      result.status = PersistentCompanionMemoryStatus::kNotFound;
+      return result;
+    }
+
+    *out_record = default_profile_record();
+    result.status = PersistentCompanionMemoryStatus::kOk;
+    result.recovery_path = PersistentCompanionMemoryRecoveryPath::kResetProfileBaseline;
+    result.repaired_storage = reset_profile() == PersistentCompanionMemoryStatus::kOk;
+    return result;
+  }
+  if (legacy_status != LocalPersistenceStatus::kOk) {
+    result.status = map_status(legacy_status);
     return result;
   }
 
-  *out_record = default_profile_record();
+  if (legacy_size != sizeof(legacy) ||
+      !ncos::core::contracts::is_valid_persisted_companion_memory(legacy)) {
+    if (bsp.persistence.erase_corrupt_records) {
+      (void)persistence_->erase_key(bsp.config_namespace, legacy_slot_key());
+    }
+    *out_record = default_profile_record();
+    result.status = PersistentCompanionMemoryStatus::kOk;
+    result.recovery_path = PersistentCompanionMemoryRecoveryPath::kResetProfileBaseline;
+    result.repaired_storage = reset_profile() == PersistentCompanionMemoryStatus::kOk;
+    return result;
+  }
+
+  *out_record = legacy;
   result.status = PersistentCompanionMemoryStatus::kOk;
-  result.recovery_path = PersistentCompanionMemoryRecoveryPath::kResetProfileBaseline;
-  result.repaired_storage = reset_profile() == PersistentCompanionMemoryStatus::kOk;
+  result.recovery_path = PersistentCompanionMemoryRecoveryPath::kRecoveredLegacy;
+  result.repaired_storage = save(legacy) == PersistentCompanionMemoryStatus::kOk;
   return result;
 }
 
@@ -168,8 +199,14 @@ PersistentCompanionMemoryStatus PersistentCompanionMemoryStore::save(
 
   const auto envelope =
       ncos::core::contracts::make_persisted_companion_memory_envelope(sanitized, next_generation);
-  return map_status(
-      persistence_->write_blob(bsp.config_namespace, target_key, &envelope, sizeof(envelope)));
+  const auto write_status =
+      persistence_->write_blob(bsp.config_namespace, target_key, &envelope, sizeof(envelope));
+  if (write_status != LocalPersistenceStatus::kOk) {
+    return map_status(write_status);
+  }
+
+  (void)persistence_->erase_key(bsp.config_namespace, legacy_slot_key());
+  return PersistentCompanionMemoryStatus::kOk;
 }
 
 PersistentCompanionMemoryStatus PersistentCompanionMemoryStore::reset() {
@@ -180,7 +217,7 @@ PersistentCompanionMemoryStatus PersistentCompanionMemoryStore::reset() {
   }
 
   bool had_error = false;
-  const char* keys[] = {primary_slot_key(), backup_slot_key()};
+  const char* keys[] = {primary_slot_key(), backup_slot_key(), legacy_slot_key()};
   for (const char* key : keys) {
     const auto status = persistence_->erase_key(bsp.config_namespace, key);
     if (status != LocalPersistenceStatus::kOk && status != LocalPersistenceStatus::kNotFound) {
@@ -207,6 +244,10 @@ const char* PersistentCompanionMemoryStore::primary_slot_key() {
 
 const char* PersistentCompanionMemoryStore::backup_slot_key() {
   return BackupSlotKey;
+}
+
+const char* PersistentCompanionMemoryStore::legacy_slot_key() {
+  return active_storage_platform_bsp().persistent_companion_memory_key;
 }
 
 }  // namespace ncos::drivers::storage

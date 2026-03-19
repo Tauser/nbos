@@ -42,7 +42,8 @@ The active storage baseline is centralized in:
 
 It defines:
 - active backend
-- namespace/key for persisted runtime config
+- namespace for local persisted records
+- official legacy keys for migration
 - size limits
 - corrupt-record erase policy
 - whether runtime-config and companion-memory persistence are allowed
@@ -51,6 +52,7 @@ For the current board baseline:
 - backend: `NVS`
 - namespace: `ncos`
 - legacy runtime-config key: `runtime_cfg`
+- legacy companion-memory key: `companion_mem`
 
 ### Low-level local persistence
 
@@ -211,8 +213,9 @@ Both official persisted records now use a versioned local envelope with:
 
 Local write model:
 - runtime config: `runtime_cfg_a` / `runtime_cfg_b`
+- runtime-config legacy fallback read: `runtime_cfg`
 - companion memory: `comp_mem_a` / `comp_mem_b`
-- legacy fallback read remains only for `runtime_config`
+- companion-memory legacy fallback read: `companion_mem`
 
 Write rule:
 - new data is written to the opposite slot from the current valid winner
@@ -222,13 +225,15 @@ Write rule:
 Read rule:
 - if both slots are valid, highest generation wins
 - if the newest slot is corrupt, the older valid slot becomes the last-known-good
-- if no companion-memory slot is valid after corruption, the store rebuilds the profile baseline
+- if no envelope slot is valid, a valid legacy single-slot record is still accepted while migration is in progress
+- if no valid snapshot remains after recovery, the store rebuilds the profile baseline
 
 ## Recovery and reset
 
 Recovery is explicit for both stores:
 - direct load: current slot is valid
 - last-known-good fallback: older valid slot wins when the newer slot is corrupt
+- legacy migration: a valid single-slot record is accepted once and promoted to the versioned A/B layout
 - profile reset: if no valid snapshot remains, the store rewrites a safe default profile
 
 For companion memory, profile reset means:

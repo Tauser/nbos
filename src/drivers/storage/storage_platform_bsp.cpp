@@ -9,6 +9,7 @@ const ncos::drivers::storage::StoragePlatformBsp StorageBsp = {
     ncos::drivers::storage::StorageBackendId::kNvs,
     "ncos",
     "runtime_cfg",
+    "companion_mem",
     {
         128U,
         true,

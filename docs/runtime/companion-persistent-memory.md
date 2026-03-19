@@ -64,6 +64,7 @@ Persistent companion memory is instead:
 - cross-reboot
 - resettable on user/factory reset
 - schema-versioned and checksum-protected
+- stored in a dual-slot local layout with a legacy migration path
 
 ## Defaults and Integrity
 
@@ -75,7 +76,17 @@ The baseline safe profile is intentionally neutral:
 
 All fields are sanitized and clamped before becoming authoritative.
 
+Current local layout:
+- versioned A/B slots: `comp_mem_a` and `comp_mem_b`
+- legacy migration key: `companion_mem`
+
 ## Reset Semantics
+
+Recovery paths are now explicit:
+- direct load from a valid versioned slot
+- last-known-good fallback when the newest slot is corrupt
+- legacy single-slot migration into the versioned layout
+- reset-profile rebuild when no valid snapshot remains
 
 `reset_profile()` restores only the persistent companion-memory record:
 - preferences go back to neutral

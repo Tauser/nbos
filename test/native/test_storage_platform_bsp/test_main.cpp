@@ -27,3 +27,4 @@ int main() {
   RUN_TEST(test_storage_platform_bsp_exposes_local_persistence_defaults);
   return UNITY_END();
 }
+

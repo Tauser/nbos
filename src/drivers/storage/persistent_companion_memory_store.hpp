@@ -19,6 +19,7 @@ enum class PersistentCompanionMemoryRecoveryPath : uint8_t {
   kNone = 0,
   kDirectLoad,
   kRecoveredLastKnownGood,
+  kRecoveredLegacy,
   kResetProfileBaseline,
 };
 
@@ -46,6 +47,7 @@ class PersistentCompanionMemoryStore final {
   static ncos::core::contracts::PersistedCompanionMemoryRecord default_profile_record();
   static const char* primary_slot_key();
   static const char* backup_slot_key();
+  static const char* legacy_slot_key();
 
  private:
   LocalPersistence owned_persistence_{};

@@ -23,6 +23,7 @@ struct StoragePlatformBsp {
   StorageBackendId config_backend = StorageBackendId::kUnavailable;
   const char* config_namespace = "";
   const char* runtime_config_key = "";
+  const char* persistent_companion_memory_key = "";
   StoragePersistenceLimits persistence{};
 };
 
