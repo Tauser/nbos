@@ -1,5 +1,7 @@
 #include "services/motion/motion_service.hpp"
 
+#include "core/contracts/companion_personality_contracts.hpp"
+
 #ifndef NCOS_NATIVE_TESTS
 #include "esp_log.h"
 #else
@@ -14,17 +16,6 @@ constexpr uint64_t kEmbodimentTickIntervalMs = 260;
 constexpr int16_t kMaxStepYawPermille = 140;
 constexpr int16_t kMaxStepPitchPermille = 120;
 constexpr uint32_t kMaxHoldMs = 900;
-constexpr int16_t kAttentionPitchPermille = 55;
-constexpr uint32_t kAttentionHoldMs = 220;
-constexpr int16_t kAlertPitchPermille = 32;
-constexpr int16_t kRespondingPitchPermille = 70;
-constexpr int16_t kSleepPitchPermille = -40;
-constexpr uint32_t kSleepHoldMs = 320;
-constexpr int16_t kWarmContextPitchPermille = 38;
-constexpr int16_t kWarmStimulusPitchPermille = 24;
-constexpr uint32_t kWarmContextHoldMs = 180;
-constexpr uint64_t kWarmUserContinuityWindowMs = 3200;
-constexpr uint64_t kWarmStimulusContinuityWindowMs = 2400;
 
 int16_t abs_i16(int16_t v) {
   return v < 0 ? static_cast<int16_t>(-v) : v;
@@ -199,35 +190,55 @@ void MotionService::tick(uint64_t now_ms) {
   const bool alert_state = product_state == ncos::core::contracts::CompanionProductState::kAlertScan;
   const bool warm_user_context =
       !restful_state &&
-      has_fresh_warm_continuity(state_.companion_signal, now_ms, kWarmUserContinuityWindowMs) &&
+      has_fresh_warm_continuity(
+          state_.companion_signal, now_ms,
+          ncos::core::contracts::personality_continuity_window_ms(
+              ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
       (state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kUser ||
        state_.companion_signal.recent_interaction_phase == ncos::core::contracts::InteractionPhase::kResponding ||
        state_.companion_signal.recent_turn_owner != ncos::core::contracts::TurnOwner::kNone);
   const bool warm_stimulus_context =
       !restful_state &&
-      has_fresh_warm_continuity(state_.companion_signal, now_ms, kWarmStimulusContinuityWindowMs) &&
+      has_fresh_warm_continuity(
+          state_.companion_signal, now_ms,
+          ncos::core::contracts::personality_continuity_window_ms(
+              ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
       state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
   const bool attentive_hold_requested = !active_face_expression &&
                                         (state_.companion_signal.attention_lock || attentive_state || alert_state ||
                                          warm_user_context || warm_stimulus_context);
 
   if (!active_face_expression && restful_state) {
+    const auto rest_profile =
+        ncos::core::contracts::personality_motion_profile(ncos::core::contracts::PersonalityMotionMode::kRest);
+
     ncos::core::contracts::MotionCommand rest{};
     rest.intent = ncos::core::contracts::MotionIntent::kPowerSave;
     rest.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
     rest.priority = ncos::core::contracts::MotionPriority::kLow;
     rest.pose = ncos::core::contracts::make_neutral_pose();
-    rest.pose.pitch_permille = kSleepPitchPermille;
-    rest.pose.speed_percent = static_cast<uint16_t>(18 + state_.companion_signal.emotional_arousal_percent / 10);
-    rest.hold_ms = kSleepHoldMs;
+    rest.pose.pitch_permille = rest_profile.pitch_permille;
+    rest.pose.speed_percent =
+        static_cast<uint16_t>(rest_profile.base_speed_percent + state_.companion_signal.emotional_arousal_percent / 12);
+    rest.hold_ms = rest_profile.hold_ms;
     (void)request_motion(rest, now_ms);
-    next_embodiment_ms_ = now_ms + kSleepHoldMs;
+    next_embodiment_ms_ = now_ms + rest_profile.hold_ms;
     return;
   }
 
   if (attentive_hold_requested) {
     const bool warm_only = !state_.companion_signal.attention_lock && !attentive_state && !alert_state &&
                            (warm_user_context || warm_stimulus_context);
+    const auto profile = ncos::core::contracts::personality_motion_profile(
+        product_state == ncos::core::contracts::CompanionProductState::kResponding
+            ? ncos::core::contracts::PersonalityMotionMode::kResponding
+            : (alert_state
+                   ? ncos::core::contracts::PersonalityMotionMode::kAlertScan
+                   : (warm_stimulus_context
+                          ? ncos::core::contracts::PersonalityMotionMode::kWarmStimulus
+                          : (warm_user_context ? ncos::core::contracts::PersonalityMotionMode::kWarmUser
+                                               : ncos::core::contracts::PersonalityMotionMode::kAttendUser))));
+
     ncos::core::contracts::MotionCommand attend{};
     attend.intent = (alert_state || warm_stimulus_context)
                         ? ncos::core::contracts::MotionIntent::kObserveStimulus
@@ -235,16 +246,13 @@ void MotionService::tick(uint64_t now_ms) {
     attend.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
     attend.priority = ncos::core::contracts::MotionPriority::kLow;
     attend.pose = ncos::core::contracts::make_neutral_pose();
-    attend.pose.pitch_permille = product_state == ncos::core::contracts::CompanionProductState::kResponding
-                                     ? kRespondingPitchPermille
-                                     : (alert_state ? kAlertPitchPermille
-                                                    : (warm_stimulus_context ? kWarmStimulusPitchPermille
-                                                                             : (warm_user_context ? kWarmContextPitchPermille
-                                                                                                  : kAttentionPitchPermille)));
+    attend.pose.pitch_permille = profile.pitch_permille;
     attend.pose.speed_percent = warm_only
-                                    ? static_cast<uint16_t>(24 + state_.companion_signal.recent_engagement_percent / 6)
-                                    : static_cast<uint16_t>(30 + state_.companion_signal.emotional_arousal_percent / 5);
-    attend.hold_ms = warm_only ? kWarmContextHoldMs : kAttentionHoldMs;
+                                    ? static_cast<uint16_t>(profile.base_speed_percent +
+                                                            state_.companion_signal.recent_engagement_percent / 8)
+                                    : static_cast<uint16_t>(profile.base_speed_percent +
+                                                            state_.companion_signal.emotional_arousal_percent / 6);
+    attend.hold_ms = profile.hold_ms;
     (void)request_motion(attend, now_ms);
     next_embodiment_ms_ = now_ms + kEmbodimentTickIntervalMs;
     return;

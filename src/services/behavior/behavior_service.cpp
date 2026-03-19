@@ -24,12 +24,13 @@ ncos::core::contracts::BehaviorProposal make_behavior_proposal(
   return out;
 }
 
-constexpr uint64_t WarmContinuityWindowMs = 3200;
 
 bool has_warm_user_continuity(const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
   if (!snapshot.session.warm || snapshot.runtime.safe_mode || snapshot.session.last_activity_ms == 0 ||
       now_ms < snapshot.session.last_activity_ms ||
-      (now_ms - snapshot.session.last_activity_ms) > WarmContinuityWindowMs) {
+      (now_ms - snapshot.session.last_activity_ms) >
+          ncos::core::contracts::personality_continuity_window_ms(
+              ncos::core::contracts::PersonalityContinuityKind::kUser)) {
     return false;
   }
 
@@ -211,7 +212,7 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
         5,
-        180,
+        ncos::core::contracts::personality_reengagement_ttl_ms(),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         "attend_user_continuity");
   }

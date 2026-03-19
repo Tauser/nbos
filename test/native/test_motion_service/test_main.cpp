@@ -271,7 +271,7 @@ void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neu
 
   TEST_ASSERT_GREATER_THAN_UINT32(1, service.state().apply_success_total);
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
-  TEST_ASSERT_EQUAL_INT16(55, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_EQUAL_INT16(48, service.state().last_pose.pitch_permille);
 
   companion.attention_lock = false;
   companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
@@ -299,7 +299,7 @@ void test_motion_service_sleep_state_drives_power_save_pose() {
 
   TEST_ASSERT_FALSE(service.state().neutral_applied);
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
-  TEST_ASSERT_EQUAL_INT16(-40, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_EQUAL_INT16(-43, service.state().last_pose.pitch_permille);
   TEST_ASSERT_LESS_THAN_UINT16(25, service.state().last_pose.speed_percent);
 }
 
@@ -318,7 +318,7 @@ void test_motion_service_responding_state_uses_stronger_attend_pose() {
   service.tick(11500);
 
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
-  TEST_ASSERT_EQUAL_INT16(70, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_EQUAL_INT16(68, service.state().last_pose.pitch_permille);
 }
 
 void test_motion_service_sleep_state_does_not_override_active_face_follow() {
@@ -364,7 +364,7 @@ void test_motion_service_uses_warm_context_for_soft_attention_pose() {
 
   TEST_ASSERT_FALSE(service.state().neutral_applied);
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
-  TEST_ASSERT_EQUAL_INT16(38, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_EQUAL_INT16(34, service.state().last_pose.pitch_permille);
   TEST_ASSERT_LESS_THAN_UINT16(40, service.state().last_pose.speed_percent);
 }
 

@@ -49,3 +49,21 @@ Isso mantem a base pequena: sem writer novo, sem maquina paralela e sem misturar
 - a personalidade ainda nao dirige rotina ou autonomia rica; ela so consolida o tom-base onde ja ha resposta operacional
 - os limites sao deliberadamente conservadores para preservar a leitura premium do produto
 - expansoes futuras devem continuar aproveitando a mesma fonte de verdade, em vez de criar um sistema novo de persona
+
+## Mapeamento operacional atual
+
+- `Face`
+  - `IdleObserve` usa foco e saliencia moderados, com cadencia mais calma
+  - `WarmUser` segura centro e calor visual por pouco tempo para evitar reengajamento frio
+  - `AlertScan` acelera a cadencia e abre curiosidade lateral sem perder controle
+  - `Responding` usa foco mais firme e saliencia mais alta, mas continua sem agressividade
+- `Motion`
+  - `Rest` inclina levemente para baixo com baixa energia
+  - `AttendUser` levanta a postura de forma acolhedora
+  - `AlertScan` observa com energia moderada, nao tensa
+  - `Responding` usa a postura mais firme do baseline, ainda abaixo de um gesto brusco
+- `Timing`
+  - continuidade com usuario: `3,2 s`
+  - continuidade com estimulo: `2,4 s`
+  - reengajamento curto: `190 ms`
+  - `AttendUser` e `AlertScan` continuam curtos por design, para nao deixar o companion pegajoso

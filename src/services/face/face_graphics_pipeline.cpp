@@ -1,6 +1,7 @@
 #include "services/face/face_graphics_pipeline.hpp"
 
 #include "config/system_config.hpp"
+#include "core/contracts/companion_personality_contracts.hpp"
 #include "drivers/display/display_runtime.hpp"
 #include "hal/platform/monotonic_clock.hpp"
 
@@ -10,9 +11,6 @@ using ncos::core::contracts::AttentionTarget;
 using ncos::core::contracts::CompanionProductState;
 using ncos::core::contracts::InteractionPhase;
 using ncos::core::contracts::TurnOwner;
-
-constexpr uint64_t WarmUserContinuityWindowMs = 3200;
-constexpr uint64_t WarmStimulusContinuityWindowMs = 2400;
 
 uint64_t session_context_age_ms(const ncos::core::contracts::FaceMultimodalInput& input) {
   if (input.session_last_activity_ms == 0 || input.observed_at_ms < input.session_last_activity_ms) {
@@ -32,7 +30,10 @@ bool has_warm_continuity(const ncos::core::contracts::FaceMultimodalInput& input
 }
 
 bool has_warm_user_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
-  return has_warm_continuity(input, WarmUserContinuityWindowMs) &&
+  return has_warm_continuity(
+           input,
+           ncos::core::contracts::personality_continuity_window_ms(
+               ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
          (input.recent_stimulus_target == AttentionTarget::kUser ||
           input.recent_interaction_phase == InteractionPhase::kResponding ||
           input.recent_turn_owner != TurnOwner::kNone) &&
@@ -40,7 +41,10 @@ bool has_warm_user_continuity(const ncos::core::contracts::FaceMultimodalInput& 
 }
 
 bool has_warm_stimulus_continuity(const ncos::core::contracts::FaceMultimodalInput& input) {
-  return has_warm_continuity(input, WarmStimulusContinuityWindowMs) &&
+  return has_warm_continuity(
+           input,
+           ncos::core::contracts::personality_continuity_window_ms(
+               ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
          input.recent_stimulus_target == AttentionTarget::kStimulus;
 }
 
@@ -145,84 +149,70 @@ bool should_run_idle_signature_clip(const ncos::core::contracts::FaceMultimodalI
 
 FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts::FaceMultimodalInput& input,
                                                      bool gaze_left) {
-  FaceAutonomyGazeProfile profile{};
-  profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
-                                : ncos::models::face::GazeDirection::kRight;
-  profile.focus_percent = 48;
-  profile.salience_percent = 30;
-  profile.hold_ms = 420;
-  profile.cadence_ms = 700;
-  profile.alternate_lateral = true;
+  using ncos::core::contracts::PersonalityFaceMode;
+  using ncos::core::contracts::personality_face_profile;
 
+  PersonalityFaceMode mode = PersonalityFaceMode::kIdleObserve;
   switch (input.companion_product_state) {
     case CompanionProductState::kResponding:
-      profile.direction = ncos::models::face::GazeDirection::kCenter;
-      profile.focus_percent = 68;
-      profile.salience_percent = 62;
-      profile.hold_ms = 560;
-      profile.cadence_ms = 420;
-      profile.alternate_lateral = false;
+      mode = PersonalityFaceMode::kResponding;
       break;
     case CompanionProductState::kAttendUser:
-      profile.direction = ncos::models::face::GazeDirection::kCenter;
-      profile.focus_percent = 62;
-      profile.salience_percent = 54;
-      profile.hold_ms = 520;
-      profile.cadence_ms = 420;
-      profile.alternate_lateral = false;
+      mode = PersonalityFaceMode::kAttendUser;
       break;
     case CompanionProductState::kAlertScan:
-      profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
-                                    : ncos::models::face::GazeDirection::kRight;
-      profile.focus_percent = 56;
-      profile.salience_percent = 44;
-      profile.hold_ms = 420;
-      profile.cadence_ms = 480;
-      profile.alternate_lateral = true;
+      mode = PersonalityFaceMode::kAlertScan;
       break;
     case CompanionProductState::kSleep:
-      profile.direction = ncos::models::face::GazeDirection::kCenter;
-      profile.focus_percent = 24;
-      profile.salience_percent = 16;
-      profile.hold_ms = 900;
-      profile.cadence_ms = 980;
-      profile.alternate_lateral = false;
+      mode = PersonalityFaceMode::kSleep;
       break;
     case CompanionProductState::kEnergyProtect:
-      profile.direction = ncos::models::face::GazeDirection::kCenter;
-      profile.focus_percent = 30;
-      profile.salience_percent = 20;
-      profile.hold_ms = 820;
-      profile.cadence_ms = 880;
-      profile.alternate_lateral = false;
+      mode = PersonalityFaceMode::kEnergyProtect;
       break;
     case CompanionProductState::kBooting:
-      profile.direction = ncos::models::face::GazeDirection::kCenter;
-      profile.focus_percent = 36;
-      profile.salience_percent = 24;
-      profile.hold_ms = 700;
-      profile.cadence_ms = 760;
-      profile.alternate_lateral = false;
+      mode = PersonalityFaceMode::kBooting;
       break;
     case CompanionProductState::kIdleObserve:
     default:
       if (has_warm_user_continuity(input)) {
-        profile.direction = ncos::models::face::GazeDirection::kCenter;
-        profile.focus_percent = input.recent_interaction_phase == InteractionPhase::kResponding ? 60 : 56;
-        profile.salience_percent = input.recent_interaction_phase == InteractionPhase::kResponding ? 48 : 40;
-        profile.hold_ms = input.recent_interaction_phase == InteractionPhase::kResponding ? 560 : 500;
-        profile.cadence_ms = 520;
-        profile.alternate_lateral = false;
+        mode = PersonalityFaceMode::kWarmUser;
       } else if (has_warm_stimulus_continuity(input)) {
-        profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
-                                      : ncos::models::face::GazeDirection::kRight;
-        profile.focus_percent = 46;
-        profile.salience_percent = 36;
-        profile.hold_ms = 440;
-        profile.cadence_ms = 560;
-        profile.alternate_lateral = true;
+        mode = PersonalityFaceMode::kWarmStimulus;
       }
       break;
+  }
+
+  const auto envelope = personality_face_profile(mode);
+  FaceAutonomyGazeProfile profile{};
+  profile.focus_percent = envelope.focus_percent;
+  profile.salience_percent = envelope.salience_percent;
+  profile.hold_ms = envelope.hold_ms;
+  profile.cadence_ms = envelope.cadence_ms;
+  profile.alternate_lateral = envelope.alternate_lateral;
+
+  switch (mode) {
+    case PersonalityFaceMode::kResponding:
+    case PersonalityFaceMode::kAttendUser:
+    case PersonalityFaceMode::kSleep:
+    case PersonalityFaceMode::kEnergyProtect:
+    case PersonalityFaceMode::kBooting:
+    case PersonalityFaceMode::kWarmUser:
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      break;
+    case PersonalityFaceMode::kAlertScan:
+    case PersonalityFaceMode::kWarmStimulus:
+    case PersonalityFaceMode::kIdleObserve:
+    default:
+      profile.direction = gaze_left ? ncos::models::face::GazeDirection::kLeft
+                                    : ncos::models::face::GazeDirection::kRight;
+      break;
+  }
+
+  if (mode == PersonalityFaceMode::kWarmUser &&
+      input.recent_interaction_phase == InteractionPhase::kResponding) {
+    profile.focus_percent = static_cast<uint8_t>(profile.focus_percent + 4);
+    profile.salience_percent = static_cast<uint8_t>(profile.salience_percent + 4);
+    profile.hold_ms = static_cast<uint16_t>(profile.hold_ms + 32);
   }
 
   return profile;

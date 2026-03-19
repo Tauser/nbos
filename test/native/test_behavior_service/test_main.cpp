@@ -128,6 +128,7 @@ void test_behavior_service_uses_short_context_to_avoid_cold_reengagement() {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
                         static_cast<int>(proposal.profile));
   TEST_ASSERT_EQUAL_UINT8(5, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(190, proposal.proposal.ttl_ms);
   TEST_ASSERT_EQUAL_STRING("attend_user_continuity", proposal.rationale);
 }
 
