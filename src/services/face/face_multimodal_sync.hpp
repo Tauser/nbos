@@ -14,6 +14,7 @@ struct FaceMultimodalSyncResult {
   uint8_t target_focus_percent = 0;
   uint8_t target_lid_open_percent = 100;
   uint8_t target_brow_intensity_percent = 0;
+  ncos::models::face::BlinkPhase target_blink_phase = ncos::models::face::BlinkPhase::kOpen;
 };
 
 class FaceMultimodalSync final {

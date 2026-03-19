@@ -74,8 +74,34 @@ void test_face_multimodal_sync_applies_modulation_under_ownership() {
 
   TEST_ASSERT_TRUE(result.applied);
   TEST_ASSERT_EQUAL_UINT8(result.target_focus_percent, state.eyes.focus_percent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(result.target_blink_phase), static_cast<int>(state.lids.phase));
   TEST_ASSERT_EQUAL_UINT8(result.target_lid_open_percent, state.lids.openness_percent);
   TEST_ASSERT_EQUAL_UINT8(result.target_brow_intensity_percent, state.brows.intensity_percent);
+}
+
+void test_face_multimodal_sync_generates_full_blink_window_for_engaged_character() {
+  auto state = ncos::core::contracts::make_face_render_state_baseline();
+  ncos::services::face::FaceCompositor compositor{};
+  ncos::services::face::FaceMultimodalSync sync{};
+  TEST_ASSERT_TRUE(compositor.bind_state(&state));
+
+  ncos::core::contracts::FaceMultimodalInput input{};
+  input.social_engagement_percent = 90;
+  input.behavior_activation_percent = 75;
+  input.emotional_arousal_percent = 50;
+
+  ncos::services::face::FaceMultimodalSyncResult result{};
+  TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 20, &result));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kClosing), static_cast<int>(result.target_blink_phase));
+  TEST_ASSERT_LESS_THAN_UINT8(60, result.target_lid_open_percent);
+
+  TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 80, &result));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kClosed), static_cast<int>(result.target_blink_phase));
+  TEST_ASSERT_EQUAL_UINT8(0, result.target_lid_open_percent);
+
+  TEST_ASSERT_TRUE(sync.apply(input, &compositor, &state, 34, 150, &result));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::models::face::BlinkPhase::kOpening), static_cast<int>(result.target_blink_phase));
+  TEST_ASSERT_GREATER_THAN_UINT8(50, result.target_lid_open_percent);
 }
 
 void test_face_tooling_exports_preview_json_snapshot() {
@@ -124,7 +150,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_multimodal_input_aggregates_audio_touch_and_motion);
   RUN_TEST(test_face_multimodal_sync_applies_modulation_under_ownership);
+  RUN_TEST(test_face_multimodal_sync_generates_full_blink_window_for_engaged_character);
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);
   return UNITY_END();
 }
-
