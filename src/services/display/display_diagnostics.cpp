@@ -16,8 +16,6 @@ constexpr uint16_t DebugHotColor = 0xF800;
 constexpr uint16_t DebugCoolColor = 0x07E0;
 constexpr uint16_t DebugFallbackColor = 0xFFE0;
 constexpr int16_t SweepWidth = 24;
-constexpr uint32_t ExperimentSpiWriteHz[] = {40000000u, 27000000u, 20000000u};
-constexpr uint32_t SpiStepWindowMs = 3200u;
 
 uint16_t bar_color_for_ratio(uint32_t value, uint32_t budget) {
   if (budget == 0) {
@@ -65,6 +63,25 @@ uint16_t sprite_period_ms(const ncos::drivers::display::DisplayDriver* display) 
   return display->capability_profile().timing.recommended_sprite_window_period_ms;
 }
 
+uint16_t abs_i16(int16_t value) {
+  return value < 0 ? static_cast<uint16_t>(-value) : static_cast<uint16_t>(value);
+}
+
+bool eye_trail_in_bad_motion_zone(const ncos::services::face::FaceFrame& previous,
+                                  const ncos::services::face::FaceFrame& current) {
+  const int16_t left_dx = static_cast<int16_t>(current.left_eye_x - previous.left_eye_x);
+  const int16_t right_dx = static_cast<int16_t>(current.right_eye_x - previous.right_eye_x);
+  const int16_t left_dy = static_cast<int16_t>(current.left_eye_y - previous.left_eye_y);
+  const int16_t right_dy = static_cast<int16_t>(current.right_eye_y - previous.right_eye_y);
+
+  const uint16_t max_dx = abs_i16(abs_i16(left_dx) > abs_i16(right_dx) ? left_dx : right_dx);
+  const uint16_t max_dy = abs_i16(abs_i16(left_dy) > abs_i16(right_dy) ? left_dy : right_dy);
+  const bool abrupt_motion = max_dx >= 8 || max_dy >= 6;
+  const bool diagonal_motion = max_dx > 0 && max_dy > 0;
+  const bool high_visual_activity = abrupt_motion && current.eye_color != current.face_color;
+  return abrupt_motion || diagonal_motion || high_visual_activity;
+}
+
 }  // namespace
 
 namespace ncos::services::display {
@@ -77,6 +94,8 @@ bool DisplayDiagnosticsRunner::bind(ncos::drivers::display::DisplayDriver* displ
   last_sweep_x_ = -1;
   last_sprite_x_ = -1;
   panel_flip_phase_ = 0;
+  has_previous_eye_trail_frame_ = false;
+  previous_eye_trail_frame_ = ncos::services::face::FaceFrame{};
   return display_ != nullptr && renderer_ != nullptr;
 }
 
@@ -86,14 +105,12 @@ void DisplayDiagnosticsRunner::set_mode(ncos::config::DisplayDiagnosticsMode mod
   last_sweep_x_ = -1;
   last_sprite_x_ = -1;
   panel_flip_phase_ = 0;
+  has_previous_eye_trail_frame_ = false;
+  previous_eye_trail_frame_ = ncos::services::face::FaceFrame{};
 }
 
 ncos::config::DisplayDiagnosticsMode DisplayDiagnosticsRunner::mode() const {
   return mode_;
-}
-
-uint32_t DisplayDiagnosticsRunner::current_experiment_spi_hz(uint64_t now_ms) const {
-  return ExperimentSpiWriteHz[(now_ms / SpiStepWindowMs) % (sizeof(ExperimentSpiWriteHz) / sizeof(ExperimentSpiWriteHz[0]))];
 }
 
 void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
@@ -112,20 +129,10 @@ void DisplayDiagnosticsRunner::tick(uint64_t now_ms) {
       render_horizontal_sweep(now_ms);
       break;
     case ncos::config::DisplayDiagnosticsMode::kEyeTrailFullRedraw:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceFullRedraw,
-                       ncos::services::face::OcularUpdatePattern::kDirtyPerEye);
+      render_eye_trail(now_ms, DisplayRenderMode::kForceFullRedraw);
       break;
     case ncos::config::DisplayDiagnosticsMode::kEyeTrailDirtyRect:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
-                       ncos::services::face::OcularUpdatePattern::kDirtyPerEye);
-      break;
-    case ncos::config::DisplayDiagnosticsMode::kEyeTrailBandComposite:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
-                       ncos::services::face::OcularUpdatePattern::kFixedBandComposite);
-      break;
-    case ncos::config::DisplayDiagnosticsMode::kEyeTrailBandRedraw:
-      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect,
-                       ncos::services::face::OcularUpdatePattern::kFixedBandRedraw);
+      render_eye_trail(now_ms, DisplayRenderMode::kForceDirtyRect);
       break;
     case ncos::config::DisplayDiagnosticsMode::kSpriteWindowTrail:
       render_sprite_window_trail(now_ms);
@@ -283,20 +290,29 @@ ncos::services::face::FaceFrame DisplayDiagnosticsRunner::make_eye_trail_frame(u
 }
 
 void DisplayDiagnosticsRunner::render_eye_trail(uint64_t now_ms,
-                                                ncos::services::display::DisplayRenderMode render_mode,
-                                                ncos::services::face::OcularUpdatePattern ocular_pattern) {
-  const uint16_t period_ms = render_mode == DisplayRenderMode::kForceFullRedraw
-                                 ? full_redraw_period_ms(display_)
-                                 : partial_redraw_period_ms(display_);
+                                                ncos::services::display::DisplayRenderMode render_mode) {
+  auto frame = make_eye_trail_frame(now_ms);
+  uint16_t period_ms = render_mode == DisplayRenderMode::kForceFullRedraw
+                           ? full_redraw_period_ms(display_)
+                           : partial_redraw_period_ms(display_);
+
+  if (ncos::config::kGlobalConfig.runtime.display_diagnostics_conservative_pacing &&
+      has_previous_eye_trail_frame_ && eye_trail_in_bad_motion_zone(previous_eye_trail_frame_, frame)) {
+    period_ms = static_cast<uint16_t>(ncos::config::kGlobalConfig.runtime.display_diagnostics_conservative_period_ms > period_ms
+                                          ? ncos::config::kGlobalConfig.runtime.display_diagnostics_conservative_period_ms
+                                          : period_ms);
+  }
+
   if (last_step_ms_ != 0 && (now_ms - last_step_ms_) < period_ms) {
     return;
   }
 
   last_step_ms_ = now_ms;
-  display_->set_write_clock_hz(current_experiment_spi_hz(now_ms));
+  display_->set_write_clock_hz(ncos::config::kGlobalConfig.runtime.display_diagnostics_spi_write_hz);
   renderer_->set_render_mode(render_mode);
-  renderer_->set_ocular_update_pattern(ocular_pattern);
-  (void)renderer_->render(make_eye_trail_frame(now_ms));
+  (void)renderer_->render(frame);
+  previous_eye_trail_frame_ = frame;
+  has_previous_eye_trail_frame_ = true;
 }
 
 void DisplayDiagnosticsRunner::render_sprite_window_trail(uint64_t now_ms) {

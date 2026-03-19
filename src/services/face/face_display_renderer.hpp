@@ -8,12 +8,6 @@
 
 namespace ncos::services::face {
 
-enum class OcularUpdatePattern : uint8_t {
-  kDirtyPerEye = 0,
-  kFixedBandComposite,
-  kFixedBandRedraw,
-};
-
 struct FaceRenderStats {
   uint32_t last_frame_time_us = 0;
   uint32_t avg_frame_time_us = 0;
@@ -33,8 +27,6 @@ class FaceDisplayRenderer final {
   bool bind(ncos::drivers::display::DisplayDriver* display);
   bool render(const FaceFrame& frame);
   void set_render_mode(ncos::services::display::DisplayRenderMode mode);
-  void set_ocular_update_pattern(OcularUpdatePattern pattern);
-  OcularUpdatePattern ocular_update_pattern() const;
   ncos::services::display::DisplayRenderPlan last_render_plan() const;
   FaceRenderStats render_stats() const;
 
@@ -44,11 +36,10 @@ class FaceDisplayRenderer final {
   FaceFrame previous_frame_{};
   ncos::services::display::DisplayRenderMode render_mode_ =
       ncos::services::display::DisplayRenderMode::kAuto;
-  OcularUpdatePattern ocular_update_pattern_ = OcularUpdatePattern::kDirtyPerEye;
   ncos::services::display::DisplayRenderPlan last_render_plan_{};
   FaceRenderStats render_stats_{};
-  static constexpr int16_t CompositeRegionMaxWidth = 128;
-  static constexpr int16_t CompositeRegionMaxHeight = 80;
+  static constexpr int16_t CompositeRegionMaxWidth = 64;
+  static constexpr int16_t CompositeRegionMaxHeight = 72;
   static constexpr size_t CompositeRegionMaxPixels =
       static_cast<size_t>(CompositeRegionMaxWidth) * static_cast<size_t>(CompositeRegionMaxHeight);
   std::array<uint16_t, CompositeRegionMaxPixels> composite_region_buffer_{};

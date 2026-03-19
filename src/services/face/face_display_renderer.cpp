@@ -5,10 +5,6 @@
 
 namespace {
 
-constexpr int16_t BandMarginX = 8;
-constexpr int16_t BandHeight = 72;
-constexpr int16_t BandMinWidth = 124;
-
 uint64_t monotonic_time_us() {
   const auto now = std::chrono::steady_clock::now().time_since_epoch();
   return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
@@ -86,56 +82,6 @@ EyeGeometry resolve_eye_geometry(const ncos::services::face::FaceFrame& frame, b
   geometry.x = static_cast<int16_t>((left_eye ? frame.left_eye_x : frame.right_eye_x) - resolved_eye_w / 2);
   geometry.y = static_cast<int16_t>((left_eye ? frame.left_eye_y : frame.right_eye_y) - resolved_eye_h / 2);
   return geometry;
-}
-
-ncos::services::display::DirtyRect clip_rect(int16_t x,
-                                             int16_t y,
-                                             int16_t w,
-                                             int16_t h,
-                                             int16_t display_width,
-                                             int16_t display_height) {
-  ncos::services::display::DirtyRect clipped{};
-  int16_t x0 = x;
-  int16_t y0 = y;
-  int16_t x1 = static_cast<int16_t>(x + w);
-  int16_t y1 = static_cast<int16_t>(y + h);
-
-  if (x0 < 0) {
-    x0 = 0;
-  }
-  if (y0 < 0) {
-    y0 = 0;
-  }
-  if (x1 > display_width) {
-    x1 = display_width;
-  }
-  if (y1 > display_height) {
-    y1 = display_height;
-  }
-
-  clipped.valid = x1 > x0 && y1 > y0;
-  clipped.clipped = x0 != x || y0 != y || x1 != x + w || y1 != y + h;
-  clipped.x = x0;
-  clipped.y = y0;
-  clipped.w = clipped.valid ? static_cast<int16_t>(x1 - x0) : 0;
-  clipped.h = clipped.valid ? static_cast<int16_t>(y1 - y0) : 0;
-  return clipped;
-}
-
-ncos::services::display::DirtyRect compute_fixed_band_rect(const EyeGeometry& left_eye,
-                                                           const EyeGeometry& right_eye,
-                                                           int16_t display_width,
-                                                           int16_t display_height) {
-  const int16_t left_center_x = static_cast<int16_t>(left_eye.x + left_eye.w / 2);
-  const int16_t right_center_x = static_cast<int16_t>(right_eye.x + right_eye.w / 2);
-  const int16_t center_x = static_cast<int16_t>((left_center_x + right_center_x) / 2);
-  const int16_t center_y = static_cast<int16_t>(((left_eye.y + left_eye.h / 2) + (right_eye.y + right_eye.h / 2)) / 2);
-  const int16_t natural_width = static_cast<int16_t>((right_center_x - left_center_x) + left_eye.w / 2 +
-                                                     right_eye.w / 2 + BandMarginX * 2);
-  const int16_t band_width = max_i16(BandMinWidth, natural_width);
-  return clip_rect(static_cast<int16_t>(center_x - band_width / 2),
-                   static_cast<int16_t>(center_y - BandHeight / 2),
-                   band_width, BandHeight, display_width, display_height);
 }
 
 bool rects_intersect(const ncos::services::display::DirtyRect& rect, const EyeGeometry& eye) {
@@ -222,124 +168,61 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 
   const EyeGeometry left_eye = resolve_eye_geometry(frame, true);
   const EyeGeometry right_eye = resolve_eye_geometry(frame, false);
-  const auto ocular_band = compute_fixed_band_rect(left_eye, right_eye, static_cast<int16_t>(display_->width()),
-                                                   static_cast<int16_t>(display_->height()));
   const uint64_t frame_start_us = monotonic_time_us();
   uint16_t frame_flushes = 0;
-  uint32_t updated_area_px = 0;
 
   display_->setRotation(1);
   display_->startWrite();
 
-  bool used_partial_strategy = false;
-  if (!last_render_plan_.full_redraw) {
-    switch (ocular_update_pattern_) {
-      case OcularUpdatePattern::kDirtyPerEye: {
-        const auto flush_region = [this, &frame, &left_eye, &right_eye, &frame_flushes](
-                                      const ncos::services::display::DirtyRect& region) -> bool {
-          if (!region.valid || region.w <= 0 || region.h <= 0) {
-            return true;
-          }
-          if (region.w > CompositeRegionMaxWidth || region.h > CompositeRegionMaxHeight) {
-            return false;
-          }
-
-          const size_t pixel_count = static_cast<size_t>(region.w) * static_cast<size_t>(region.h);
-          std::fill_n(composite_region_buffer_.data(), pixel_count, frame.face_color);
-
-          const EyeGeometry eyes[] = {left_eye, right_eye};
-          for (const auto& eye : eyes) {
-            if (!rects_intersect(region, eye)) {
-              continue;
-            }
-
-            const int16_t x0 = max_i16(region.x, eye.x);
-            const int16_t y0 = max_i16(region.y, eye.y);
-            const int16_t x1 = min_i16(static_cast<int16_t>(region.x + region.w),
-                                       static_cast<int16_t>(eye.x + eye.w));
-            const int16_t y1 = min_i16(static_cast<int16_t>(region.y + region.h),
-                                       static_cast<int16_t>(eye.y + eye.h));
-
-            for (int16_t y = y0; y < y1; ++y) {
-              const size_t row_offset = static_cast<size_t>(y - region.y) * static_cast<size_t>(region.w);
-              for (int16_t x = x0; x < x1; ++x) {
-                if (!point_inside_round_rect(x, y, eye)) {
-                  continue;
-                }
-                composite_region_buffer_[row_offset + static_cast<size_t>(x - region.x)] = eye.color;
-              }
-            }
-          }
-
-          display_->pushImage(region.x, region.y, region.w, region.h, composite_region_buffer_.data());
-          ++frame_flushes;
-          return true;
-        };
-
-        used_partial_strategy = flush_region(last_render_plan_.dirty_rect) &&
-                                flush_region(last_render_plan_.dirty_rect_secondary);
-        if (used_partial_strategy) {
-          updated_area_px = rect_area(last_render_plan_.dirty_rect) + rect_area(last_render_plan_.dirty_rect_secondary);
-        }
-        break;
+  bool used_regional_composite = false;
+  if (!last_render_plan_.full_redraw &&
+      last_render_plan_.recommended_flush_path == ncos::drivers::display::DisplayFlushPath::kRegionalComposite) {
+    const auto flush_region = [this, &frame, &left_eye, &right_eye, &frame_flushes](
+                                  const ncos::services::display::DirtyRect& region) -> bool {
+      if (!region.valid || region.w <= 0 || region.h <= 0) {
+        return true;
+      }
+      if (region.w > CompositeRegionMaxWidth || region.h > CompositeRegionMaxHeight) {
+        return false;
       }
 
-      case OcularUpdatePattern::kFixedBandComposite: {
-        if (ocular_band.valid && ocular_band.w <= CompositeRegionMaxWidth && ocular_band.h <= CompositeRegionMaxHeight) {
-          const size_t pixel_count = static_cast<size_t>(ocular_band.w) * static_cast<size_t>(ocular_band.h);
-          std::fill_n(composite_region_buffer_.data(), pixel_count, frame.face_color);
+      const size_t pixel_count = static_cast<size_t>(region.w) * static_cast<size_t>(region.h);
+      std::fill_n(composite_region_buffer_.data(), pixel_count, frame.face_color);
 
-          const EyeGeometry eyes[] = {left_eye, right_eye};
-          for (const auto& eye : eyes) {
-            if (!rects_intersect(ocular_band, eye)) {
+      const EyeGeometry eyes[] = {left_eye, right_eye};
+      for (const auto& eye : eyes) {
+        if (!rects_intersect(region, eye)) {
+          continue;
+        }
+
+        const int16_t x0 = max_i16(region.x, eye.x);
+        const int16_t y0 = max_i16(region.y, eye.y);
+        const int16_t x1 = min_i16(static_cast<int16_t>(region.x + region.w),
+                                   static_cast<int16_t>(eye.x + eye.w));
+        const int16_t y1 = min_i16(static_cast<int16_t>(region.y + region.h),
+                                   static_cast<int16_t>(eye.y + eye.h));
+
+        for (int16_t y = y0; y < y1; ++y) {
+          const size_t row_offset = static_cast<size_t>(y - region.y) * static_cast<size_t>(region.w);
+          for (int16_t x = x0; x < x1; ++x) {
+            if (!point_inside_round_rect(x, y, eye)) {
               continue;
             }
-
-            const int16_t x0 = max_i16(ocular_band.x, eye.x);
-            const int16_t y0 = max_i16(ocular_band.y, eye.y);
-            const int16_t x1 = min_i16(static_cast<int16_t>(ocular_band.x + ocular_band.w),
-                                       static_cast<int16_t>(eye.x + eye.w));
-            const int16_t y1 = min_i16(static_cast<int16_t>(ocular_band.y + ocular_band.h),
-                                       static_cast<int16_t>(eye.y + eye.h));
-
-            for (int16_t y = y0; y < y1; ++y) {
-              const size_t row_offset = static_cast<size_t>(y - ocular_band.y) * static_cast<size_t>(ocular_band.w);
-              for (int16_t x = x0; x < x1; ++x) {
-                if (!point_inside_round_rect(x, y, eye)) {
-                  continue;
-                }
-                composite_region_buffer_[row_offset + static_cast<size_t>(x - ocular_band.x)] = eye.color;
-              }
-            }
+            composite_region_buffer_[row_offset + static_cast<size_t>(x - region.x)] = eye.color;
           }
-
-          display_->pushImage(ocular_band.x, ocular_band.y, ocular_band.w, ocular_band.h, composite_region_buffer_.data());
-          ++frame_flushes;
-          updated_area_px = rect_area(ocular_band);
-          used_partial_strategy = true;
         }
-        break;
       }
 
-      case OcularUpdatePattern::kFixedBandRedraw:
-        if (ocular_band.valid) {
-          display_->fillRect(ocular_band.x, ocular_band.y, ocular_band.w, ocular_band.h, frame.face_color);
-          ++frame_flushes;
-          display_->fillRoundRect(left_eye.x, left_eye.y, left_eye.w, left_eye.h, left_eye.corner, frame.eye_color);
-          ++frame_flushes;
-          display_->fillRoundRect(right_eye.x, right_eye.y, right_eye.w, right_eye.h, right_eye.corner, frame.eye_color);
-          ++frame_flushes;
-          updated_area_px = rect_area(ocular_band);
-          used_partial_strategy = true;
-        }
-        break;
+      display_->pushImage(region.x, region.y, region.w, region.h, composite_region_buffer_.data());
+      ++frame_flushes;
+      return true;
+    };
 
-      default:
-        break;
-    }
+    used_regional_composite = flush_region(last_render_plan_.dirty_rect) &&
+                              flush_region(last_render_plan_.dirty_rect_secondary);
   }
 
-  if (!used_partial_strategy) {
+  if (!used_regional_composite) {
     if (last_render_plan_.full_redraw) {
       display_->fillScreen(frame.background);
       ++frame_flushes;
@@ -364,7 +247,6 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
                            frame.face_color);
         ++frame_flushes;
       }
-      updated_area_px = rect_area(last_render_plan_.dirty_rect) + rect_area(last_render_plan_.dirty_rect_secondary);
     }
 
     display_->fillRoundRect(left_eye.x, left_eye.y, left_eye.w, left_eye.h, left_eye.corner, frame.eye_color);
@@ -377,12 +259,13 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 
   const uint64_t frame_end_us = monotonic_time_us();
   const uint32_t frame_time_us = static_cast<uint32_t>(frame_end_us - frame_start_us);
+  const uint32_t dirty_area_px = rect_area(last_render_plan_.dirty_rect) + rect_area(last_render_plan_.dirty_rect_secondary);
 
   render_stats_.last_frame_time_us = frame_time_us;
-  render_stats_.last_dirty_area_px = updated_area_px;
+  render_stats_.last_dirty_area_px = dirty_area_px;
   render_stats_.avg_dirty_area_px = render_stats_.rendered_frames == 0
-                                        ? updated_area_px
-                                        : static_cast<uint32_t>((render_stats_.avg_dirty_area_px * 7u + updated_area_px) / 8u);
+                                        ? dirty_area_px
+                                        : static_cast<uint32_t>((render_stats_.avg_dirty_area_px * 7u + dirty_area_px) / 8u);
   render_stats_.last_frame_flushes = frame_flushes;
   render_stats_.last_frame_skipped = false;
   render_stats_.last_frame_full_redraw = last_render_plan_.full_redraw;
@@ -400,14 +283,6 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
 
 void FaceDisplayRenderer::set_render_mode(ncos::services::display::DisplayRenderMode mode) {
   render_mode_ = mode;
-}
-
-void FaceDisplayRenderer::set_ocular_update_pattern(OcularUpdatePattern pattern) {
-  ocular_update_pattern_ = pattern;
-}
-
-OcularUpdatePattern FaceDisplayRenderer::ocular_update_pattern() const {
-  return ocular_update_pattern_;
 }
 
 ncos::services::display::DisplayRenderPlan FaceDisplayRenderer::last_render_plan() const {
