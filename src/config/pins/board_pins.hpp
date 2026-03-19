@@ -12,7 +12,7 @@ namespace pins {
 inline constexpr int kDisplayMosi = 21;
 inline constexpr int kDisplaySck = 47;
 inline constexpr int kDisplayDc = 45;
-inline constexpr int kDisplayRst = 20;
+inline constexpr int kDisplayRst = -1;
 inline constexpr int kDisplayCs = -1;  // Not connected to MCU.
 
 // INMP441 microphone
