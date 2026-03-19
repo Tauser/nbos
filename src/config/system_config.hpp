@@ -27,10 +27,10 @@ struct RuntimeConfig {
   uint32_t diagnostics_heartbeat_ms = 3000;
   bool diagnostics_enabled = true;
   uint8_t boot_display_attempts = 2;
-  DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kEyeTrailDirtyRect;
+  DisplayDiagnosticsMode display_diagnostics_mode = DisplayDiagnosticsMode::kOff;
   uint32_t face_frame_budget_us = 14000;
-  uint32_t display_diagnostics_spi_write_hz = 27000000;
-  bool display_diagnostics_conservative_pacing = true;
+  uint32_t display_diagnostics_spi_write_hz = 40000000;
+  bool display_diagnostics_conservative_pacing = false;
   uint16_t display_diagnostics_conservative_period_ms = 135;
 
   bool ota_enabled = false;
@@ -154,3 +154,4 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+
