@@ -52,6 +52,10 @@ ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
   return ncos::services::face::FaceOfficialPresetId::kCoreNeutral;
 }
 
+bool is_attending_user_input(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return input.touch_active || input.behavior_active || input.social_engagement_percent >= 70;
+}
+
 ncos::core::contracts::MotionFaceSignal face_direction_to_motion_signal(
     ncos::models::face::GazeDirection direction, bool clip_active) {
   ncos::core::contracts::MotionFaceSignal signal{};
@@ -208,6 +212,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   tuning_.stages.compositor_us = static_cast<uint32_t>(ncos::hal::platform::monotonic_time_us() - compositor_start_us);
 
   const FaceOfficialPresetId target_preset = select_official_preset_for_input(multimodal);
+  const bool attending_user = is_attending_user_input(multimodal);
   if (target_preset != official_preset_ && !clip_player_.active()) {
     FaceLayerRequest base_request{};
     base_request.layer = ncos::models::face::FaceLayer::kBase;
@@ -224,7 +229,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     }
   }
 
-  if (!fallback_status_.active && !clip_player_.active() && now_ms >= next_clip_start_ms_) {
+  if (!fallback_status_.active && !clip_player_.active() && !attending_user && now_ms >= next_clip_start_ms_) {
     (void)clip_player_.play(SignatureClip, &compositor_, &state_, now_ms);
     next_clip_start_ms_ = now_ms + 6200;
   }
@@ -245,18 +250,27 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
       if (compositor_.request_layer(gaze_request, now_ms).granted) {
         ncos::models::face::FaceGazeTarget target{};
         target.anchor = ncos::models::face::GazeAnchor::kUser;
-        target.direction = gaze_left_ ? ncos::models::face::GazeDirection::kLeft
-                                      : ncos::models::face::GazeDirection::kRight;
-        target.focus_percent = 48;
-        target.salience_percent = 30;
-        target.hold_ms = 420;
+        if (attending_user) {
+          target.direction = ncos::models::face::GazeDirection::kCenter;
+          target.focus_percent = 62;
+          target.salience_percent = 54;
+          target.hold_ms = 520;
+        } else {
+          target.direction = gaze_left_ ? ncos::models::face::GazeDirection::kLeft
+                                        : ncos::models::face::GazeDirection::kRight;
+          target.focus_percent = 48;
+          target.salience_percent = 30;
+          target.hold_ms = 420;
+        }
         target.origin = ncos::models::face::FaceGazeTargetOrigin::kSystem;
 
         (void)gaze_controller_.set_target(target, now_ms);
-        gaze_left_ = !gaze_left_;
+        if (!attending_user) {
+          gaze_left_ = !gaze_left_;
+        }
       }
 
-      next_gaze_target_ms_ = now_ms + 700;
+      next_gaze_target_ms_ = now_ms + (attending_user ? 420 : 700);
     }
 
     (void)gaze_controller_.tick(now_ms, &state_);
@@ -365,6 +379,7 @@ FaceRenderStats FaceGraphicsPipeline::render_stats() const {
 }
 
 }  // namespace ncos::services::face
+
 
 
 

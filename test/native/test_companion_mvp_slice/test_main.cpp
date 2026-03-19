@@ -70,6 +70,7 @@ void test_companion_mvp_slice_uses_touch_as_official_trigger() {
   TEST_ASSERT_TRUE(face_input.touch_active);
   TEST_ASSERT_TRUE(face_input.behavior_active);
   TEST_ASSERT_EQUAL_UINT8(78, face_input.touch_intensity_percent);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT8(70, face_input.social_engagement_percent);
   TEST_ASSERT_EQUAL_UINT8(58, face_input.behavior_activation_percent);
 }
 

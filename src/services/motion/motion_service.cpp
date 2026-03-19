@@ -14,6 +14,8 @@ constexpr uint64_t kEmbodimentTickIntervalMs = 260;
 constexpr int16_t kMaxStepYawPermille = 140;
 constexpr int16_t kMaxStepPitchPermille = 120;
 constexpr uint32_t kMaxHoldMs = 900;
+constexpr int16_t kAttentionPitchPermille = 55;
+constexpr uint32_t kAttentionHoldMs = 220;
 
 int16_t abs_i16(int16_t v) {
   return v < 0 ? static_cast<int16_t>(-v) : v;
@@ -165,14 +167,37 @@ void MotionService::tick(uint64_t now_ms) {
 
   const bool gaze_has_shift = abs_i16(state_.face_signal.gaze_x_percent) >= 12 ||
                               abs_i16(state_.face_signal.gaze_y_percent) >= 10;
+  const bool attentive_hold_requested =
+      state_.companion_signal.attention_lock && !gaze_has_shift && !state_.face_signal.clip_active;
+
+  if (attentive_hold_requested) {
+    ncos::core::contracts::MotionCommand attend{};
+    attend.intent = ncos::core::contracts::MotionIntent::kAttendUser;
+    attend.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
+    attend.priority = ncos::core::contracts::MotionPriority::kLow;
+    attend.pose = ncos::core::contracts::make_neutral_pose();
+    attend.pose.pitch_permille = kAttentionPitchPermille;
+    attend.pose.speed_percent = static_cast<uint16_t>(30 + state_.companion_signal.emotional_arousal_percent / 5);
+    attend.hold_ms = kAttentionHoldMs;
+    (void)request_motion(attend, now_ms);
+    next_embodiment_ms_ = now_ms + kEmbodimentTickIntervalMs;
+    return;
+  }
+
   if (!gaze_has_shift && !state_.face_signal.clip_active) {
+    if ((state_.last_pose.yaw_permille != 0 || state_.last_pose.pitch_permille != 0) &&
+        !state_.companion_signal.attention_lock) {
+      (void)enforce_neutral_guard(now_ms, false);
+    }
     next_embodiment_ms_ = now_ms + 220;
     return;
   }
 
   ncos::core::contracts::MotionCommand follow{};
   follow.intent = state_.face_signal.clip_active ? ncos::core::contracts::MotionIntent::kAttendUser
-                                                 : ncos::core::contracts::MotionIntent::kObserveStimulus;
+                                                 : (state_.companion_signal.attention_lock
+                                                        ? ncos::core::contracts::MotionIntent::kAttendUser
+                                                        : ncos::core::contracts::MotionIntent::kObserveStimulus);
   follow.origin = ncos::core::contracts::MotionCommandOrigin::kFace;
   follow.priority = ncos::core::contracts::MotionPriority::kLow;
   follow.pose.yaw_permille = static_cast<int16_t>(state_.face_signal.gaze_x_percent * 6);
@@ -279,5 +304,3 @@ bool MotionService::enforce_neutral_guard(uint64_t now_ms, bool recovery_command
 }
 
 }  // namespace ncos::services::motion
-
-

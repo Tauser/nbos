@@ -254,6 +254,33 @@ void test_motion_service_fail_safe_guard_blocks_non_recovery_until_neutral() {
   TEST_ASSERT_TRUE(service.request_motion(command, 8400));
 }
 
+void test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neutral() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(9500));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.attention_lock = true;
+  companion.emotional_arousal_percent = 60;
+  service.update_companion_signal(companion, 9600);
+
+  service.tick(9700);
+
+  TEST_ASSERT_GREATER_THAN_UINT32(1, service.state().apply_success_total);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(55, service.state().last_pose.pitch_permille);
+
+  companion.attention_lock = false;
+  service.update_companion_signal(companion, 10000);
+  service.tick(10100);
+
+  TEST_ASSERT_TRUE(service.state().neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
+}
+
 void test_motion_service_updates_companion_and_face_signals() {
   FakeMotionPort fake{};
 
@@ -295,8 +322,7 @@ int main() {
   RUN_TEST(test_motion_service_tick_uses_companion_safe_mode_for_recovery);
   RUN_TEST(test_motion_service_stale_face_signal_guard_returns_to_neutral);
   RUN_TEST(test_motion_service_fail_safe_guard_blocks_non_recovery_until_neutral);
+  RUN_TEST(test_motion_service_attention_lock_drives_attentive_pose_and_returns_to_neutral);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }
-
-

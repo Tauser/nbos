@@ -20,6 +20,14 @@ uint8_t touch_intensity_percent(const ncos::core::contracts::TouchRuntimeState& 
   return clamp_percent((static_cast<uint32_t>(touch.normalized_level) * 100U) / 1000U);
 }
 
+uint8_t touch_social_engagement_percent(const ncos::core::contracts::TouchRuntimeState& touch) {
+  if (!touch.initialized || !touch.trigger_active) {
+    return 0;
+  }
+
+  return clamp_percent(40U + touch_intensity_percent(touch) / 2U);
+}
+
 uint8_t motion_intensity_percent(const ncos::core::contracts::ImuRuntimeState& imu) {
   const uint32_t gx = imu.gx_dps < 0 ? static_cast<uint32_t>(-imu.gx_dps) : static_cast<uint32_t>(imu.gx_dps);
   const uint32_t gy = imu.gy_dps < 0 ? static_cast<uint32_t>(-imu.gy_dps) : static_cast<uint32_t>(imu.gy_dps);
@@ -60,7 +68,7 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
                                                uint64_t now_ms) {
   FaceMultimodalInput input{};
   input.audio_ready = is_ready_for_local_audio(audio);
-  input.touch_active = touch.initialized && touch.last_read_ok;
+  input.touch_active = touch.initialized && touch.trigger_active;
   input.imu_ready = imu.initialized && imu.last_read_ok;
 
   input.audio_energy_percent = audio_energy_percent(audio);
@@ -70,6 +78,10 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
 
   input.emotional_arousal_percent = companion.emotional.vector.arousal_percent;
   input.social_engagement_percent = companion.emotional.vector.social_engagement_percent;
+  const uint8_t touch_social = touch_social_engagement_percent(touch);
+  if (touch_social > input.social_engagement_percent) {
+    input.social_engagement_percent = touch_social;
+  }
   input.behavior_activation_percent = behavior_activation_percent(behavior, now_ms);
   input.behavior_active = input.behavior_activation_percent > 0;
 

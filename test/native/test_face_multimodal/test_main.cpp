@@ -28,6 +28,7 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   ncos::core::contracts::TouchRuntimeState touch{};
   touch.initialized = true;
   touch.last_read_ok = true;
+  touch.trigger_active = true;
   touch.normalized_level = 650;
 
   ncos::core::contracts::ImuRuntimeState imu{};
@@ -50,7 +51,28 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   TEST_ASSERT_GREATER_THAN_UINT8(0, input.audio_energy_percent);
   TEST_ASSERT_GREATER_THAN_UINT8(0, input.touch_intensity_percent);
   TEST_ASSERT_GREATER_THAN_UINT8(0, input.motion_intensity_percent);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT8(70, input.social_engagement_percent);
   TEST_ASSERT_EQUAL_UINT64(1234, input.observed_at_ms);
+}
+
+void test_face_multimodal_input_ignores_touch_readiness_without_active_trigger() {
+  ncos::core::contracts::AudioRuntimeState audio{};
+
+  ncos::core::contracts::TouchRuntimeState touch{};
+  touch.initialized = true;
+  touch.last_read_ok = true;
+  touch.trigger_active = false;
+  touch.normalized_level = 650;
+
+  ncos::core::contracts::ImuRuntimeState imu{};
+  ncos::core::contracts::CompanionSnapshot companion{};
+  ncos::core::contracts::BehaviorRuntimeState behavior{};
+
+  const auto input =
+      ncos::core::contracts::make_face_multimodal_input(audio, touch, imu, companion, behavior, 1400);
+
+  TEST_ASSERT_FALSE(input.touch_active);
+  TEST_ASSERT_EQUAL_UINT8(0, input.social_engagement_percent);
 }
 
 void test_face_multimodal_sync_applies_modulation_under_ownership() {
@@ -150,11 +172,9 @@ void test_face_tooling_exports_preview_json_snapshot() {
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_face_multimodal_input_aggregates_audio_touch_and_motion);
+  RUN_TEST(test_face_multimodal_input_ignores_touch_readiness_without_active_trigger);
   RUN_TEST(test_face_multimodal_sync_applies_modulation_under_ownership);
   RUN_TEST(test_face_multimodal_sync_generates_full_blink_window_for_engaged_character);
   RUN_TEST(test_face_tooling_exports_preview_json_snapshot);
   return UNITY_END();
 }
-
-
-
