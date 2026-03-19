@@ -49,6 +49,12 @@ bool flush_path_recommended(const DisplayPanelCapabilityProfile& profile,
       }
       return profile.workarounds.prefer_direct_primitives;
 
+    case DisplayFlushPath::kRegionalComposite:
+      if (!profile.workarounds.allow_dirty_rect_for_small_eye_motion) {
+        return false;
+      }
+      return profile.observed.dirty_rect_motion_artifacts;
+
     case DisplayFlushPath::kSpriteWindow:
       if (profile.workarounds.avoid_sprite_window_in_product_path) {
         return false;

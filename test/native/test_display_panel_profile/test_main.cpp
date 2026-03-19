@@ -22,11 +22,11 @@ void test_display_panel_profile_captures_real_panel_quirks() {
   TEST_ASSERT_TRUE(profile.workarounds.avoid_sprite_window_in_product_path);
 }
 
-void test_display_panel_profile_recommends_direct_primitives_over_sprite_window() {
+void test_display_panel_profile_recommends_regional_composite_and_rejects_sprite_window() {
   const auto& profile = ncos::drivers::display::active_panel_capability_profile();
 
   TEST_ASSERT_TRUE(ncos::drivers::display::flush_path_recommended(
-      profile, ncos::drivers::display::DisplayFlushPath::kDirectPrimitives, true));
+      profile, ncos::drivers::display::DisplayFlushPath::kRegionalComposite, true));
   TEST_ASSERT_FALSE(ncos::drivers::display::flush_path_recommended(
       profile, ncos::drivers::display::DisplayFlushPath::kSpriteWindow, true));
 }
@@ -34,6 +34,6 @@ void test_display_panel_profile_recommends_direct_primitives_over_sprite_window(
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_display_panel_profile_captures_real_panel_quirks);
-  RUN_TEST(test_display_panel_profile_recommends_direct_primitives_over_sprite_window);
+  RUN_TEST(test_display_panel_profile_recommends_regional_composite_and_rejects_sprite_window);
   return UNITY_END();
 }

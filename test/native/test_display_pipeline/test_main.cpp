@@ -58,7 +58,7 @@ void test_display_pipeline_reports_background_change_as_full_redraw_reason() {
       plan.full_redraw_reason, ncos::services::display::FullRedrawReason::kBackgroundChanged));
 }
 
-void test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_direct_flush_path() {
+void test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_regional_composite_flush_path() {
   auto previous = make_base_frame();
   auto current = previous;
   current.left_eye_x += 14;
@@ -77,7 +77,7 @@ void test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_direct_flu
   TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect_secondary.w);
   TEST_ASSERT_GREATER_THAN(0, plan.dirty_rect_secondary.h);
   TEST_ASSERT_LESS_THAN_INT(plan.dirty_rect_secondary.x, plan.dirty_rect.x + plan.dirty_rect.w);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::drivers::display::DisplayFlushPath::kDirectPrimitives),
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::drivers::display::DisplayFlushPath::kRegionalComposite),
                         static_cast<int>(plan.recommended_flush_path));
 }
 
@@ -134,7 +134,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_display_pipeline_reports_head_change_as_full_redraw_reason);
   RUN_TEST(test_display_pipeline_reports_background_change_as_full_redraw_reason);
-  RUN_TEST(test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_direct_flush_path);
+  RUN_TEST(test_display_pipeline_uses_dirty_rect_for_eye_motion_and_prefers_regional_composite_flush_path);
   RUN_TEST(test_display_pipeline_marks_dirty_rect_when_clipped_by_bounds);
   RUN_TEST(test_display_pipeline_forces_full_redraw_when_requested);
   RUN_TEST(test_display_pipeline_without_previous_frame_starts_with_full_redraw);

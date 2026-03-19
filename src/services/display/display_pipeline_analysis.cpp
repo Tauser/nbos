@@ -229,9 +229,13 @@ DisplayRenderPlan analyze_render_plan(const ncos::services::face::FaceFrame* pre
     plan.dirty_rect_secondary = DirtyRect{};
   }
 
-  if (!ncos::drivers::display::flush_path_recommended(
-          panel_profile, ncos::drivers::display::DisplayFlushPath::kDirectPrimitives,
+  if (ncos::drivers::display::flush_path_recommended(
+          panel_profile, ncos::drivers::display::DisplayFlushPath::kRegionalComposite,
           plan.high_contrast_motion)) {
+    plan.recommended_flush_path = ncos::drivers::display::DisplayFlushPath::kRegionalComposite;
+  } else if (!ncos::drivers::display::flush_path_recommended(
+                 panel_profile, ncos::drivers::display::DisplayFlushPath::kDirectPrimitives,
+                 plan.high_contrast_motion)) {
     plan.recommended_flush_path = ncos::drivers::display::DisplayFlushPath::kSpriteWindow;
   }
 

@@ -11,6 +11,7 @@ enum class DisplayPanelId : uint8_t {
 
 enum class DisplayFlushPath : uint8_t {
   kDirectPrimitives = 0,
+  kRegionalComposite,
   kSpriteWindow,
 };
 
