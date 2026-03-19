@@ -20,6 +20,11 @@ class RuntimeConfigStore final : public ncos::interfaces::state::RuntimeConfigPe
 
   static ncos::core::contracts::PersistedRuntimeConfigRecord capture_runtime_config(
       const ncos::config::RuntimeConfig& runtime_config);
+  static bool is_exportable_record(
+      const ncos::core::contracts::PersistedRuntimeConfigRecord& record);
+  static bool apply_import_record_to_runtime_config(
+      const ncos::core::contracts::PersistedRuntimeConfigRecord& record,
+      ncos::config::RuntimeConfig* runtime_config);
   static void apply_record_to_runtime_config(
       const ncos::core::contracts::PersistedRuntimeConfigRecord& record,
       ncos::config::RuntimeConfig* runtime_config);

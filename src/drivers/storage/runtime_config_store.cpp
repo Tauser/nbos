@@ -42,22 +42,21 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load
   }
 
   const auto& bsp = active_storage_platform_bsp();
-  if (!bsp.persistence.allow_runtime_config_persistence || bsp.config_backend == StorageBackendId::kUnavailable) {
+  if (!bsp.persistence.allow_runtime_config_persistence ||
+      bsp.config_backend == StorageBackendId::kUnavailable) {
     return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kUnavailable;
   }
 
   ncos::core::contracts::PersistedRuntimeConfigRecord stored{};
   size_t stored_size = 0;
-  const auto status = persistence_->read_blob(bsp.config_namespace,
-                                              bsp.runtime_config_key,
-                                              &stored,
-                                              sizeof(stored),
-                                              &stored_size);
+  const auto status = persistence_->read_blob(
+      bsp.config_namespace, bsp.runtime_config_key, &stored, sizeof(stored), &stored_size);
   if (status != LocalPersistenceStatus::kOk) {
     return map_status(status);
   }
 
-  if (stored_size != sizeof(stored) || !ncos::core::contracts::is_valid_persisted_runtime_config(stored)) {
+  if (stored_size != sizeof(stored) ||
+      !ncos::core::contracts::is_valid_persisted_runtime_config(stored)) {
     if (bsp.persistence.erase_corrupt_records) {
       (void)persistence_->erase_key(bsp.config_namespace, bsp.runtime_config_key);
     }
@@ -71,7 +70,8 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::load
 ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::save(
     const ncos::core::contracts::PersistedRuntimeConfigRecord& record) {
   const auto& bsp = active_storage_platform_bsp();
-  if (!bsp.persistence.allow_runtime_config_persistence || bsp.config_backend == StorageBackendId::kUnavailable) {
+  if (!bsp.persistence.allow_runtime_config_persistence ||
+      bsp.config_backend == StorageBackendId::kUnavailable) {
     return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kUnavailable;
   }
 
@@ -81,13 +81,14 @@ ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::save
     return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kInvalidData;
   }
 
-  return map_status(
-      persistence_->write_blob(bsp.config_namespace, bsp.runtime_config_key, &sanitized, sizeof(sanitized)));
+  return map_status(persistence_->write_blob(
+      bsp.config_namespace, bsp.runtime_config_key, &sanitized, sizeof(sanitized)));
 }
 
 ncos::interfaces::state::RuntimeConfigPersistenceStatus RuntimeConfigStore::reset() {
   const auto& bsp = active_storage_platform_bsp();
-  if (!bsp.persistence.allow_runtime_config_persistence || bsp.config_backend == StorageBackendId::kUnavailable) {
+  if (!bsp.persistence.allow_runtime_config_persistence ||
+      bsp.config_backend == StorageBackendId::kUnavailable) {
     return ncos::interfaces::state::RuntimeConfigPersistenceStatus::kUnavailable;
   }
 
@@ -111,6 +112,27 @@ ncos::core::contracts::PersistedRuntimeConfigRecord RuntimeConfigStore::capture_
   record.telemetry_interval_ms = runtime_config.telemetry_interval_ms;
   ncos::core::contracts::sanitize_persisted_runtime_config(&record);
   return record;
+}
+
+bool RuntimeConfigStore::is_exportable_record(
+    const ncos::core::contracts::PersistedRuntimeConfigRecord& record) {
+  if (!ncos::core::contracts::storage_data_is_portable(
+          ncos::core::contracts::StorageDataClass::kRuntimeConfig)) {
+    return false;
+  }
+
+  return ncos::core::contracts::is_importable_persisted_runtime_config(record);
+}
+
+bool RuntimeConfigStore::apply_import_record_to_runtime_config(
+    const ncos::core::contracts::PersistedRuntimeConfigRecord& record,
+    ncos::config::RuntimeConfig* runtime_config) {
+  if (runtime_config == nullptr || !is_exportable_record(record)) {
+    return false;
+  }
+
+  apply_record_to_runtime_config(record, runtime_config);
+  return true;
 }
 
 void RuntimeConfigStore::apply_record_to_runtime_config(
