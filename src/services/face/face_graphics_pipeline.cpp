@@ -33,7 +33,7 @@ bool has_warm_user_continuity(const ncos::core::contracts::FaceMultimodalInput& 
   return has_warm_continuity(
            input,
            ncos::core::contracts::personality_continuity_window_ms(
-               ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
+               input.personality, ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
          (input.recent_stimulus_target == AttentionTarget::kUser ||
           input.recent_interaction_phase == InteractionPhase::kResponding ||
           input.recent_turn_owner != TurnOwner::kNone) &&
@@ -44,7 +44,7 @@ bool has_warm_stimulus_continuity(const ncos::core::contracts::FaceMultimodalInp
   return has_warm_continuity(
            input,
            ncos::core::contracts::personality_continuity_window_ms(
-               ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
+               input.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
          input.recent_stimulus_target == AttentionTarget::kStimulus;
 }
 
@@ -182,7 +182,7 @@ FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts
       break;
   }
 
-  const auto envelope = personality_face_profile(mode);
+  const auto envelope = personality_face_profile(input.personality, mode);
   FaceAutonomyGazeProfile profile{};
   profile.focus_percent = envelope.focus_percent;
   profile.salience_percent = envelope.salience_percent;

@@ -193,6 +193,7 @@ void MotionService::tick(uint64_t now_ms) {
       has_fresh_warm_continuity(
           state_.companion_signal, now_ms,
           ncos::core::contracts::personality_continuity_window_ms(
+              state_.companion_signal.personality,
               ncos::core::contracts::PersonalityContinuityKind::kUser)) &&
       (state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kUser ||
        state_.companion_signal.recent_interaction_phase == ncos::core::contracts::InteractionPhase::kResponding ||
@@ -202,6 +203,7 @@ void MotionService::tick(uint64_t now_ms) {
       has_fresh_warm_continuity(
           state_.companion_signal, now_ms,
           ncos::core::contracts::personality_continuity_window_ms(
+              state_.companion_signal.personality,
               ncos::core::contracts::PersonalityContinuityKind::kStimulus)) &&
       state_.companion_signal.recent_stimulus_target == ncos::core::contracts::AttentionTarget::kStimulus;
   const bool attentive_hold_requested = !active_face_expression &&
@@ -210,7 +212,8 @@ void MotionService::tick(uint64_t now_ms) {
 
   if (!active_face_expression && restful_state) {
     const auto rest_profile =
-        ncos::core::contracts::personality_motion_profile(ncos::core::contracts::PersonalityMotionMode::kRest);
+        ncos::core::contracts::personality_motion_profile(
+            state_.companion_signal.personality, ncos::core::contracts::PersonalityMotionMode::kRest);
 
     ncos::core::contracts::MotionCommand rest{};
     rest.intent = ncos::core::contracts::MotionIntent::kPowerSave;
@@ -230,6 +233,7 @@ void MotionService::tick(uint64_t now_ms) {
     const bool warm_only = !state_.companion_signal.attention_lock && !attentive_state && !alert_state &&
                            (warm_user_context || warm_stimulus_context);
     const auto profile = ncos::core::contracts::personality_motion_profile(
+        state_.companion_signal.personality,
         product_state == ncos::core::contracts::CompanionProductState::kResponding
             ? ncos::core::contracts::PersonalityMotionMode::kResponding
             : (alert_state

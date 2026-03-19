@@ -66,6 +66,7 @@ struct MotionCompanionSignal {
   bool safe_mode = false;
   bool attention_lock = false;
   bool session_warm = false;
+  CompanionPersonalityState personality{};
   uint8_t emotional_arousal_percent = 0;
   uint8_t recent_engagement_percent = 0;
   uint64_t session_last_activity_ms = 0;

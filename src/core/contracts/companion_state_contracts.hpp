@@ -91,14 +91,15 @@ enum class TurnOwner : uint8_t {
 
 enum class CompanionStateDomain : uint8_t {
   kStructural = 1,
-  kRuntime = 2,
-  kGovernance = 3,
-  kEmotional = 4,
-  kAttentional = 5,
-  kEnergetic = 6,
-  kInteractional = 7,
-  kTransient = 8,
-  kSessionMemory = 9,
+  kPersonality = 2,
+  kRuntime = 3,
+  kGovernance = 4,
+  kEmotional = 5,
+  kAttentional = 6,
+  kEnergetic = 7,
+  kInteractional = 8,
+  kTransient = 9,
+  kSessionMemory = 10,
 };
 
 enum class CompanionStateWriter : uint8_t {
@@ -126,6 +127,21 @@ struct CompanionStructuralState {
   bool offline_first = true;
   uint16_t semantic_taxonomy_version = 0;
   const char* board_name = "unknown";
+};
+
+struct CompanionPersonalityState {
+  const char* profile_name = "companion_core";
+  uint8_t warmth_percent = 68;
+  uint8_t curiosity_percent = 58;
+  uint8_t composure_percent = 72;
+  uint8_t initiative_percent = 46;
+  uint8_t assertiveness_percent = 52;
+  uint32_t behavior_energy_protect_ttl_ms = 420;
+  uint32_t behavior_alert_scan_ttl_ms = 220;
+  uint32_t behavior_attend_user_ttl_ms = 220;
+  uint32_t reengagement_ttl_ms = 190;
+  uint64_t user_continuity_window_ms = 3200;
+  uint64_t stimulus_continuity_window_ms = 2400;
 };
 
 struct CompanionTransientState {
@@ -226,6 +242,7 @@ struct CompanionSessionMemoryState {
 
 struct CompanionSnapshot {
   CompanionStructuralState structural{};
+  CompanionPersonalityState personality{};
   CompanionRuntimeState runtime{};
   CompanionGovernanceState governance{};
   CompanionEmotionalState emotional{};

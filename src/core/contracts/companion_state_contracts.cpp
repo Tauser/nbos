@@ -122,7 +122,8 @@ CompanionEmotionalSignal normalize_emotional_signal(const CompanionEmotionalSign
 bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain domain) {
   switch (writer) {
     case CompanionStateWriter::kBootstrap:
-      return domain == CompanionStateDomain::kStructural;
+      return domain == CompanionStateDomain::kStructural ||
+             domain == CompanionStateDomain::kPersonality;
     case CompanionStateWriter::kRuntimeCore:
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance;
     case CompanionStateWriter::kGovernanceCore:
@@ -147,13 +148,15 @@ bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain
     case CompanionStateReader::kBehaviorService:
       return domain != CompanionStateDomain::kStructural;
     case CompanionStateReader::kFaceService:
-      return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
+      return domain == CompanionStateDomain::kPersonality ||
+             domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEmotional ||
              domain == CompanionStateDomain::kAttentional ||
              domain == CompanionStateDomain::kInteractional ||
              domain == CompanionStateDomain::kSessionMemory;
     case CompanionStateReader::kMotionService:
-      return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
+      return domain == CompanionStateDomain::kPersonality ||
+             domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kAttentional ||
              domain == CompanionStateDomain::kEnergetic ||
              domain == CompanionStateDomain::kInteractional ||
@@ -168,8 +171,8 @@ bool can_reader_observe_domain(CompanionStateReader reader, CompanionStateDomain
       return domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEnergetic;
     case CompanionStateReader::kDiagnostics:
-      return domain == CompanionStateDomain::kStructural || domain == CompanionStateDomain::kRuntime ||
-             domain == CompanionStateDomain::kGovernance ||
+      return domain == CompanionStateDomain::kStructural || domain == CompanionStateDomain::kPersonality ||
+             domain == CompanionStateDomain::kRuntime || domain == CompanionStateDomain::kGovernance ||
              domain == CompanionStateDomain::kEnergetic ||
              domain == CompanionStateDomain::kTransient ||
              domain == CompanionStateDomain::kSessionMemory;
@@ -187,6 +190,21 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
 
   if (!can_reader_observe_domain(reader, CompanionStateDomain::kStructural)) {
     redacted.structural = CompanionStructuralState{};
+  }
+  if (!can_reader_observe_domain(reader, CompanionStateDomain::kPersonality)) {
+    redacted.personality = CompanionPersonalityState{};
+    redacted.personality.profile_name = nullptr;
+    redacted.personality.warmth_percent = 0;
+    redacted.personality.curiosity_percent = 0;
+    redacted.personality.composure_percent = 0;
+    redacted.personality.initiative_percent = 0;
+    redacted.personality.assertiveness_percent = 0;
+    redacted.personality.behavior_energy_protect_ttl_ms = 0;
+    redacted.personality.behavior_alert_scan_ttl_ms = 0;
+    redacted.personality.behavior_attend_user_ttl_ms = 0;
+    redacted.personality.reengagement_ttl_ms = 0;
+    redacted.personality.user_continuity_window_ms = 0;
+    redacted.personality.stimulus_continuity_window_ms = 0;
   }
   if (!can_reader_observe_domain(reader, CompanionStateDomain::kRuntime)) {
     redacted.runtime = CompanionRuntimeState{};

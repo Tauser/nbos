@@ -16,6 +16,7 @@ struct FaceMultimodalInput {
   bool motion_active = false;
   bool behavior_active = false;
   bool session_warm = false;
+  CompanionPersonalityState personality{};
   CompanionProductState companion_product_state = CompanionProductState::kBooting;
   AttentionTarget recent_stimulus_target = AttentionTarget::kNone;
   AttentionChannel recent_stimulus_channel = AttentionChannel::kVisual;

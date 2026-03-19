@@ -94,7 +94,7 @@ bool EmotionService::tick(const ncos::core::contracts::CompanionSnapshot& snapsh
   }
 
   ncos::core::contracts::apply_personality_baseline_to_emotion(
-      &model, behavior_state.active_profile, routine_state.attention_mode);
+      snapshot.personality, &model, behavior_state.active_profile, routine_state.attention_mode);
   model = ncos::models::emotion::normalize_model(model);
 
   ncos::core::contracts::CompanionEmotionalSignal signal{};

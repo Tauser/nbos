@@ -55,6 +55,8 @@ void test_face_multimodal_input_aggregates_audio_touch_and_motion() {
   TEST_ASSERT_GREATER_OR_EQUAL_UINT8(70, input.social_engagement_percent);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAttendUser),
                         static_cast<int>(input.companion_product_state));
+  TEST_ASSERT_EQUAL_STRING("companion_core", input.personality.profile_name);
+  TEST_ASSERT_EQUAL_UINT8(68, input.personality.warmth_percent);
   TEST_ASSERT_EQUAL_UINT64(1234, input.observed_at_ms);
 }
 

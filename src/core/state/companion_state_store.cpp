@@ -1,5 +1,7 @@
 #include "core/state/companion_state_store.hpp"
 
+#include "core/contracts/companion_personality_contracts.hpp"
+
 namespace {
 constexpr uint64_t AttendUserHoldMs = 1400;
 constexpr uint64_t AlertScanHoldMs = 1600;
@@ -18,6 +20,7 @@ bool CompanionStateStore::initialize(const ncos::core::contracts::CompanionStruc
   }
 
   snapshot_.structural = structural;
+  snapshot_.personality = ncos::core::contracts::make_companion_personality_state();
   snapshot_.runtime.last_transition_cause =
       ncos::core::contracts::CompanionStateTransitionCause::kBootstrap;
   snapshot_.runtime.last_state_change_ms = now_ms;

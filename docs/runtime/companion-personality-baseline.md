@@ -22,6 +22,10 @@ O companion nao deve:
 - ficar pegajoso ou insistente fora da janela curta de continuidade
 - perder estabilidade visual e emocional por exagero de resposta
 
+## Fonte de verdade oficial
+
+A personalidade-base agora vive em `CompanionSnapshot.personality` e e a leitura oficial compartilhada para `BehaviorService`, `Face` e `Motion`. Isso evita duplicacao de parametros locais e mantem um baseline unico de produto para expressao, timing e sociabilidade.
+
 ## Onde a personalidade opera hoje
 
 A personalidade-base entra apenas onde ja existe efeito real de produto:

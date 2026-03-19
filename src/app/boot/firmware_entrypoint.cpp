@@ -133,6 +133,7 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
                           behavior_attention_lock ||
                           snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kResponding;
   signal.session_warm = snapshot.session.warm;
+  signal.personality = snapshot.personality;
   signal.emotional_arousal_percent = map_arousal_percent(snapshot, behavior_state, now_ms);
   signal.recent_engagement_percent = snapshot.session.engagement_recent_percent;
   signal.session_last_activity_ms = snapshot.session.last_activity_ms;

@@ -417,6 +417,9 @@ void test_motion_service_updates_companion_and_face_signals() {
   TEST_ASSERT_TRUE(state.companion_signal.safe_mode);
   TEST_ASSERT_TRUE(state.companion_signal.attention_lock);
   TEST_ASSERT_FALSE(state.companion_signal.session_warm);
+  TEST_ASSERT_EQUAL_STRING("companion_core", state.companion_signal.personality.profile_name);
+  TEST_ASSERT_EQUAL_UINT8(68, state.companion_signal.personality.warmth_percent);
+  TEST_ASSERT_EQUAL_UINT16(190, state.companion_signal.personality.reengagement_ttl_ms);
   TEST_ASSERT_EQUAL_UINT8(78, state.companion_signal.emotional_arousal_percent);
   TEST_ASSERT_EQUAL_UINT64(0, state.companion_signal.session_last_activity_ms);
   TEST_ASSERT_EQUAL_UINT64(0, state.companion_signal.session_last_engagement_ms);

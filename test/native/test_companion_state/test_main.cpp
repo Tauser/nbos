@@ -29,6 +29,18 @@ void test_companion_state_keeps_structural_source_of_truth() {
   TEST_ASSERT_EQUAL_STRING("esp32s3_dev", snap.structural.board_name);
 }
 
+void test_companion_state_exposes_personality_from_central_snapshot() {
+  ncos::core::state::CompanionStateStore store;
+
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+
+  TEST_ASSERT_EQUAL_STRING("companion_core", snap.personality.profile_name);
+  TEST_ASSERT_EQUAL_UINT8(68, snap.personality.warmth_percent);
+  TEST_ASSERT_EQUAL_UINT8(58, snap.personality.curiosity_percent);
+  TEST_ASSERT_EQUAL_UINT16(190, snap.personality.reengagement_ttl_ms);
+}
+
 void test_companion_state_rejects_unauthorized_write() {
   ncos::core::state::CompanionStateStore store;
 
@@ -667,6 +679,22 @@ void test_companion_state_redacts_short_session_memory_for_cloud_reader() {
   TEST_ASSERT_EQUAL_UINT16(0, cloud_view.session.user_trigger_count);
 }
 
+void test_companion_state_redacts_personality_for_cloud_reader() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  const auto runtime_view = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  const auto cloud_view = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
+
+  TEST_ASSERT_EQUAL_STRING("companion_core", runtime_view.personality.profile_name);
+  TEST_ASSERT_EQUAL_UINT8(68, runtime_view.personality.warmth_percent);
+  TEST_ASSERT_NULL(cloud_view.personality.profile_name);
+  TEST_ASSERT_EQUAL_UINT8(0, cloud_view.personality.warmth_percent);
+  TEST_ASSERT_EQUAL_UINT8(0, cloud_view.personality.curiosity_percent);
+  TEST_ASSERT_EQUAL_UINT16(0, cloud_view.personality.reengagement_ttl_ms);
+  TEST_ASSERT_EQUAL_UINT64(0, cloud_view.personality.user_continuity_window_ms);
+}
+
 void test_companion_state_keeps_recent_stimulus_after_alert_scan_recovers_to_idle() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -783,6 +811,7 @@ void test_companion_state_redacts_by_reader_profile() {
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_companion_state_keeps_structural_source_of_truth);
+  RUN_TEST(test_companion_state_exposes_personality_from_central_snapshot);
   RUN_TEST(test_companion_state_rejects_unauthorized_write);
   RUN_TEST(test_companion_state_updates_emotional_domain);
   RUN_TEST(test_companion_state_normalizes_authoritative_emotion_vector);
@@ -803,6 +832,7 @@ int main() {
   RUN_TEST(test_companion_state_keeps_recent_stimulus_after_alert_scan_recovers_to_idle);
   RUN_TEST(test_companion_state_keeps_recent_engagement_and_interaction_context);
   RUN_TEST(test_companion_state_redacts_short_session_memory_for_cloud_reader);
+  RUN_TEST(test_companion_state_redacts_personality_for_cloud_reader);
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }

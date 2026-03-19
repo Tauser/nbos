@@ -76,6 +76,7 @@ FaceMultimodalInput make_face_multimodal_input(const AudioRuntimeState& audio,
   input.motion_intensity_percent = motion_intensity_percent(imu);
   input.motion_active = input.motion_intensity_percent >= 15;
   input.session_warm = companion.session.warm;
+  input.personality = companion.personality;
   input.companion_product_state = companion.runtime.product_state;
   input.recent_stimulus_target = companion.session.recent_stimulus.target;
   input.recent_stimulus_channel = companion.session.recent_stimulus.channel;
