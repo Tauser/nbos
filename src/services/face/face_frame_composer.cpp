@@ -51,26 +51,27 @@ bool is_lateral_direction(ncos::models::face::GazeDirection direction) {
 }
 
 int16_t lateral_parallax_shift_px(ncos::models::face::GazeDirection direction, uint8_t focus_percent) {
-  if (!is_lateral_direction(direction) || focus_percent < 80) {
+  if (!is_lateral_direction(direction) || focus_percent < 45) {
     return 0;
   }
-  return direction == ncos::models::face::GazeDirection::kLeft ? -1 : 1;
+  const int16_t shift = focus_percent >= 70 ? 2 : 1;
+  return direction == ncos::models::face::GazeDirection::kLeft ? static_cast<int16_t>(-shift) : shift;
 }
 
 int8_t leading_eye_parallax_size_delta_percent(ncos::models::face::GazeDirection direction,
                                                 uint8_t focus_percent) {
-  if (!is_lateral_direction(direction) || focus_percent < 40) {
+  if (!is_lateral_direction(direction) || focus_percent < 35) {
     return 0;
   }
-  return focus_percent >= 70 ? 4 : 2;
+  return focus_percent >= 60 ? 7 : 4;
 }
 
 int8_t trailing_eye_parallax_size_delta_percent(ncos::models::face::GazeDirection direction,
                                                  uint8_t focus_percent) {
-  if (!is_lateral_direction(direction) || focus_percent < 40) {
+  if (!is_lateral_direction(direction) || focus_percent < 35) {
     return 0;
   }
-  return focus_percent >= 70 ? -2 : -1;
+  return focus_percent >= 60 ? -4 : -2;
 }
 
 int8_t compose_size_delta(int8_t manual_delta, int8_t parallax_delta) {
@@ -170,3 +171,4 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
 }
 
 }  // namespace ncos::services::face
+

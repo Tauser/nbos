@@ -90,8 +90,8 @@ void test_face_visual_regression_freezes_key_gaze_signatures() {
   up_right_state.eyes.direction = ncos::models::face::GazeDirection::kUpRight;
 
   assert_signature(compose_signature(center_state), {109, 112, 211, 112, 16, 67, 67, 14, 67, 67, 67, 67, 145, 149});
-  assert_signature(compose_signature(left_state), {100, 112, 203, 112, 16, 67, 67, 14, 70, 70, 66, 66, 145, 149});
-  assert_signature(compose_signature(right_state), {117, 112, 220, 112, 16, 67, 67, 14, 66, 66, 70, 70, 145, 149});
+  assert_signature(compose_signature(left_state), {99, 112, 203, 112, 16, 67, 67, 14, 72, 72, 64, 64, 145, 149});
+  assert_signature(compose_signature(right_state), {117, 112, 221, 112, 16, 67, 67, 14, 64, 64, 72, 72, 145, 149});
   assert_signature(compose_signature(up_right_state), {115, 108, 217, 108, 16, 67, 67, 14, 67, 67, 67, 67, 145, 149});
 }
 
@@ -125,13 +125,13 @@ void test_face_visual_regression_freezes_official_preset_signatures() {
       {ncos::services::face::FaceOfficialPresetId::kCoreNeutral,
        {107, 112, 213, 112, 17, 70, 70, 14, 70, 70, 70, 70, 145, 149}},
       {ncos::services::face::FaceOfficialPresetId::kCoreAttend,
-       {112, 111, 224, 111, 16, 68, 59, 14, 67, 58, 71, 62, 156, 134}},
+       {112, 111, 225, 111, 16, 68, 59, 14, 65, 57, 73, 64, 156, 134}},
       {ncos::services::face::FaceOfficialPresetId::kCoreCalm,
        {109, 116, 211, 116, 8, 64, 48, 12, 64, 48, 64, 48, 145, 149}},
       {ncos::services::face::FaceOfficialPresetId::kCoreCurious,
        {104, 106, 206, 106, 18, 72, 69, 14, 72, 69, 72, 69, 139, 152}},
       {ncos::services::face::FaceOfficialPresetId::kCoreLock,
-       {94, 112, 209, 112, 16, 67, 54, 13, 70, 57, 66, 54, 156, 134}},
+       {93, 112, 209, 112, 16, 67, 54, 13, 72, 59, 64, 52, 156, 134}},
   };
 
   for (const auto& expectation : kExpectations) {
@@ -148,3 +148,4 @@ int main() {
   RUN_TEST(test_face_visual_regression_freezes_official_preset_signatures);
   return UNITY_END();
 }
+
