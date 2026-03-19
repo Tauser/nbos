@@ -199,6 +199,19 @@ Portable export/import is intentionally narrow:
 
 This keeps product portability useful without turning storage into a hidden replication surface.
 
+## Validation scenarios
+
+The current native validation matrix now explicitly covers:
+- stable reboot after committed save: latest valid snapshot remains readable after a new store instance starts
+- interrupted write across reboot: corrupted newer slot falls back to the previous valid snapshot and repairs storage
+- legacy migration: old single-slot data is accepted once and migrated into the dual-slot envelope
+- profile reset recovery: if no valid snapshot remains, storage is rebuilt from the safe runtime-config baseline
+- export/import after reset: portable payload survives user reset and can be re-applied without bypassing sanitation
+
+This makes the persistence path not only recoverable, but also auditable through:
+- explicit recovery path classification
+- repaired-storage flag on recovery load
+- deterministic test coverage for each recovery mode
 ## Trade-offs
 
 Accepted trade-offs for this stage:
@@ -210,3 +223,5 @@ Accepted trade-offs for this stage:
 - dual-slot durability is implemented only for runtime config, not yet for every future data class
 
 This keeps the checkpoint small, reviewable, and safe before the next memory/storage stages.
+
+
