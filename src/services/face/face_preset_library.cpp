@@ -193,6 +193,44 @@ uint8_t clamp_percent(uint8_t value) {
   return value > 100 ? 100 : value;
 }
 
+void apply_official_eye_signature(FaceOfficialPresetId id,
+                                  ncos::core::contracts::FaceRenderState* state) {
+  if (state == nullptr) {
+    return;
+  }
+
+  state->eyes.left_adjust = {};
+  state->eyes.right_adjust = {};
+
+  switch (id) {
+    case FaceOfficialPresetId::kCoreNeutral:
+    case FaceOfficialPresetId::kCoreCalm:
+      break;
+    case FaceOfficialPresetId::kCoreAttend:
+      state->eyes.left_adjust.size_delta_percent = -4;
+      state->eyes.left_adjust.openness_delta_percent = -4;
+      state->eyes.right_adjust.x_offset_px = 1;
+      state->eyes.right_adjust.size_delta_percent = 4;
+      state->eyes.right_adjust.openness_delta_percent = 4;
+      break;
+    case FaceOfficialPresetId::kCoreCurious:
+      state->eyes.left_adjust.x_offset_px = -1;
+      state->eyes.left_adjust.y_offset_px = -1;
+      state->eyes.left_adjust.size_delta_percent = 4;
+      state->eyes.left_adjust.openness_delta_percent = 4;
+      state->eyes.right_adjust.size_delta_percent = -2;
+      state->eyes.right_adjust.openness_delta_percent = -2;
+      break;
+    case FaceOfficialPresetId::kCoreLock:
+      state->eyes.left_adjust.x_offset_px = -1;
+      state->eyes.left_adjust.size_delta_percent = 4;
+      state->eyes.left_adjust.openness_delta_percent = 4;
+      state->eyes.right_adjust.size_delta_percent = -3;
+      state->eyes.right_adjust.openness_delta_percent = -4;
+      break;
+  }
+}
+
 }  // namespace
 
 namespace ncos::services::face {
@@ -274,7 +312,12 @@ bool apply_official_face_preset(FaceOfficialPresetId id,
     return false;
   }
 
-  return apply_face_preset(spec->source, state, now_ms);
+  if (!apply_face_preset(spec->source, state, now_ms)) {
+    return false;
+  }
+
+  apply_official_eye_signature(id, state);
+  return ncos::core::contracts::is_valid(*state);
 }
 
 }  // namespace ncos::services::face

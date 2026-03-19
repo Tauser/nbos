@@ -125,13 +125,13 @@ void test_face_visual_regression_freezes_official_preset_signatures() {
       {ncos::services::face::FaceOfficialPresetId::kCoreNeutral,
        {107, 112, 213, 112, 17, 70, 70, 14, 70, 70, 70, 70, 145, 149}},
       {ncos::services::face::FaceOfficialPresetId::kCoreAttend,
-       {112, 111, 225, 111, 16, 68, 59, 14, 65, 57, 73, 64, 156, 134}},
+       {112, 111, 226, 111, 16, 68, 59, 14, 63, 53, 75, 69, 156, 134}},
       {ncos::services::face::FaceOfficialPresetId::kCoreCalm,
        {109, 116, 211, 116, 8, 64, 48, 12, 64, 48, 64, 48, 145, 149}},
       {ncos::services::face::FaceOfficialPresetId::kCoreCurious,
-       {104, 106, 206, 106, 18, 72, 69, 14, 72, 69, 72, 69, 139, 152}},
+       {103, 105, 206, 106, 18, 72, 69, 14, 75, 75, 71, 67, 139, 152}},
       {ncos::services::face::FaceOfficialPresetId::kCoreLock,
-       {93, 112, 209, 112, 16, 67, 54, 13, 72, 59, 64, 52, 156, 134}},
+       {92, 112, 209, 112, 16, 67, 54, 13, 74, 64, 62, 48, 156, 134}},
   };
 
   for (const auto& expectation : kExpectations) {
@@ -148,4 +148,6 @@ int main() {
   RUN_TEST(test_face_visual_regression_freezes_official_preset_signatures);
   return UNITY_END();
 }
+
+
 

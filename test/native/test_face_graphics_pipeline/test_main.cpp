@@ -92,7 +92,7 @@ void test_face_frame_composer_adds_subtle_lateral_parallax_without_touching_diag
   TEST_ASSERT_EQUAL_INT16(diagonal_frame.left_eye_w, diagonal_frame.right_eye_w);
 }
 
-void test_face_official_preset_resets_eye_asymmetry_adjustments() {
+void test_face_official_preset_applies_curated_eye_signature() {
   auto state = ncos::core::contracts::make_face_render_state_baseline();
   state.eyes.left_adjust.x_offset_px = -4;
   state.eyes.right_adjust.size_delta_percent = 12;
@@ -101,9 +101,11 @@ void test_face_official_preset_resets_eye_asymmetry_adjustments() {
       ncos::services::face::FaceOfficialPresetId::kCoreAttend, &state, 1500));
 
   TEST_ASSERT_EQUAL_INT8(0, state.eyes.left_adjust.x_offset_px);
-  TEST_ASSERT_EQUAL_INT8(0, state.eyes.left_adjust.size_delta_percent);
-  TEST_ASSERT_EQUAL_INT8(0, state.eyes.right_adjust.x_offset_px);
-  TEST_ASSERT_EQUAL_INT8(0, state.eyes.right_adjust.size_delta_percent);
+  TEST_ASSERT_EQUAL_INT8(-4, state.eyes.left_adjust.size_delta_percent);
+  TEST_ASSERT_EQUAL_INT8(-4, state.eyes.left_adjust.openness_delta_percent);
+  TEST_ASSERT_EQUAL_INT8(1, state.eyes.right_adjust.x_offset_px);
+  TEST_ASSERT_EQUAL_INT8(4, state.eyes.right_adjust.size_delta_percent);
+  TEST_ASSERT_EQUAL_INT8(4, state.eyes.right_adjust.openness_delta_percent);
 }
 
 void test_face_frame_composer_rejects_invalid_render_state() {
@@ -122,7 +124,7 @@ int main() {
   RUN_TEST(test_face_frame_composer_applies_gaze_offset_without_renderer_semantics);
   RUN_TEST(test_face_frame_composer_supports_controlled_eye_asymmetry);
   RUN_TEST(test_face_frame_composer_adds_subtle_lateral_parallax_without_touching_diagonal);
-  RUN_TEST(test_face_official_preset_resets_eye_asymmetry_adjustments);
+  RUN_TEST(test_face_official_preset_applies_curated_eye_signature);
   RUN_TEST(test_face_frame_composer_rejects_invalid_render_state);
   return UNITY_END();
 }
