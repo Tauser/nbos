@@ -53,6 +53,68 @@ constexpr CompanionPersonalityState make_companion_personality_state() {
   return CompanionPersonalityState{};
 }
 
+constexpr int8_t personality_adaptive_social_warmth_bias_min_percent() {
+  return -10;
+}
+
+constexpr int8_t personality_adaptive_social_warmth_bias_max_percent() {
+  return 10;
+}
+
+constexpr int8_t personality_adaptive_response_energy_bias_min_percent() {
+  return -8;
+}
+
+constexpr int8_t personality_adaptive_response_energy_bias_max_percent() {
+  return 8;
+}
+
+constexpr int16_t personality_adaptive_continuity_window_bias_min_ms() {
+  return -600;
+}
+
+constexpr int16_t personality_adaptive_continuity_window_bias_max_ms() {
+  return 600;
+}
+
+constexpr int8_t personality_clamp_i8(int16_t value, int8_t min_value, int8_t max_value) {
+  if (value < min_value) {
+    return min_value;
+  }
+  if (value > max_value) {
+    return max_value;
+  }
+  return static_cast<int8_t>(value);
+}
+
+constexpr int16_t personality_clamp_i16(int32_t value, int16_t min_value, int16_t max_value) {
+  if (value < min_value) {
+    return min_value;
+  }
+  if (value > max_value) {
+    return max_value;
+  }
+  return static_cast<int16_t>(value);
+}
+
+constexpr int8_t personality_social_warmth_bias_percent(const CompanionPersonalityState& personality) {
+  return personality_clamp_i8(personality.adaptive_social_warmth_bias_percent,
+                              personality_adaptive_social_warmth_bias_min_percent(),
+                              personality_adaptive_social_warmth_bias_max_percent());
+}
+
+constexpr int8_t personality_response_energy_bias_percent(const CompanionPersonalityState& personality) {
+  return personality_clamp_i8(personality.adaptive_response_energy_bias_percent,
+                              personality_adaptive_response_energy_bias_min_percent(),
+                              personality_adaptive_response_energy_bias_max_percent());
+}
+
+constexpr int16_t personality_continuity_window_bias_ms(const CompanionPersonalityState& personality) {
+  return personality_clamp_i16(personality.adaptive_continuity_window_bias_ms,
+                               personality_adaptive_continuity_window_bias_min_ms(),
+                               personality_adaptive_continuity_window_bias_max_ms());
+}
+
 constexpr uint32_t personality_behavior_ttl_ms(const CompanionPersonalityState& personality,
                                                BehaviorProfile profile) {
   switch (profile) {
@@ -70,12 +132,15 @@ constexpr uint32_t personality_behavior_ttl_ms(const CompanionPersonalityState& 
 
 constexpr uint64_t personality_continuity_window_ms(const CompanionPersonalityState& personality,
                                                     PersonalityContinuityKind kind) {
+  const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
   switch (kind) {
     case PersonalityContinuityKind::kUser:
-      return personality.user_continuity_window_ms;
+      return static_cast<uint64_t>(static_cast<int64_t>(personality.user_continuity_window_ms) +
+                                   continuity_bias_ms);
     case PersonalityContinuityKind::kStimulus:
     default:
-      return personality.stimulus_continuity_window_ms;
+      return static_cast<uint64_t>(static_cast<int64_t>(personality.stimulus_continuity_window_ms) +
+                                   continuity_bias_ms);
   }
 }
 
@@ -91,26 +156,38 @@ constexpr uint8_t personality_continuity_engagement_threshold_percent(
 }
 
 constexpr uint32_t personality_reengagement_ttl_ms(const CompanionPersonalityState& personality) {
-  return personality.reengagement_ttl_ms;
+  const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
+  return static_cast<uint32_t>(static_cast<int32_t>(personality.reengagement_ttl_ms) +
+                               continuity_bias_ms / 20);
 }
 
 constexpr PersonalityFaceProfile personality_face_profile(const CompanionPersonalityState& personality,
                                                           PersonalityFaceMode mode) {
   PersonalityFaceProfile profile{};
+  const int8_t social_bias_percent = personality_social_warmth_bias_percent(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
 
   switch (mode) {
     case PersonalityFaceMode::kResponding:
-      profile.focus_percent = static_cast<uint8_t>(62 + personality.assertiveness_percent / 8);
-      profile.salience_percent = static_cast<uint8_t>(56 + personality.assertiveness_percent / 8);
-      profile.hold_ms = static_cast<uint16_t>(520 + personality.assertiveness_percent);
-      profile.cadence_ms = static_cast<uint16_t>(340 + personality.initiative_percent);
+      profile.focus_percent = static_cast<uint8_t>(62 + personality.assertiveness_percent / 8 +
+                                                   response_bias_percent / 2);
+      profile.salience_percent = static_cast<uint8_t>(56 + personality.assertiveness_percent / 8 +
+                                                      response_bias_percent / 2);
+      profile.hold_ms = static_cast<uint16_t>(520 + personality.assertiveness_percent +
+                                              response_bias_percent * 4);
+      profile.cadence_ms = static_cast<uint16_t>(340 + personality.initiative_percent -
+                                                 response_bias_percent * 4);
       profile.alternate_lateral = false;
       break;
     case PersonalityFaceMode::kAttendUser:
-      profile.focus_percent = static_cast<uint8_t>(58 + personality.warmth_percent / 10);
-      profile.salience_percent = static_cast<uint8_t>(46 + personality.warmth_percent / 8);
-      profile.hold_ms = static_cast<uint16_t>(480 + personality.assertiveness_percent);
-      profile.cadence_ms = static_cast<uint16_t>(360 + personality.initiative_percent);
+      profile.focus_percent = static_cast<uint8_t>(58 + personality.warmth_percent / 10 +
+                                                   social_bias_percent / 2);
+      profile.salience_percent = static_cast<uint8_t>(46 + personality.warmth_percent / 8 +
+                                                      social_bias_percent / 2);
+      profile.hold_ms = static_cast<uint16_t>(480 + personality.assertiveness_percent +
+                                              social_bias_percent * 4);
+      profile.cadence_ms = static_cast<uint16_t>(360 + personality.initiative_percent -
+                                                 social_bias_percent * 4);
       profile.alternate_lateral = false;
       break;
     case PersonalityFaceMode::kAlertScan:
@@ -121,10 +198,14 @@ constexpr PersonalityFaceProfile personality_face_profile(const CompanionPersona
       profile.alternate_lateral = true;
       break;
     case PersonalityFaceMode::kWarmUser:
-      profile.focus_percent = static_cast<uint8_t>(52 + personality.warmth_percent / 8);
-      profile.salience_percent = static_cast<uint8_t>(38 + personality.warmth_percent / 10);
-      profile.hold_ms = static_cast<uint16_t>(460 + personality.warmth_percent);
-      profile.cadence_ms = static_cast<uint16_t>(480 + personality.initiative_percent / 2);
+      profile.focus_percent = static_cast<uint8_t>(52 + personality.warmth_percent / 8 +
+                                                   social_bias_percent / 2);
+      profile.salience_percent = static_cast<uint8_t>(38 + personality.warmth_percent / 10 +
+                                                      social_bias_percent / 2);
+      profile.hold_ms = static_cast<uint16_t>(460 + personality.warmth_percent +
+                                              social_bias_percent * 5);
+      profile.cadence_ms = static_cast<uint16_t>(480 + personality.initiative_percent / 2 -
+                                                 social_bias_percent * 4);
       profile.alternate_lateral = false;
       break;
     case PersonalityFaceMode::kWarmStimulus:
@@ -158,7 +239,8 @@ constexpr PersonalityFaceProfile personality_face_profile(const CompanionPersona
     case PersonalityFaceMode::kIdleObserve:
     default:
       profile.focus_percent = static_cast<uint8_t>(42 + personality.curiosity_percent / 12);
-      profile.salience_percent = static_cast<uint8_t>(20 + personality.warmth_percent / 8);
+      profile.salience_percent = static_cast<uint8_t>(20 + personality.warmth_percent / 8 +
+                                                      social_bias_percent / 3);
       profile.hold_ms = static_cast<uint16_t>(420 + personality.composure_percent / 3);
       profile.cadence_ms = static_cast<uint16_t>(700 + personality.composure_percent);
       profile.alternate_lateral = true;
@@ -171,17 +253,24 @@ constexpr PersonalityFaceProfile personality_face_profile(const CompanionPersona
 constexpr PersonalityMotionProfile personality_motion_profile(const CompanionPersonalityState& personality,
                                                               PersonalityMotionMode mode) {
   PersonalityMotionProfile profile{};
+  const int8_t social_bias_percent = personality_social_warmth_bias_percent(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
 
   switch (mode) {
     case PersonalityMotionMode::kResponding:
       profile.pitch_permille = static_cast<int16_t>(60 + personality.assertiveness_percent / 6);
-      profile.base_speed_percent = static_cast<uint16_t>(28 + personality.assertiveness_percent / 8);
-      profile.hold_ms = static_cast<uint16_t>(220 + personality.assertiveness_percent / 2);
+      profile.base_speed_percent = static_cast<uint16_t>(28 + personality.assertiveness_percent / 8 +
+                                                         response_bias_percent / 2);
+      profile.hold_ms = static_cast<uint16_t>(220 + personality.assertiveness_percent / 2 +
+                                              response_bias_percent * 4);
       break;
     case PersonalityMotionMode::kAttendUser:
-      profile.pitch_permille = static_cast<int16_t>(42 + personality.warmth_percent / 10);
-      profile.base_speed_percent = static_cast<uint16_t>(24 + personality.assertiveness_percent / 10);
-      profile.hold_ms = static_cast<uint16_t>(190 + personality.warmth_percent / 3);
+      profile.pitch_permille = static_cast<int16_t>(42 + personality.warmth_percent / 10 +
+                                                    social_bias_percent / 2);
+      profile.base_speed_percent = static_cast<uint16_t>(24 + personality.assertiveness_percent / 10 +
+                                                         social_bias_percent / 3);
+      profile.hold_ms = static_cast<uint16_t>(190 + personality.warmth_percent / 3 +
+                                              social_bias_percent * 3);
       break;
     case PersonalityMotionMode::kAlertScan:
       profile.pitch_permille = static_cast<int16_t>(20 + personality.curiosity_percent / 8);
@@ -189,9 +278,12 @@ constexpr PersonalityMotionProfile personality_motion_profile(const CompanionPer
       profile.hold_ms = static_cast<uint16_t>(180 + personality.curiosity_percent / 4);
       break;
     case PersonalityMotionMode::kWarmUser:
-      profile.pitch_permille = static_cast<int16_t>(28 + personality.warmth_percent / 10);
-      profile.base_speed_percent = static_cast<uint16_t>(20 + personality.warmth_percent / 13);
-      profile.hold_ms = static_cast<uint16_t>(160 + personality.warmth_percent / 5);
+      profile.pitch_permille = static_cast<int16_t>(28 + personality.warmth_percent / 10 +
+                                                    social_bias_percent / 2);
+      profile.base_speed_percent = static_cast<uint16_t>(20 + personality.warmth_percent / 13 +
+                                                         social_bias_percent / 3);
+      profile.hold_ms = static_cast<uint16_t>(160 + personality.warmth_percent / 5 +
+                                              social_bias_percent * 2);
       break;
     case PersonalityMotionMode::kWarmStimulus:
       profile.pitch_permille = static_cast<int16_t>(18 + personality.curiosity_percent / 14);
@@ -238,28 +330,32 @@ inline void apply_personality_baseline_to_emotion(const CompanionPersonalityStat
   }
 
   int16_t valence_floor = 6;
-  uint8_t arousal_ceiling = static_cast<uint8_t>(28 + personality.composure_percent / 2);
-  uint8_t social_floor = static_cast<uint8_t>(personality.warmth_percent / 2);
-  uint8_t intensity_ceiling = 62;
+  const int8_t social_bias_percent = personality_social_warmth_bias_percent(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
+  uint8_t arousal_ceiling = static_cast<uint8_t>(28 + personality.composure_percent / 2 +
+                                                 response_bias_percent);
+  uint8_t social_floor = static_cast<uint8_t>(personality.warmth_percent / 2 + social_bias_percent);
+  uint8_t intensity_ceiling = static_cast<uint8_t>(62 + response_bias_percent);
 
   if (behavior_profile == BehaviorProfile::kAttendUser ||
       attention_mode == AttentionMode::kUserEngaged) {
     valence_floor = 18;
-    arousal_ceiling = 72;
-    social_floor = static_cast<uint8_t>(44 + personality.warmth_percent / 4);
-    intensity_ceiling = 68;
+    arousal_ceiling = static_cast<uint8_t>(72 + response_bias_percent);
+    social_floor = static_cast<uint8_t>(44 + personality.warmth_percent / 4 + social_bias_percent);
+    intensity_ceiling = static_cast<uint8_t>(68 + response_bias_percent);
   } else if (behavior_profile == BehaviorProfile::kAlertScan ||
              attention_mode == AttentionMode::kStimulusTracking) {
     valence_floor = -10;
-    arousal_ceiling = 78;
-    social_floor = static_cast<uint8_t>(20 + personality.curiosity_percent / 10);
-    intensity_ceiling = 76;
+    arousal_ceiling = static_cast<uint8_t>(78 + response_bias_percent);
+    social_floor = static_cast<uint8_t>(20 + personality.curiosity_percent / 10 +
+                                        social_bias_percent / 2);
+    intensity_ceiling = static_cast<uint8_t>(76 + response_bias_percent);
   } else if (behavior_profile == BehaviorProfile::kEnergyProtect ||
              attention_mode == AttentionMode::kEnergyConserve) {
     valence_floor = -8;
-    arousal_ceiling = 58;
-    social_floor = 18;
-    intensity_ceiling = 58;
+    arousal_ceiling = static_cast<uint8_t>(58 + response_bias_percent / 2);
+    social_floor = static_cast<uint8_t>(18 + social_bias_percent / 2);
+    intensity_ceiling = static_cast<uint8_t>(58 + response_bias_percent / 2);
   }
 
   model->vector.valence_percent = static_cast<int8_t>(

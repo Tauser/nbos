@@ -26,6 +26,32 @@ O companion nao deve:
 
 A personalidade-base agora vive em `CompanionSnapshot.personality` e e a leitura oficial compartilhada para `BehaviorService`, `Face` e `Motion`. Isso evita duplicacao de parametros locais e mantem um baseline unico de produto para expressao, timing e sociabilidade.
 
+## Separacao entre fixo e adaptavel
+
+Tracos fixos de identidade:
+
+- `warmth_percent`
+- `curiosity_percent`
+- `composure_percent`
+- `initiative_percent`
+- `assertiveness_percent`
+
+Esses cinco valores definem o DNA do personagem e nao devem oscilar dinamicamente no runtime normal.
+
+Camada adaptavel oficial:
+
+- `adaptive_social_warmth_bias_percent`
+  - ajusta o quanto o companion pode parecer um pouco mais caloroso ou mais contido
+  - limite: `-10` a `+10`
+- `adaptive_response_energy_bias_percent`
+  - ajusta o quanto resposta e gesto podem ganhar ou perder energia
+  - limite: `-8` a `+8`
+- `adaptive_continuity_window_bias_ms`
+  - ajusta quanto a continuidade curta pode segurar um pouco mais ou menos
+  - limite: `-600 ms` a `+600 ms`
+
+Esses parametros sao a parte oficialmente adaptavel da personalidade porque modulam expressao, timing e sociabilidade sem reescrever os tracos-base.
+
 ## Onde a personalidade opera hoje
 
 A personalidade-base entra apenas onde ja existe efeito real de produto:
@@ -34,6 +60,8 @@ A personalidade-base entra apenas onde ja existe efeito real de produto:
   - limita a permanencia operacional de `EnergyProtect`, `AlertScan` e `AttendUser`
 - `EmotionService`
   - aplica pisos e tetos em valencia, arousal, social engagement, intensidade e estabilidade
+- helpers centrais de personalidade
+  - aplicam a camada adaptavel com clamp duro para face, motion, timing curto e envelope emocional
 
 Isso mantem a base pequena: sem writer novo, sem maquina paralela e sem misturar personalidade com driver, render ou semantica de preset.
 
@@ -61,6 +89,7 @@ Baseline oficial de continuidade perceptivel:
 
 - a personalidade ainda nao dirige rotina ou autonomia rica; ela so consolida o tom-base onde ja ha resposta operacional
 - os limites sao deliberadamente conservadores para preservar a leitura premium do produto
+- a camada adaptavel existe no estado central, mas ainda nasce zerada; isso prepara evolucao futura sem alterar o baseline atual
 - expansoes futuras devem continuar aproveitando a mesma fonte de verdade, em vez de criar um sistema novo de persona
 
 ## Mapeamento operacional atual

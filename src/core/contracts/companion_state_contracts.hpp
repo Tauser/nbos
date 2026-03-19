@@ -136,6 +136,9 @@ struct CompanionPersonalityState {
   uint8_t composure_percent = 72;
   uint8_t initiative_percent = 46;
   uint8_t assertiveness_percent = 52;
+  int8_t adaptive_social_warmth_bias_percent = 0;
+  int8_t adaptive_response_energy_bias_percent = 0;
+  int16_t adaptive_continuity_window_bias_ms = 0;
   uint32_t behavior_energy_protect_ttl_ms = 420;
   uint32_t behavior_alert_scan_ttl_ms = 220;
   uint32_t behavior_attend_user_ttl_ms = 220;
@@ -308,3 +311,4 @@ EmotionalTone tone_from_emotion_model(const ncos::models::emotion::EmotionModelS
 EmotionalArousal arousal_from_emotion_model(const ncos::models::emotion::EmotionModelState& model);
 
 }  // namespace ncos::core::contracts
+

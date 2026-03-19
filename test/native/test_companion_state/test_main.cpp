@@ -38,6 +38,9 @@ void test_companion_state_exposes_personality_from_central_snapshot() {
   TEST_ASSERT_EQUAL_STRING("companion_core", snap.personality.profile_name);
   TEST_ASSERT_EQUAL_UINT8(68, snap.personality.warmth_percent);
   TEST_ASSERT_EQUAL_UINT8(58, snap.personality.curiosity_percent);
+  TEST_ASSERT_EQUAL_INT8(0, snap.personality.adaptive_social_warmth_bias_percent);
+  TEST_ASSERT_EQUAL_INT8(0, snap.personality.adaptive_response_energy_bias_percent);
+  TEST_ASSERT_EQUAL_INT16(0, snap.personality.adaptive_continuity_window_bias_ms);
   TEST_ASSERT_EQUAL_UINT16(190, snap.personality.reengagement_ttl_ms);
 }
 
@@ -688,9 +691,13 @@ void test_companion_state_redacts_personality_for_cloud_reader() {
 
   TEST_ASSERT_EQUAL_STRING("companion_core", runtime_view.personality.profile_name);
   TEST_ASSERT_EQUAL_UINT8(68, runtime_view.personality.warmth_percent);
+  TEST_ASSERT_EQUAL_INT8(0, runtime_view.personality.adaptive_social_warmth_bias_percent);
   TEST_ASSERT_NULL(cloud_view.personality.profile_name);
   TEST_ASSERT_EQUAL_UINT8(0, cloud_view.personality.warmth_percent);
   TEST_ASSERT_EQUAL_UINT8(0, cloud_view.personality.curiosity_percent);
+  TEST_ASSERT_EQUAL_INT8(0, cloud_view.personality.adaptive_social_warmth_bias_percent);
+  TEST_ASSERT_EQUAL_INT8(0, cloud_view.personality.adaptive_response_energy_bias_percent);
+  TEST_ASSERT_EQUAL_INT16(0, cloud_view.personality.adaptive_continuity_window_bias_ms);
   TEST_ASSERT_EQUAL_UINT16(0, cloud_view.personality.reengagement_ttl_ms);
   TEST_ASSERT_EQUAL_UINT64(0, cloud_view.personality.user_continuity_window_ms);
 }

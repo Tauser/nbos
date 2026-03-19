@@ -199,6 +199,9 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
     redacted.personality.composure_percent = 0;
     redacted.personality.initiative_percent = 0;
     redacted.personality.assertiveness_percent = 0;
+    redacted.personality.adaptive_social_warmth_bias_percent = 0;
+    redacted.personality.adaptive_response_energy_bias_percent = 0;
+    redacted.personality.adaptive_continuity_window_bias_ms = 0;
     redacted.personality.behavior_energy_protect_ttl_ms = 0;
     redacted.personality.behavior_alert_scan_ttl_ms = 0;
     redacted.personality.behavior_attend_user_ttl_ms = 0;
@@ -235,3 +238,4 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
 }
 
 }  // namespace ncos::core::contracts
+
