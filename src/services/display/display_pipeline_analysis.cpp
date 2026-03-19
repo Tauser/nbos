@@ -12,6 +12,16 @@ int16_t max_i16(int16_t a, int16_t b) {
   return a > b ? a : b;
 }
 
+int16_t eye_w(const ncos::services::face::FaceFrame& frame, bool left_eye) {
+  const int16_t specific = left_eye ? frame.left_eye_w : frame.right_eye_w;
+  return specific > 0 ? specific : frame.eye_w;
+}
+
+int16_t eye_h(const ncos::services::face::FaceFrame& frame, bool left_eye) {
+  const int16_t specific = left_eye ? frame.left_eye_h : frame.right_eye_h;
+  return specific > 0 ? specific : frame.eye_h;
+}
+
 struct EyeRect {
   int16_t x = 0;
   int16_t y = 0;
@@ -22,10 +32,12 @@ struct EyeRect {
 EyeRect make_eye_rect(const ncos::services::face::FaceFrame& frame, bool left_eye) {
   const int16_t eye_x = left_eye ? frame.left_eye_x : frame.right_eye_x;
   const int16_t eye_y = left_eye ? frame.left_eye_y : frame.right_eye_y;
+  const int16_t resolved_eye_w = eye_w(frame, left_eye);
+  const int16_t resolved_eye_h = eye_h(frame, left_eye);
 
   EyeRect rect{};
-  rect.w = static_cast<int16_t>(frame.eye_w + EyeDirtyPadding);
-  rect.h = static_cast<int16_t>(frame.eye_h + EyeDirtyPadding);
+  rect.w = static_cast<int16_t>(resolved_eye_w + EyeDirtyPadding);
+  rect.h = static_cast<int16_t>(resolved_eye_h + EyeDirtyPadding);
   rect.x = static_cast<int16_t>(eye_x - rect.w / 2);
   rect.y = static_cast<int16_t>(eye_y - rect.h / 2);
   return rect;
@@ -112,6 +124,8 @@ bool motion_present(const ncos::services::face::FaceFrame& previous,
                     const ncos::services::face::FaceFrame& current) {
   return previous.left_eye_x != current.left_eye_x || previous.left_eye_y != current.left_eye_y ||
          previous.right_eye_x != current.right_eye_x || previous.right_eye_y != current.right_eye_y ||
+         previous.left_eye_w != current.left_eye_w || previous.left_eye_h != current.left_eye_h ||
+         previous.right_eye_w != current.right_eye_w || previous.right_eye_h != current.right_eye_h ||
          previous.head_x != current.head_x || previous.head_y != current.head_y;
 }
 
@@ -136,6 +150,24 @@ ncos::services::display::FullRedrawReason detect_full_redraw_reason(
   return reason;
 }
 
+ncos::services::display::DirtyRect compute_single_eye_rect(const ncos::services::face::FaceFrame& previous,
+                                                           const ncos::services::face::FaceFrame& current,
+                                                           bool left_eye,
+                                                           int16_t display_width,
+                                                           int16_t display_height) {
+  const EyeRect prev = make_eye_rect(previous, left_eye);
+  const EyeRect next = make_eye_rect(current, left_eye);
+
+  return clip_rect({min_i16(prev.x, next.x), min_i16(prev.y, next.y),
+                    static_cast<int16_t>(max_i16(static_cast<int16_t>(prev.x + prev.w),
+                                                 static_cast<int16_t>(next.x + next.w)) -
+                                         min_i16(prev.x, next.x)),
+                    static_cast<int16_t>(max_i16(static_cast<int16_t>(prev.y + prev.h),
+                                                 static_cast<int16_t>(next.y + next.h)) -
+                                         min_i16(prev.y, next.y))},
+                   display_width, display_height);
+}
+
 }  // namespace
 
 namespace ncos::services::display {
@@ -144,29 +176,8 @@ DirtyRect compute_eye_dirty_rect(const ncos::services::face::FaceFrame& previous
                                  const ncos::services::face::FaceFrame& current,
                                  int16_t display_width,
                                  int16_t display_height) {
-  const EyeRect prev_left = make_eye_rect(previous, true);
-  const EyeRect prev_right = make_eye_rect(previous, false);
-  const EyeRect next_left = make_eye_rect(current, true);
-  const EyeRect next_right = make_eye_rect(current, false);
-
-  DirtyRect left_rect = clip_rect(
-      {min_i16(prev_left.x, next_left.x), min_i16(prev_left.y, next_left.y),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_left.x + prev_left.w),
-                                    static_cast<int16_t>(next_left.x + next_left.w)) -
-                            min_i16(prev_left.x, next_left.x)),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_left.y + prev_left.h),
-                                    static_cast<int16_t>(next_left.y + next_left.h)) -
-                            min_i16(prev_left.y, next_left.y))},
-      display_width, display_height);
-  DirtyRect right_rect = clip_rect(
-      {min_i16(prev_right.x, next_right.x), min_i16(prev_right.y, next_right.y),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_right.x + prev_right.w),
-                                    static_cast<int16_t>(next_right.x + next_right.w)) -
-                            min_i16(prev_right.x, next_right.x)),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_right.y + prev_right.h),
-                                    static_cast<int16_t>(next_right.y + next_right.h)) -
-                            min_i16(prev_right.y, next_right.y))},
-      display_width, display_height);
+  DirtyRect left_rect = compute_single_eye_rect(previous, current, true, display_width, display_height);
+  DirtyRect right_rect = compute_single_eye_rect(previous, current, false, display_width, display_height);
 
   return rects_overlap_or_touch(left_rect, right_rect) ? merge_rects(left_rect, right_rect) : left_rect;
 }
@@ -210,30 +221,8 @@ DisplayRenderPlan analyze_render_plan(const ncos::services::face::FaceFrame* pre
   plan.full_redraw = false;
   plan.full_redraw_reason = FullRedrawReason::kNone;
   plan.effective_mode = DisplayRenderMode::kForceDirtyRect;
-
-  const EyeRect prev_left = make_eye_rect(*previous, true);
-  const EyeRect prev_right = make_eye_rect(*previous, false);
-  const EyeRect next_left = make_eye_rect(current, true);
-  const EyeRect next_right = make_eye_rect(current, false);
-
-  plan.dirty_rect = clip_rect(
-      {min_i16(prev_left.x, next_left.x), min_i16(prev_left.y, next_left.y),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_left.x + prev_left.w),
-                                    static_cast<int16_t>(next_left.x + next_left.w)) -
-                            min_i16(prev_left.x, next_left.x)),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_left.y + prev_left.h),
-                                    static_cast<int16_t>(next_left.y + next_left.h)) -
-                            min_i16(prev_left.y, next_left.y))},
-      display_width, display_height);
-  plan.dirty_rect_secondary = clip_rect(
-      {min_i16(prev_right.x, next_right.x), min_i16(prev_right.y, next_right.y),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_right.x + prev_right.w),
-                                    static_cast<int16_t>(next_right.x + next_right.w)) -
-                            min_i16(prev_right.x, next_right.x)),
-       static_cast<int16_t>(max_i16(static_cast<int16_t>(prev_right.y + prev_right.h),
-                                    static_cast<int16_t>(next_right.y + next_right.h)) -
-                            min_i16(prev_right.y, next_right.y))},
-      display_width, display_height);
+  plan.dirty_rect = compute_single_eye_rect(*previous, current, true, display_width, display_height);
+  plan.dirty_rect_secondary = compute_single_eye_rect(*previous, current, false, display_width, display_height);
 
   if (rects_overlap_or_touch(plan.dirty_rect, plan.dirty_rect_secondary)) {
     plan.dirty_rect = merge_rects(plan.dirty_rect, plan.dirty_rect_secondary);

@@ -15,6 +15,12 @@ bool geometry_is_valid(const ncos::core::contracts::FaceShapeGeometry& geometry)
          percent_in_range(geometry.silhouette_roundness_percent);
 }
 
+bool eye_side_adjustments_valid(const ncos::models::face::EyePose::SideAdjustments& adjust) {
+  return adjust.x_offset_px >= -12 && adjust.x_offset_px <= 12 && adjust.y_offset_px >= -12 &&
+         adjust.y_offset_px <= 12 && adjust.size_delta_percent >= -20 && adjust.size_delta_percent <= 20 &&
+         adjust.openness_delta_percent >= -35 && adjust.openness_delta_percent <= 35;
+}
+
 }  // namespace
 
 namespace ncos::core::contracts {
@@ -143,6 +149,11 @@ bool is_valid(const FaceRenderState& state) {
     return false;
   }
 
+  if (!eye_side_adjustments_valid(state.eyes.left_adjust) ||
+      !eye_side_adjustments_valid(state.eyes.right_adjust)) {
+    return false;
+  }
+
   if (!geometry_is_valid(state.geometry)) {
     return false;
   }
@@ -208,3 +219,4 @@ bool apply_layer_claim(FaceRenderState* state, const FaceLayerClaim& claim, uint
 }
 
 }  // namespace ncos::core::contracts
+

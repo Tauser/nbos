@@ -11,6 +11,30 @@ uint64_t monotonic_time_us() {
   return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
 }
 
+int16_t left_eye_w(const ncos::services::face::FaceFrame& frame) {
+  return frame.left_eye_w > 0 ? frame.left_eye_w : frame.eye_w;
+}
+
+int16_t left_eye_h(const ncos::services::face::FaceFrame& frame) {
+  return frame.left_eye_h > 0 ? frame.left_eye_h : frame.eye_h;
+}
+
+int16_t left_eye_corner(const ncos::services::face::FaceFrame& frame) {
+  return frame.left_eye_corner > 0 ? frame.left_eye_corner : frame.eye_corner;
+}
+
+int16_t right_eye_w(const ncos::services::face::FaceFrame& frame) {
+  return frame.right_eye_w > 0 ? frame.right_eye_w : frame.eye_w;
+}
+
+int16_t right_eye_h(const ncos::services::face::FaceFrame& frame) {
+  return frame.right_eye_h > 0 ? frame.right_eye_h : frame.eye_h;
+}
+
+int16_t right_eye_corner(const ncos::services::face::FaceFrame& frame) {
+  return frame.right_eye_corner > 0 ? frame.right_eye_corner : frame.eye_corner;
+}
+
 bool frames_equal(const ncos::services::face::FaceFrame& lhs, const ncos::services::face::FaceFrame& rhs) {
   return lhs.background == rhs.background && lhs.face_color == rhs.face_color &&
          lhs.eye_color == rhs.eye_color && lhs.pupil_color == rhs.pupil_color &&
@@ -19,7 +43,11 @@ bool frames_equal(const ncos::services::face::FaceFrame& lhs, const ncos::servic
          lhs.left_eye_x == rhs.left_eye_x && lhs.left_eye_y == rhs.left_eye_y &&
          lhs.right_eye_x == rhs.right_eye_x && lhs.right_eye_y == rhs.right_eye_y &&
          lhs.eye_radius == rhs.eye_radius && lhs.eye_w == rhs.eye_w && lhs.eye_h == rhs.eye_h &&
-         lhs.eye_corner == rhs.eye_corner && lhs.left_pupil_x == rhs.left_pupil_x &&
+         lhs.eye_corner == rhs.eye_corner && lhs.left_eye_radius == rhs.left_eye_radius &&
+         lhs.left_eye_w == rhs.left_eye_w && lhs.left_eye_h == rhs.left_eye_h &&
+         lhs.left_eye_corner == rhs.left_eye_corner && lhs.right_eye_radius == rhs.right_eye_radius &&
+         lhs.right_eye_w == rhs.right_eye_w && lhs.right_eye_h == rhs.right_eye_h &&
+         lhs.right_eye_corner == rhs.right_eye_corner && lhs.left_pupil_x == rhs.left_pupil_x &&
          lhs.left_pupil_y == rhs.left_pupil_y && lhs.right_pupil_x == rhs.right_pupil_x &&
          lhs.right_pupil_y == rhs.right_pupil_y && lhs.pupil_radius == rhs.pupil_radius &&
          lhs.mouth_x == rhs.mouth_x && lhs.mouth_y == rhs.mouth_y && lhs.mouth_w == rhs.mouth_w &&
@@ -85,15 +113,19 @@ bool FaceDisplayRenderer::render(const FaceFrame& frame) {
     }
   }
 
-  const int16_t left_eye_x = static_cast<int16_t>(frame.left_eye_x - frame.eye_w / 2);
-  const int16_t left_eye_y = static_cast<int16_t>(frame.left_eye_y - frame.eye_h / 2);
-  const int16_t right_eye_x = static_cast<int16_t>(frame.right_eye_x - frame.eye_w / 2);
-  const int16_t right_eye_y = static_cast<int16_t>(frame.right_eye_y - frame.eye_h / 2);
+  const int16_t resolved_left_eye_w = left_eye_w(frame);
+  const int16_t resolved_left_eye_h = left_eye_h(frame);
+  const int16_t resolved_right_eye_w = right_eye_w(frame);
+  const int16_t resolved_right_eye_h = right_eye_h(frame);
+  const int16_t left_eye_x = static_cast<int16_t>(frame.left_eye_x - resolved_left_eye_w / 2);
+  const int16_t left_eye_y = static_cast<int16_t>(frame.left_eye_y - resolved_left_eye_h / 2);
+  const int16_t right_eye_x = static_cast<int16_t>(frame.right_eye_x - resolved_right_eye_w / 2);
+  const int16_t right_eye_y = static_cast<int16_t>(frame.right_eye_y - resolved_right_eye_h / 2);
 
-  display_->fillRoundRect(left_eye_x, left_eye_y, frame.eye_w, frame.eye_h, frame.eye_corner,
-                          frame.eye_color);
-  display_->fillRoundRect(right_eye_x, right_eye_y, frame.eye_w, frame.eye_h, frame.eye_corner,
-                          frame.eye_color);
+  display_->fillRoundRect(left_eye_x, left_eye_y, resolved_left_eye_w, resolved_left_eye_h,
+                          left_eye_corner(frame), frame.eye_color);
+  display_->fillRoundRect(right_eye_x, right_eye_y, resolved_right_eye_w, resolved_right_eye_h,
+                          right_eye_corner(frame), frame.eye_color);
 
   const int16_t orientation_x = static_cast<int16_t>(display_->width() / 2);
   const int16_t orientation_y = static_cast<int16_t>(display_->height() - 8);
@@ -141,4 +173,3 @@ FaceRenderStats FaceDisplayRenderer::render_stats() const {
 }
 
 }  // namespace ncos::services::face
-

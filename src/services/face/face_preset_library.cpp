@@ -237,6 +237,8 @@ bool apply_face_preset(FaceExploratoryPresetId id,
   state->eyes.anchor = spec->gaze_anchor;
   state->eyes.direction = spec->gaze_direction;
   state->eyes.focus_percent = clamp_percent(spec->gaze_focus_percent);
+  state->eyes.left_adjust = {};
+  state->eyes.right_adjust = {};
 
   state->lids.phase = ncos::models::face::BlinkPhase::kOpen;
   state->lids.openness_percent = clamp_percent(spec->eyelid_openness_percent);
@@ -276,3 +278,4 @@ bool apply_official_face_preset(FaceOfficialPresetId id,
 }
 
 }  // namespace ncos::services::face
+

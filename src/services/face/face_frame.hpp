@@ -25,6 +25,14 @@ struct FaceFrame {
   int16_t eye_w = 0;
   int16_t eye_h = 0;
   int16_t eye_corner = 0;
+  int16_t left_eye_radius = 0;
+  int16_t left_eye_w = 0;
+  int16_t left_eye_h = 0;
+  int16_t left_eye_corner = 0;
+  int16_t right_eye_radius = 0;
+  int16_t right_eye_w = 0;
+  int16_t right_eye_h = 0;
+  int16_t right_eye_corner = 0;
 
   int16_t left_pupil_x = 0;
   int16_t left_pupil_y = 0;

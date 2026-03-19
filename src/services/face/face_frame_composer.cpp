@@ -14,6 +14,37 @@ int16_t clamp_i16_frame(int32_t value, int16_t min_v, int16_t max_v) {
   return static_cast<int16_t>(value);
 }
 
+uint8_t clamp_percent_frame(int32_t value) {
+  if (value < 0) {
+    return 0;
+  }
+  if (value > 100) {
+    return 100;
+  }
+  return static_cast<uint8_t>(value);
+}
+
+int16_t scale_dimension(int16_t base, int8_t delta_percent, int16_t min_v, int16_t max_v) {
+  const int32_t scaled = (static_cast<int32_t>(base) * (100 + delta_percent) + 50) / 100;
+  return clamp_i16_frame(scaled, min_v, max_v);
+}
+
+int16_t resolve_eye_radius(int16_t base_radius, uint8_t openness_percent, int8_t size_delta_percent) {
+  const int16_t scaled_base_radius = scale_dimension(base_radius, size_delta_percent, 2, 30);
+  if (openness_percent > 80) {
+    return scaled_base_radius;
+  }
+  if (openness_percent > 40) {
+    return clamp_i16_frame(scaled_base_radius / 2, 2, 30);
+  }
+  return 2;
+}
+
+int16_t resolve_eye_height(int16_t base_width, uint8_t openness_percent, int8_t size_delta_percent) {
+  const int16_t scaled_width = scale_dimension(base_width, size_delta_percent, 40, 96);
+  return clamp_i16_frame((static_cast<int32_t>(scaled_width) * openness_percent) / 100, 2, scaled_width);
+}
+
 }  // namespace
 
 namespace ncos::services::face {
@@ -42,14 +73,36 @@ bool FaceFrameComposer::compose(const ncos::core::contracts::FaceRenderState& st
   frame.head_x = static_cast<int16_t>(layout.center_x - layout.head_w / 2);
   frame.head_y = static_cast<int16_t>(layout.center_y - layout.head_h / 2);
 
-  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2 + layout.gaze_dx);
-  frame.left_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy);
-  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2 + layout.gaze_dx);
-  frame.right_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy);
+  const auto& left_adjust = state.eyes.left_adjust;
+  const auto& right_adjust = state.eyes.right_adjust;
+  const uint8_t left_openness =
+      clamp_percent_frame(static_cast<int32_t>(state.lids.openness_percent) + left_adjust.openness_delta_percent);
+  const uint8_t right_openness =
+      clamp_percent_frame(static_cast<int32_t>(state.lids.openness_percent) + right_adjust.openness_delta_percent);
+
+  frame.left_eye_x = static_cast<int16_t>(layout.center_x - layout.eye_spacing / 2 + layout.gaze_dx +
+                                          left_adjust.x_offset_px);
+  frame.left_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy + left_adjust.y_offset_px);
+  frame.right_eye_x = static_cast<int16_t>(layout.center_x + layout.eye_spacing / 2 + layout.gaze_dx +
+                                           right_adjust.x_offset_px);
+  frame.right_eye_y = static_cast<int16_t>(layout.eye_line_y + layout.gaze_dy + right_adjust.y_offset_px);
+
   frame.eye_radius = layout.eye_radius;
   frame.eye_w = layout.eye_w;
   frame.eye_h = layout.eye_h;
   frame.eye_corner = clamp_i16_frame(layout.eye_h / 4, 5, 14);
+
+  frame.left_eye_w = scale_dimension(layout.eye_w, left_adjust.size_delta_percent, 40, 96);
+  frame.left_eye_h = resolve_eye_height(layout.eye_w, left_openness, left_adjust.size_delta_percent);
+  frame.left_eye_radius =
+      resolve_eye_radius(layout.eye_radius, left_openness, left_adjust.size_delta_percent);
+  frame.left_eye_corner = clamp_i16_frame(frame.left_eye_h / 4, 5, 14);
+
+  frame.right_eye_w = scale_dimension(layout.eye_w, right_adjust.size_delta_percent, 40, 96);
+  frame.right_eye_h = resolve_eye_height(layout.eye_w, right_openness, right_adjust.size_delta_percent);
+  frame.right_eye_radius =
+      resolve_eye_radius(layout.eye_radius, right_openness, right_adjust.size_delta_percent);
+  frame.right_eye_corner = clamp_i16_frame(frame.right_eye_h / 4, 5, 14);
 
   frame.left_pupil_x = frame.left_eye_x;
   frame.left_pupil_y = frame.left_eye_y;

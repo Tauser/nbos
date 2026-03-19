@@ -90,9 +90,18 @@ inline constexpr size_t face_layer_index(FaceLayer layer) {
 }
 
 struct EyePose {
+  struct SideAdjustments {
+    int8_t x_offset_px = 0;
+    int8_t y_offset_px = 0;
+    int8_t size_delta_percent = 0;
+    int8_t openness_delta_percent = 0;
+  };
+
   GazeAnchor anchor = GazeAnchor::kCenter;
   GazeDirection direction = GazeDirection::kCenter;
   uint8_t focus_percent = 0;
+  SideAdjustments left_adjust{};
+  SideAdjustments right_adjust{};
 };
 
 struct EyelidPose {
@@ -111,3 +120,4 @@ struct BrowPose {
 };
 
 }  // namespace ncos::models::face
+
