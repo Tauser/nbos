@@ -43,7 +43,11 @@ As capacidades e quirks do painel ficam centralizadas em:
 - `src/drivers/display/panel_capability_profile.hpp`
 - `src/drivers/display/panel_capability_profile.cpp`
 
-O driver consome esse perfil em:
+O BSP visual que centraliza wiring, init flags e bring-up de plataforma fica em:
+- `src/drivers/display/display_platform_bsp.hpp`
+- `src/drivers/display/display_platform_bsp.cpp`
+
+O driver consome esse encapsulamento em:
 - `src/drivers/display/display_driver.cpp`
 
-O restante do sistema nao deve codificar quirks do ST7789 diretamente.
+O restante do sistema nao deve codificar quirks do ST7789 nem flags de init diretamente.
