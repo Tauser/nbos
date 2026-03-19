@@ -35,13 +35,18 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
       ncos::core::contracts::CompanionStateReader reader) const override;
 
  private:
+  static bool energy_protect_active(const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static bool user_attention_active(const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static bool stimulus_attention_active(const ncos::core::contracts::CompanionSnapshot& snapshot);
+  static bool response_active(const ncos::core::contracts::CompanionSnapshot& snapshot);
   static ncos::core::contracts::CompanionPresenceMode derive_presence_mode(
       const ncos::core::contracts::CompanionSnapshot& snapshot);
   static ncos::core::contracts::CompanionProductState derive_product_state(
-      const ncos::core::contracts::CompanionSnapshot& snapshot);
+      const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
   static ncos::core::contracts::CompanionStateTransitionCause derive_transition_cause(
       ncos::core::contracts::CompanionProductState previous_state,
       ncos::core::contracts::CompanionProductState next_state);
+  static uint64_t hold_duration_for_state(ncos::core::contracts::CompanionProductState state);
 
   void refresh_derived_runtime_state(uint64_t now_ms);
   bool authorize_write(ncos::core::contracts::CompanionStateWriter writer,

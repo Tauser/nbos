@@ -10,6 +10,8 @@ Consolidar uma maquina de estados pequena e oficial do companion em cima do `Com
   - Runtime ainda nao foi iniciado ou nao ficou pronto.
 - `kIdleObserve`
   - Estado base do produto em runtime nominal, sem atencao dominante nem resposta ativa.
+- `kSleep`
+  - Estado de descanso previsivel, com runtime nominal e sem estimulo relevante por tempo suficiente.
 - `kAttendUser`
   - Usuario em foco com lock, confianca suficiente ou sessao ativa.
 - `kAlertScan`
@@ -28,7 +30,16 @@ A maquina e derivada nesta ordem:
 3. `kResponding`
 4. `kAlertScan`
 5. `kAttendUser`
-6. `kIdleObserve`
+6. `kSleep` quando ja estava dormindo e nao ha wake relevante
+7. `kIdleObserve`
+8. `kSleep` por decay de idle estavel
+
+## Timers oficiais
+
+- `Responding`: permanencia minima de `900 ms` apos a ultima atividade de resposta.
+- `AlertScan`: permanencia minima de `1600 ms` apos a ultima observacao forte de estimulo.
+- `AttendUser`: permanencia minima de `1400 ms` apos a ultima atencao valida ao usuario.
+- `IdleObserve -> Sleep`: entra em `sleep` apos `12000 ms` de idle estavel sem estimulo forte.
 
 ## Eventos oficiais de entrada e saida
 
@@ -41,7 +52,7 @@ A maquina e derivada nesta ordem:
 - `kUserTrigger`
   - entrada em `kAttendUser` por touch, voz ou atencao ao usuario.
 - `kUserRelease`
-  - retorno de `kAttendUser` para `kIdleObserve` quando o estimulo cessa.
+  - retorno de `kAttendUser` para `kIdleObserve` quando a permanencia expira sem novo trigger.
 - `kStimulusObserved`
   - entrada em `kAlertScan` por foco no mundo.
 - `kCompanionResponding`
@@ -50,6 +61,14 @@ A maquina e derivada nesta ordem:
   - entrada em `kEnergyProtect` por limitacao energetica.
 - `kRecoveryToIdle`
   - retorno geral para `kIdleObserve` fora do caso especifico de soltura do usuario.
+- `kIdleDecayToSleep`
+  - entrada em `kSleep` por permanencia longa em idle estavel.
+
+## Criterios de permanencia
+
+- Estados ativos nao caem imediatamente quando o sinal cru some; eles respeitam o `state_hold_until_ms`.
+- `Sleep` so entra a partir de `IdleObserve`; nunca substitui `Responding`, `AlertScan`, `AttendUser` ou `EnergyProtect` enquanto esses estiverem validos.
+- Qualquer trigger forte de usuario, estimulo ou resposta acorda o companion diretamente para o estado ativo correspondente.
 
 ## Envelope de produto
 

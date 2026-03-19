@@ -16,10 +16,11 @@ enum class CompanionPresenceMode : uint8_t {
 enum class CompanionProductState : uint8_t {
   kBooting = 1,
   kIdleObserve = 2,
-  kAttendUser = 3,
-  kAlertScan = 4,
-  kResponding = 5,
-  kEnergyProtect = 6,
+  kSleep = 3,
+  kAttendUser = 4,
+  kAlertScan = 5,
+  kResponding = 6,
+  kEnergyProtect = 7,
 };
 
 enum class CompanionStateTransitionCause : uint8_t {
@@ -32,6 +33,7 @@ enum class CompanionStateTransitionCause : uint8_t {
   kCompanionResponding = 7,
   kEnergyGuard = 8,
   kRecoveryToIdle = 9,
+  kIdleDecayToSleep = 10,
 };
 
 enum class GovernanceHealth : uint8_t {
@@ -144,6 +146,9 @@ struct CompanionRuntimeState {
   CompanionStateTransitionCause last_transition_cause =
       CompanionStateTransitionCause::kBootstrap;
   uint64_t last_state_change_ms = 0;
+  uint64_t state_hold_until_ms = 0;
+  uint64_t idle_since_ms = 0;
+  uint64_t state_dwell_ms = 0;
   uint32_t state_transition_total = 0;
 };
 
