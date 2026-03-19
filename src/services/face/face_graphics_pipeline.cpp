@@ -129,6 +129,8 @@ bool FaceGraphicsPipeline::initialize(uint64_t now_ms) {
   diagnostics_runner_.set_mode(diagnostics_mode_);
 
   state_ = ncos::core::contracts::make_face_render_state_baseline();
+  state_.safety_mode = ncos::core::contracts::FaceRenderSafetyMode::kNominal;
+  fallback_status_ = FaceVisualFallbackStatus{};
   tuning_ = FaceTuningTelemetry{};
   tuning_.frame_budget_us = ncos::config::kGlobalConfig.runtime.face_frame_budget_us;
   preview_snapshot_ = make_face_preview_snapshot(state_, false, now_ms, tuning_);
@@ -226,7 +228,7 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
     }
   }
 
-  if (!clip_player_.active() && now_ms >= next_clip_start_ms_) {
+  if (!fallback_status_.active && !clip_player_.active() && now_ms >= next_clip_start_ms_) {
     (void)clip_player_.play(SignatureClip, &compositor_, &state_, now_ms);
     next_clip_start_ms_ = now_ms + 6200;
   }
@@ -315,6 +317,27 @@ void FaceGraphicsPipeline::tick(uint64_t now_ms,
   if (is_diagonal_direction(state_.eyes.direction)) {
     tuning_.degradation = tuning_.degradation | FaceVisualDegradationFlag::kDiagonalMotion;
   }
+
+  if (!fallback_status_.active && should_enter_face_visual_fallback(tuning_)) {
+    if (set_face_visual_fallback_active(&fallback_status_, true, now_ms, tuning_.degradation) &&
+        clip_player_.active()) {
+      (void)clip_player_.cancel(now_ms, &state_);
+    }
+  } else if (fallback_status_.active && should_exit_face_visual_fallback(tuning_)) {
+    (void)set_face_visual_fallback_active(&fallback_status_, false, now_ms, FaceVisualDegradationFlag::kNone);
+  }
+
+  if (fallback_status_.active) {
+    apply_face_visual_fallback(&state_);
+  } else {
+    state_.safety_mode = ncos::core::contracts::FaceRenderSafetyMode::kNominal;
+  }
+
+  tuning_.safe_visual_mode = fallback_status_.active;
+  tuning_.fallback_entries = fallback_status_.entry_count;
+  tuning_.fallback_exits = fallback_status_.exit_count;
+  tuning_.fallback_last_change_ms = fallback_status_.last_change_ms;
+  tuning_.fallback_trigger = fallback_status_.last_trigger;
 
   preview_snapshot_ = make_face_preview_snapshot(state_, clip_player_.active(), now_ms, tuning_);
   if (diagnostics_mode_ == ncos::config::DisplayDiagnosticsMode::kFaceVisualDebug) {

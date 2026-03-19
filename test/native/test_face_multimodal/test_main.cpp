@@ -11,6 +11,7 @@
 #include "services/face/face_compositor.cpp"
 #include "services/face/face_multimodal_sync.cpp"
 #include "services/face/face_tooling.cpp"
+#include "services/face/face_visual_fallback.cpp"
 
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
@@ -94,6 +95,12 @@ void test_face_tooling_exports_preview_json_snapshot() {
   tuning.skipped_duplicate_frames = 4;
   tuning.degradation = ncos::services::face::FaceVisualDegradationFlag::kHighContrastMotion |
                        ncos::services::face::FaceVisualDegradationFlag::kDiagonalMotion;
+  tuning.safe_visual_mode = true;
+  tuning.fallback_entries = 2;
+  tuning.fallback_exits = 1;
+  tuning.fallback_last_change_ms = 4800;
+  tuning.fallback_trigger = ncos::services::face::FaceVisualDegradationFlag::kLargeDirtyRect |
+                            ncos::services::face::FaceVisualDegradationFlag::kFrameOverBudget;
 
   const auto snapshot = ncos::services::face::make_face_preview_snapshot(state, false, 5000, tuning);
 
@@ -107,6 +114,10 @@ void test_face_tooling_exports_preview_json_snapshot() {
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"total_us\":9100"));
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"render_us\":5300"));
   TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"degradation\":\"high_contrast_motion|diagonal_motion\""));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"safe_visual_mode\":true"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"fallback_entries\":2"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"fallback_exits\":1"));
+  TEST_ASSERT_NOT_EQUAL(nullptr, strstr(json, "\"fallback_trigger\":\"frame_over_budget|large_dirty_rect\""));
 }
 
 int main() {

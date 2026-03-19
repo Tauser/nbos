@@ -103,6 +103,8 @@ size_t export_face_preview_json(const FacePreviewSnapshot& snapshot,
 
   char degradation[128] = {};
   (void)append_degradation_labels(degradation, sizeof(degradation), snapshot.tuning.degradation);
+  char fallback_trigger[128] = {};
+  (void)append_degradation_labels(fallback_trigger, sizeof(fallback_trigger), snapshot.tuning.fallback_trigger);
 
   const int written = snprintf(
       out_buffer,
@@ -113,7 +115,9 @@ size_t export_face_preview_json(const FacePreviewSnapshot& snapshot,
       "\"gaze_us\":%lu,\"modulation_us\":%lu,\"compose_us\":%lu,\"render_us\":%lu,"
       "\"avg_frame_time_us\":%lu,\"peak_frame_time_us\":%lu,\"dirty_area_px\":%lu,"
       "\"rendered_frames\":%lu,\"skipped_duplicate_frames\":%lu,\"frame_skipped\":%s,"
-      "\"full_redraw\":%s,\"high_contrast_motion\":%s,\"degradation\":\"%s\"}}",
+      "\"full_redraw\":%s,\"high_contrast_motion\":%s,\"safe_visual_mode\":%s,"
+      "\"fallback_entries\":%lu,\"fallback_exits\":%lu,\"fallback_last_change_ms\":%llu,"
+      "\"degradation\":\"%s\",\"fallback_trigger\":\"%s\"}}",
       stability,
       static_cast<unsigned long long>(snapshot.captured_at_ms),
       static_cast<unsigned long>(snapshot.state_revision),
@@ -138,7 +142,12 @@ size_t export_face_preview_json(const FacePreviewSnapshot& snapshot,
       snapshot.tuning.frame_skipped ? "true" : "false",
       snapshot.tuning.full_redraw ? "true" : "false",
       snapshot.tuning.high_contrast_motion ? "true" : "false",
-      degradation);
+      snapshot.tuning.safe_visual_mode ? "true" : "false",
+      static_cast<unsigned long>(snapshot.tuning.fallback_entries),
+      static_cast<unsigned long>(snapshot.tuning.fallback_exits),
+      static_cast<unsigned long long>(snapshot.tuning.fallback_last_change_ms),
+      degradation,
+      fallback_trigger);
 
   if (written <= 0) {
     out_buffer[0] = '\0';

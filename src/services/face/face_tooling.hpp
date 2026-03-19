@@ -52,7 +52,12 @@ struct FaceTuningTelemetry {
   bool frame_skipped = false;
   bool full_redraw = false;
   bool high_contrast_motion = false;
+  bool safe_visual_mode = false;
+  uint32_t fallback_entries = 0;
+  uint32_t fallback_exits = 0;
+  uint64_t fallback_last_change_ms = 0;
   FaceVisualDegradationFlag degradation = FaceVisualDegradationFlag::kNone;
+  FaceVisualDegradationFlag fallback_trigger = FaceVisualDegradationFlag::kNone;
 };
 
 struct FacePreviewSnapshot {

@@ -14,6 +14,7 @@ constexpr uint16_t DebugFrameColor = 0x39E7;
 constexpr uint16_t DebugWarnColor = 0xFD20;
 constexpr uint16_t DebugHotColor = 0xF800;
 constexpr uint16_t DebugCoolColor = 0x07E0;
+constexpr uint16_t DebugFallbackColor = 0xFFE0;
 constexpr int16_t SweepWidth = 24;
 
 uint16_t bar_color_for_ratio(uint32_t value, uint32_t budget) {
@@ -174,6 +175,7 @@ void DisplayDiagnosticsRunner::render_face_visual_debug(
     bool active;
     uint16_t color;
   } flags[] = {
+      {snapshot.tuning.safe_visual_mode, DebugFallbackColor},
       {snapshot.clip_active, AccentColor},
       {snapshot.tuning.full_redraw, DebugWarnColor},
       {snapshot.tuning.high_contrast_motion, DebugHotColor},
@@ -185,7 +187,7 @@ void DisplayDiagnosticsRunner::render_face_visual_debug(
        DebugHotColor},
   };
 
-  int16_t flag_x = static_cast<int16_t>(display_->width() - 38);
+  int16_t flag_x = static_cast<int16_t>(display_->width() - 45);
   const int16_t flag_y = static_cast<int16_t>(panel_y + 14);
   for (const auto& flag : flags) {
     display_->drawRect(flag_x, flag_y, 6, 6, DebugFrameColor);

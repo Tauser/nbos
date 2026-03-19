@@ -16,6 +16,7 @@
 #include "services/face/face_multimodal_sync.hpp"
 #include "services/face/face_preset_library.hpp"
 #include "services/face/face_tooling.hpp"
+#include "services/face/face_visual_fallback.hpp"
 
 namespace ncos::services::face {
 
@@ -51,6 +52,7 @@ class FaceGraphicsPipeline final {
   FaceMultimodalSync multimodal_sync_{};
   FacePreviewSnapshot preview_snapshot_{};
   FaceTuningTelemetry tuning_{};
+  FaceVisualFallbackStatus fallback_status_{};
   ncos::core::contracts::MotionFaceSignal motion_signal_{};
   FaceFrameComposer composer_{};
   FaceDisplayRenderer renderer_{};
