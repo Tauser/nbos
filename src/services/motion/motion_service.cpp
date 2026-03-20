@@ -1,12 +1,7 @@
 #include "services/motion/motion_service.hpp"
 
 #include "core/contracts/companion_personality_contracts.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* kTag = "NCOS_MOTION_SVC";
@@ -65,13 +60,13 @@ bool MotionService::initialize(uint64_t now_ms) {
   state_.last_face_signal_ms = now_ms;
 
   if (port_ == nullptr) {
-    ESP_LOGW(kTag, "Porta de motion nao conectada");
+    NCOS_LOGW(kTag, "Porta de motion nao conectada");
     return false;
   }
 
   state_.transport_conflict = port_->has_transport_conflict();
   if (state_.transport_conflict) {
-    ESP_LOGW(kTag, "Motion bloqueado por conflito de transporte");
+    NCOS_LOGW(kTag, "Motion bloqueado por conflito de transporte");
     return false;
   }
 

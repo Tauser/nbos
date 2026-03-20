@@ -162,6 +162,8 @@ ncos::core::contracts::CompanionPersistentMemorySignal make_persistent_memory_si
   signal.companion_event_salience_percent = record.last_companion_event.salience_percent;
   signal.environment_event_salience_percent = record.last_environment_event.salience_percent;
   return signal;
+}
+
 }  // namespace
 
 namespace ncos::app::boot {

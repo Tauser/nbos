@@ -3,12 +3,7 @@
 #include <limits.h>
 
 #include "config/system_config.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* kTag = "NCOS_IMU_SVC";
@@ -32,7 +27,7 @@ void ImuService::bind_port(ncos::interfaces::sensing::ImuPort* port) {
 
 bool ImuService::initialize(uint64_t now_ms) {
   if (port_ == nullptr) {
-    ESP_LOGW(kTag, "Porta de IMU nao conectada");
+    NCOS_LOGW(kTag, "Porta de IMU nao conectada");
     return false;
   }
 

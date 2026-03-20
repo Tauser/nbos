@@ -1,13 +1,7 @@
 #include "services/audio/audio_service.hpp"
 
 #include "config/system_config.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGI(tag, fmt, ...) ((void)0)
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* kTag = "NCOS_AUDIO_SVC";
@@ -22,7 +16,7 @@ void AudioService::bind_port(ncos::interfaces::audio::LocalAudioPort* port) {
 
 bool AudioService::initialize(uint64_t now_ms) {
   if (port_ == nullptr) {
-    ESP_LOGW(kTag, "Porta de audio nao conectada ao runtime");
+    NCOS_LOGW(kTag, "Porta de audio nao conectada ao runtime");
     return false;
   }
 
@@ -38,12 +32,12 @@ bool AudioService::initialize(uint64_t now_ms) {
   next_probe_ms_ = now_ms;
 
   if (!state_.initialized) {
-    ESP_LOGW(kTag, "Falha ao inicializar audio local (tx=%d rx=%d)", state_.output_ready ? 1 : 0,
+    NCOS_LOGW(kTag, "Falha ao inicializar audio local (tx=%d rx=%d)", state_.output_ready ? 1 : 0,
              state_.input_ready ? 1 : 0);
     return false;
   }
 
-  ESP_LOGI(kTag, "Audio runtime inicializado (tx=%d rx=%d)", state_.output_ready ? 1 : 0,
+  NCOS_LOGI(kTag, "Audio runtime inicializado (tx=%d rx=%d)", state_.output_ready ? 1 : 0,
            state_.input_ready ? 1 : 0);
   return true;
 }

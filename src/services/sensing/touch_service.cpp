@@ -1,12 +1,7 @@
 #include "services/sensing/touch_service.hpp"
 
 #include "config/system_config.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* kTag = "NCOS_TOUCH_SVC";
@@ -30,7 +25,7 @@ void TouchService::bind_port(ncos::interfaces::sensing::TouchPort* port) {
 
 bool TouchService::initialize(uint64_t now_ms) {
   if (port_ == nullptr) {
-    ESP_LOGW(kTag, "Porta de touch nao conectada");
+    NCOS_LOGW(kTag, "Porta de touch nao conectada");
     return false;
   }
 

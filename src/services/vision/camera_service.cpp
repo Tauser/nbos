@@ -1,12 +1,7 @@
 #include "services/vision/camera_service.hpp"
 
 #include "config/system_config.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* Tag = "NCOS_CAM_SVC";
@@ -20,7 +15,7 @@ void CameraService::bind_port(ncos::interfaces::vision::CameraPort* port) {
 
 bool CameraService::initialize(uint64_t now_ms) {
   if (port_ == nullptr) {
-    ESP_LOGW(Tag, "Porta de camera nao conectada");
+    NCOS_LOGW(Tag, "Porta de camera nao conectada");
     return false;
   }
 

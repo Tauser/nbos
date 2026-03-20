@@ -1,21 +1,15 @@
 #include "drivers/cloud/cloud_local_port.hpp"
 
+#include "hal/platform/runtime_build_target.hpp"
+
 namespace ncos::drivers::cloud {
 
 bool CloudLocalPort::ensure_ready() {
-#ifdef NCOS_NATIVE_TESTS
-  return true;
-#else
-  return false;
-#endif
+  return ncos::hal::platform::running_native_tests();
 }
 
 bool CloudLocalPort::send_packet(const ncos::core::contracts::CloudSyncPacket&) {
-#ifdef NCOS_NATIVE_TESTS
-  return true;
-#else
-  return false;
-#endif
+  return ncos::hal::platform::running_native_tests();
 }
 
 ncos::interfaces::cloud::CloudSyncPort* acquire_shared_cloud_port() {

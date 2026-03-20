@@ -1,12 +1,7 @@
 #include "services/power/power_service.hpp"
 
 #include "config/system_config.hpp"
-
-#ifndef NCOS_NATIVE_TESTS
-#include "esp_log.h"
-#else
-#define ESP_LOGW(tag, fmt, ...) ((void)0)
-#endif
+#include "hal/platform/runtime_logging.hpp"
 
 namespace {
 constexpr const char* Tag = "NCOS_POWER_SVC";
@@ -20,7 +15,7 @@ void PowerService::bind_port(ncos::interfaces::power::PowerPort* port) {
 
 bool PowerService::initialize(uint16_t service_id, uint64_t now_ms) {
   if (service_id == 0 || port_ == nullptr) {
-    ESP_LOGW(Tag, "PowerService sem porta valida");
+    NCOS_LOGW(Tag, "PowerService sem porta valida");
     return false;
   }
 
