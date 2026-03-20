@@ -23,13 +23,14 @@ class VoiceService final {
 
  private:
   static constexpr uint8_t SpeechThresholdPercent = 18;
-  static constexpr uint8_t TriggerThresholdPercent = 28;
-  static constexpr uint16_t TriggerSpeechFrames = 3;
+  static constexpr uint8_t TriggerThresholdPercent = 30;
+  static constexpr uint16_t TriggerSpeechFrames = 2;
   static constexpr uint16_t MinCaptureSamples = 128;
-  static constexpr uint64_t CaptureFreshnessMs = 320;
+  static constexpr uint64_t CaptureFreshnessMs = 260;
   static constexpr uint64_t TriggerCooldownMs = 1400;
 
   uint16_t service_id_ = 0;
+  uint64_t speech_window_opened_ms_ = 0;
   ncos::core::contracts::VoiceRuntimeState state_ = ncos::core::contracts::make_voice_runtime_baseline();
   ncos::core::contracts::VoiceResponsePlan pending_response_plan_{};
 };

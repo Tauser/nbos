@@ -51,7 +51,7 @@ struct RuntimeConfig {
   uint32_t cloud_sync_retry_backoff_ms = 6000;
   uint8_t cloud_sync_failure_threshold = 3;
 
-  uint32_t audio_probe_interval_ms = 140;
+  uint32_t audio_probe_interval_ms = 120;
   uint32_t touch_probe_interval_ms = 120;
   uint32_t imu_probe_interval_ms = 100;
   uint32_t camera_probe_interval_ms = 700;
@@ -110,7 +110,7 @@ constexpr RuntimeConfig make_runtime_config() {
     cfg.cloud_sync_retry_backoff_ms = 8000;
     cfg.cloud_sync_failure_threshold = 3;
 
-    cfg.audio_probe_interval_ms = 180;
+    cfg.audio_probe_interval_ms = 160;
     cfg.touch_probe_interval_ms = 160;
     cfg.imu_probe_interval_ms = 140;
     cfg.camera_probe_interval_ms = 1000;
@@ -154,4 +154,5 @@ inline constexpr GlobalConfig kGlobalConfig = make_global_config();
 inline constexpr bool kConfigReady = kGlobalConfig.config_ready;
 
 }  // namespace ncos::config
+
 

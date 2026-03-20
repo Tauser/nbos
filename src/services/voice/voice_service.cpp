@@ -17,6 +17,10 @@ bool is_capture_usable(const ncos::core::contracts::AudioRuntimeState& audio, ui
          is_capture_fresh(audio, now_ms, freshness_window_ms);
 }
 
+uint16_t saturating_u16(uint64_t value) {
+  return value > 0xFFFFu ? 0xFFFFu : static_cast<uint16_t>(value);
+}
+
 ncos::core::contracts::IntentTopic classify_constrained_intent(
     const ncos::core::contracts::CompanionSnapshot& companion) {
   if (companion.energetic.mode == ncos::core::contracts::EnergyMode::kConstrained) {
@@ -50,27 +54,27 @@ ncos::core::contracts::VoiceResponsePlan make_response_plan(
   switch (intent) {
     case ncos::core::contracts::IntentTopic::kAcknowledgeUser:
       plan.cue = ncos::core::contracts::VoiceResponseCue::AcknowledgeChirp;
-      plan.tone_frequency_hz = 880.0F;
-      plan.tone_duration_ms = 90;
+      plan.tone_frequency_hz = 980.0F;
+      plan.tone_duration_ms = 75;
       break;
 
     case ncos::core::contracts::IntentTopic::kInspectStimulus:
       plan.cue = ncos::core::contracts::VoiceResponseCue::StimulusChirp;
-      plan.tone_frequency_hz = 620.0F;
-      plan.tone_duration_ms = 110;
+      plan.tone_frequency_hz = 560.0F;
+      plan.tone_duration_ms = 105;
       break;
 
     case ncos::core::contracts::IntentTopic::kPreserveEnergy:
       plan.cue = ncos::core::contracts::VoiceResponseCue::EnergySoftChirp;
-      plan.tone_frequency_hz = 440.0F;
-      plan.tone_duration_ms = 80;
+      plan.tone_frequency_hz = 392.0F;
+      plan.tone_duration_ms = 85;
       break;
 
     case ncos::core::contracts::IntentTopic::kAttendUser:
     default:
       plan.cue = ncos::core::contracts::VoiceResponseCue::WakeChirp;
-      plan.tone_frequency_hz = 740.0F;
-      plan.tone_duration_ms = 70;
+      plan.tone_frequency_hz = 760.0F;
+      plan.tone_duration_ms = 60;
       break;
   }
 
@@ -87,6 +91,7 @@ bool VoiceService::initialize(uint16_t service_id, uint64_t now_ms) {
   }
 
   service_id_ = service_id;
+  speech_window_opened_ms_ = 0;
   state_ = ncos::core::contracts::make_voice_runtime_baseline();
   pending_response_plan_ = ncos::core::contracts::VoiceResponsePlan{};
   state_.initialized = true;
@@ -112,6 +117,7 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
   state_.input_available = capture_usable;
   state_.last_update_ms = now_ms;
   state_.energy_percent = ncos::core::contracts::voice_energy_percent_from_audio(audio);
+  state_.last_capture_age_ms = capture_usable ? saturating_u16(now_ms - audio.last_capture_ms) : 0;
 
   if (!capture_usable || companion.runtime.safe_mode ||
       companion.energetic.mode == ncos::core::contracts::EnergyMode::kCritical) {
@@ -120,18 +126,25 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
     state_.consecutive_speech_frames = 0;
     state_.silence_frames = 0;
     state_.stage = ncos::core::contracts::VoiceStage::Dormant;
+    speech_window_opened_ms_ = 0;
     return false;
   }
 
   state_.speech_active = state_.energy_percent >= SpeechThresholdPercent;
 
   if (state_.speech_active) {
+    if (state_.consecutive_speech_frames == 0) {
+      speech_window_opened_ms_ = now_ms;
+    }
     ++state_.consecutive_speech_frames;
     state_.silence_frames = 0;
     ++state_.speech_frames_total;
   } else {
     state_.consecutive_speech_frames = 0;
     ++state_.silence_frames;
+    if (state_.silence_frames >= 2) {
+      speech_window_opened_ms_ = 0;
+    }
   }
 
   const bool cooldown_elapsed =
@@ -145,12 +158,19 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
   if (state_.trigger_candidate) {
     state_.stage = ncos::core::contracts::VoiceStage::TriggerCandidate;
     state_.last_trigger_ms = now_ms;
+    state_.last_trigger_latency_ms =
+        speech_window_opened_ms_ == 0 ? 0 : saturating_u16(now_ms - speech_window_opened_ms_);
     ++state_.trigger_candidates_total;
 
     const auto detected_intent = classify_constrained_intent(companion);
     pending_response_plan_ = make_response_plan(detected_intent);
     state_.last_detected_intent = detected_intent;
     state_.last_response_cue = pending_response_plan_.cue;
+    state_.last_response_ready_latency_ms = state_.last_trigger_latency_ms;
+    state_.last_response_tone_duration_ms =
+        pending_response_plan_.tone_duration_ms < 0
+            ? 0
+            : static_cast<uint16_t>(pending_response_plan_.tone_duration_ms);
     ++state_.response_plan_total;
   } else if (state_.speech_active) {
     state_.stage = ncos::core::contracts::VoiceStage::Listening;

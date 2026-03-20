@@ -86,6 +86,10 @@ struct VoiceRuntimeState {
 
   uint64_t last_trigger_ms = 0;
   uint64_t last_update_ms = 0;
+  uint16_t last_capture_age_ms = 0;
+  uint16_t last_trigger_latency_ms = 0;
+  uint16_t last_response_ready_latency_ms = 0;
+  uint16_t last_response_tone_duration_ms = 0;
   uint32_t speech_frames_total = 0;
   uint32_t trigger_candidates_total = 0;
   uint32_t response_plan_total = 0;
@@ -109,3 +113,4 @@ inline uint8_t voice_energy_percent_from_audio(const AudioRuntimeState& audio) {
 }
 
 }  // namespace ncos::core::contracts
+

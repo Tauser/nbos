@@ -31,8 +31,8 @@ A captacao minima oficial do canal local de voz fica consolidada assim:
 
 - `AudioService` continua fazendo capture de pico curto (`60 ms`)
 - o runtime passa a fazer probe de audio em cadencia curta, propria para trigger local
-- profile base: `audio_probe_interval_ms = 140`
-- profile `prod`: `audio_probe_interval_ms = 180`
+- profile base: `audio_probe_interval_ms = 120`
+- profile `prod`: `audio_probe_interval_ms = 160`
 - `VoiceService` so considera a entrada utilizavel quando a captura e:
   - recente
   - valida
@@ -42,8 +42,27 @@ Protecoes minimas oficiais desta etapa:
 
 - captura antiga nao abre `listening`
 - captura com poucas amostras nao abre `listening`
-- `trigger_candidate` continua exigindo fala forte por frames consecutivos
+- trigger rapido exige energia um pouco mais alta
 - cooldown continua impedindo rearme imediato
+
+### Responsividade minima oficial
+
+O caminho minimo de usabilidade desta fase fica assim:
+
+- `TriggerSpeechFrames = 2`
+- `TriggerThresholdPercent = 30`
+- freshness window curta para evitar reaproveitar audio velho
+- o `VoiceRuntimeState` passa a registrar:
+  - idade da captura aceita
+  - latencia do trigger
+  - latencia de resposta pronta
+  - duracao do earcon escolhido
+
+Alvo pratico desta fase:
+
+- o canal local deve reagir em cerca de uma janela curta de fala, nao em uma sequencia longa de probes
+- a resposta deve ficar pronta no mesmo tick do trigger
+- a experiencia deve soar curta, distinta e previsivel
 
 ### ASR local oficial
 
@@ -65,19 +84,6 @@ Operacionalizacao minima desta fase:
   - `kInspectStimulus`
   - `kPreserveEnergy`
 
-Mapeamento minimo atual:
-
-- sessao fria -> `kAttendUser`
-- sessao quente/usuario ja engajado -> `kAcknowledgeUser`
-- contexto recente de estimulo -> `kInspectStimulus`
-- energia constrangida -> `kPreserveEnergy`
-
-Interpretacao pratica:
-
-- o produto ainda nao promete ditado livre
-- a voz local passa a gerar resposta minima coerente com o contexto do runtime
-- o contrato continua abrindo caminho para ASR mais rico depois
-
 ### TTS local oficial
 
 O fluxo oficial minimo de saida de voz fica definido como:
@@ -95,16 +101,16 @@ Operacionalizacao minima desta fase:
 
 Mapa minimo de resposta:
 
-- `kAttendUser` -> `WakeChirp`
-- `kAcknowledgeUser` -> `AcknowledgeChirp`
-- `kInspectStimulus` -> `StimulusChirp`
-- `kPreserveEnergy` -> `EnergySoftChirp`
+- `kAttendUser` -> `WakeChirp` (`760 Hz / 60 ms`)
+- `kAcknowledgeUser` -> `AcknowledgeChirp` (`980 Hz / 75 ms`)
+- `kInspectStimulus` -> `StimulusChirp` (`560 Hz / 105 ms`)
+- `kPreserveEnergy` -> `EnergySoftChirp` (`392 Hz / 85 ms`)
 
 Interpretacao pratica:
 
-- nesta fase, utilidade e latencia valem mais que naturalidade de fala
-- o companion pode confirmar acao rapidamente sem depender de pipeline pesado de sintese
-- a resposta local ja impacta o estado central e o comportamento seguinte
+- o canal agora responde mais rapido
+- os earcons ficaram mais separados entre si
+- a resposta continua curta o suficiente para nao travar o turno
 
 ## Prioridades oficiais
 
@@ -113,12 +119,6 @@ A ordem oficial de prioridade para a voz local minima e:
 1. `TriggerResponsiveness`
 2. `ShortTurnUtility`
 3. `RichTranscriptFidelity`
-
-Consequencias praticas:
-
-- e melhor responder rapido a um turno curto do que perseguir transcricao longa
-- e melhor confirmar uma interacao de forma simples do que esperar TTS natural
-- fidelidade rica de ASR/TTS fica fora do caminho critico desta fase
 
 ## Base real reaproveitada
 
@@ -130,8 +130,6 @@ Arquivos relevantes:
 - [audio_local_port.cpp](C:\Users\Tauser\Documents\PlatformIO\Projects\NBOS\src\drivers\audio\audio_local_port.cpp)
 - [firmware_entrypoint.cpp](C:\Users\Tauser\Documents\PlatformIO\Projects\NBOS\src\app\boot\firmware_entrypoint.cpp)
 - [system_config.hpp](C:\Users\Tauser\Documents\PlatformIO\Projects\NBOS\src\config\system_config.hpp)
-- [0018-voice-pipeline-local-base.md](C:\Users\Tauser\Documents\PlatformIO\Projects\NBOS\docs\architecture\0018-voice-pipeline-local-base.md)
-- [0021-voice-vision-companion-behavior-integration.md](C:\Users\Tauser\Documents\PlatformIO\Projects\NBOS\docs\architecture\0021-voice-vision-companion-behavior-integration.md)
 
 ## O que continua fora de escopo
 
@@ -147,9 +145,9 @@ A voz local fica oficialmente consolidada como um pipeline de baixa latencia par
 
 - captar audio local em cadencia curta
 - aceitar apenas captura valida e recente
-- detectar fala/trigger local
+- detectar fala/trigger local com metrica explicita de latencia
 - mapear contexto curto para uma intent minima util
-- tocar resposta local leve e coerente
+- tocar resposta local leve, curta e distinta
 - promover atencao/interacao auditiva e resposta do companion no estado central
 
 Isso fecha uma arquitetura minima util sem prometer uma pilha de voice assistant completa antes da hora.
