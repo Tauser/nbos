@@ -110,6 +110,7 @@ enum class CompanionStateWriter : uint8_t {
   kAttentionService = 5,
   kPowerService = 6,
   kInteractionService = 7,
+  kPersistenceCore = 8,
 };
 
 enum class CompanionStateReader : uint8_t {
@@ -136,6 +137,15 @@ struct CompanionPersonalityState {
   uint8_t composure_percent = 72;
   uint8_t initiative_percent = 46;
   uint8_t assertiveness_percent = 52;
+  bool persistent_memory_applied = false;
+  int8_t persistent_social_warmth_bias_percent = 0;
+  int8_t persistent_response_energy_bias_percent = 0;
+  int16_t persistent_continuity_window_bias_ms = 0;
+  int8_t contextual_social_warmth_bias_percent = 0;
+  int8_t contextual_response_energy_bias_percent = 0;
+  int16_t contextual_continuity_window_bias_ms = 0;
+  uint16_t persistent_reinforced_sessions = 0;
+  AttentionChannel persistent_preferred_attention_channel = AttentionChannel::kTouch;
   int8_t adaptive_social_warmth_bias_percent = 0;
   int8_t adaptive_response_energy_bias_percent = 0;
   int16_t adaptive_continuity_window_bias_ms = 0;
@@ -299,6 +309,21 @@ struct CompanionInteractionSignal {
   bool response_pending = false;
 };
 
+struct CompanionPersistentMemorySignal {
+  bool valid = false;
+  uint8_t social_warmth_preference_percent = 50;
+  uint8_t response_energy_preference_percent = 50;
+  uint8_t stimulus_sensitivity_percent = 50;
+  AttentionChannel preferred_attention_channel = AttentionChannel::kTouch;
+  uint8_t touch_engagement_affinity_percent = 50;
+  uint8_t repeat_engagement_affinity_percent = 50;
+  uint8_t calm_recovery_affinity_percent = 50;
+  uint16_t reinforced_sessions = 0;
+  uint8_t user_event_salience_percent = 0;
+  uint8_t companion_event_salience_percent = 0;
+  uint8_t environment_event_salience_percent = 0;
+};
+
 GovernanceHealth evaluate_governance_health(uint32_t allowed_total, uint32_t preempted_total,
                                             uint32_t rejected_total);
 bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain domain);
@@ -311,4 +336,7 @@ EmotionalTone tone_from_emotion_model(const ncos::models::emotion::EmotionModelS
 EmotionalArousal arousal_from_emotion_model(const ncos::models::emotion::EmotionModelState& model);
 
 }  // namespace ncos::core::contracts
+
+
+
 

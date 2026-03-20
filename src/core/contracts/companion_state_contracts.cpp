@@ -136,6 +136,8 @@ bool can_writer_mutate_domain(CompanionStateWriter writer, CompanionStateDomain 
       return domain == CompanionStateDomain::kEnergetic;
     case CompanionStateWriter::kInteractionService:
       return domain == CompanionStateDomain::kInteractional;
+    case CompanionStateWriter::kPersistenceCore:
+      return domain == CompanionStateDomain::kPersonality;
     default:
       return false;
   }
@@ -199,6 +201,15 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
     redacted.personality.composure_percent = 0;
     redacted.personality.initiative_percent = 0;
     redacted.personality.assertiveness_percent = 0;
+    redacted.personality.persistent_memory_applied = false;
+    redacted.personality.persistent_social_warmth_bias_percent = 0;
+    redacted.personality.persistent_response_energy_bias_percent = 0;
+    redacted.personality.persistent_continuity_window_bias_ms = 0;
+    redacted.personality.contextual_social_warmth_bias_percent = 0;
+    redacted.personality.contextual_response_energy_bias_percent = 0;
+    redacted.personality.contextual_continuity_window_bias_ms = 0;
+    redacted.personality.persistent_reinforced_sessions = 0;
+    redacted.personality.persistent_preferred_attention_channel = AttentionChannel::kVisual;
     redacted.personality.adaptive_social_warmth_bias_percent = 0;
     redacted.personality.adaptive_response_energy_bias_percent = 0;
     redacted.personality.adaptive_continuity_window_bias_ms = 0;
@@ -238,4 +249,6 @@ CompanionSnapshot redact_snapshot_for_reader(const CompanionSnapshot& source,
 }
 
 }  // namespace ncos::core::contracts
+
+
 

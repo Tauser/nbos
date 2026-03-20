@@ -13,6 +13,10 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
   bool initialize(const ncos::core::contracts::CompanionStructuralState& structural,
                   ncos::core::contracts::CompanionStateWriter writer,
                   uint64_t now_ms) override;
+  bool ingest_persistent_memory_signal(
+      const ncos::core::contracts::CompanionPersistentMemorySignal& signal,
+      ncos::core::contracts::CompanionStateWriter writer,
+      uint64_t now_ms);
   bool ingest_runtime(const ncos::core::contracts::CompanionRuntimeSignal& runtime,
                       ncos::core::contracts::CompanionStateWriter writer,
                       uint64_t now_ms) override;
@@ -55,6 +59,12 @@ class CompanionStateStore final : public ncos::interfaces::state::CompanionState
       const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
   static bool stimulus_session_continuity_active(
       const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
+  static int8_t derive_persistent_social_warmth_bias_percent(
+      const ncos::core::contracts::CompanionPersistentMemorySignal& signal);
+  static int8_t derive_persistent_response_energy_bias_percent(
+      const ncos::core::contracts::CompanionPersistentMemorySignal& signal);
+  static int16_t derive_persistent_continuity_window_bias_ms(
+      const ncos::core::contracts::CompanionPersistentMemorySignal& signal);
   static int8_t derive_target_social_warmth_bias_percent(
       const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms);
   static int8_t derive_target_response_energy_bias_percent(

@@ -42,6 +42,14 @@ uint8_t engagement_bonus(uint8_t engagement_percent, uint8_t floor_percent, uint
   const uint8_t bonus = static_cast<uint8_t>((engagement_percent - floor_percent) / divisor);
   return bonus > cap ? cap : bonus;
 }
+
+uint8_t salience_bonus(uint8_t salience_percent, uint8_t divisor, uint8_t cap) {
+  if (divisor == 0) {
+    return 0;
+  }
+  const uint8_t bonus = static_cast<uint8_t>(salience_percent / divisor);
+  return bonus > cap ? cap : bonus;
+}
 }
 
 namespace ncos::core::state {
@@ -58,6 +66,42 @@ bool CompanionStateStore::initialize(const ncos::core::contracts::CompanionStruc
   snapshot_.runtime.last_transition_cause =
       ncos::core::contracts::CompanionStateTransitionCause::kBootstrap;
   snapshot_.runtime.last_state_change_ms = now_ms;
+  refresh_derived_runtime_state(now_ms);
+  snapshot_.captured_at_ms = now_ms;
+  ++snapshot_.revision;
+  return true;
+}
+
+bool CompanionStateStore::ingest_persistent_memory_signal(
+    const ncos::core::contracts::CompanionPersistentMemorySignal& signal,
+    ncos::core::contracts::CompanionStateWriter writer,
+    uint64_t now_ms) {
+  if (!authorize_write(writer, ncos::core::contracts::CompanionStateDomain::kPersonality)) {
+    return false;
+  }
+
+  auto& personality = snapshot_.personality;
+  personality.persistent_memory_applied = signal.valid;
+  personality.persistent_social_warmth_bias_percent =
+      derive_persistent_social_warmth_bias_percent(signal);
+  personality.persistent_response_energy_bias_percent =
+      derive_persistent_response_energy_bias_percent(signal);
+  personality.persistent_continuity_window_bias_ms =
+      derive_persistent_continuity_window_bias_ms(signal);
+  personality.contextual_social_warmth_bias_percent = 0;
+  personality.contextual_response_energy_bias_percent = 0;
+  personality.contextual_continuity_window_bias_ms = 0;
+  personality.persistent_reinforced_sessions = signal.valid ? signal.reinforced_sessions : 0;
+  personality.persistent_preferred_attention_channel =
+      signal.valid ? signal.preferred_attention_channel
+                   : ncos::core::contracts::AttentionChannel::kTouch;
+  personality.adaptive_social_warmth_bias_percent =
+      personality.persistent_social_warmth_bias_percent;
+  personality.adaptive_response_energy_bias_percent =
+      personality.persistent_response_energy_bias_percent;
+  personality.adaptive_continuity_window_bias_ms =
+      personality.persistent_continuity_window_bias_ms;
+
   refresh_derived_runtime_state(now_ms);
   snapshot_.captured_at_ms = now_ms;
   ++snapshot_.revision;
@@ -361,6 +405,62 @@ bool CompanionStateStore::stimulus_session_continuity_active(
                  snapshot.personality, ncos::core::contracts::PersonalityContinuityKind::kStimulus);
 }
 
+int8_t CompanionStateStore::derive_persistent_social_warmth_bias_percent(
+    const ncos::core::contracts::CompanionPersistentMemorySignal& signal) {
+  if (!signal.valid) {
+    return 0;
+  }
+
+  int16_t target = (static_cast<int16_t>(signal.social_warmth_preference_percent) - 50) / 7;
+  target += (static_cast<int16_t>(signal.touch_engagement_affinity_percent) - 50) / 12;
+  target += (static_cast<int16_t>(signal.repeat_engagement_affinity_percent) - 50) / 18;
+  target += salience_bonus(signal.user_event_salience_percent, 28, 2);
+  target += salience_bonus(signal.companion_event_salience_percent, 40, 1);
+
+  return ncos::core::contracts::personality_clamp_i8(
+      target, ncos::core::contracts::personality_adaptive_social_warmth_bias_min_percent(),
+      ncos::core::contracts::personality_adaptive_social_warmth_bias_max_percent());
+}
+
+int8_t CompanionStateStore::derive_persistent_response_energy_bias_percent(
+    const ncos::core::contracts::CompanionPersistentMemorySignal& signal) {
+  if (!signal.valid) {
+    return 0;
+  }
+
+  int16_t target = (static_cast<int16_t>(signal.response_energy_preference_percent) - 50) / 7;
+  target += (static_cast<int16_t>(signal.stimulus_sensitivity_percent) - 50) / 12;
+  target += (static_cast<int16_t>(signal.repeat_engagement_affinity_percent) - 50) / 16;
+  target -= (static_cast<int16_t>(signal.calm_recovery_affinity_percent) - 50) / 16;
+  target += salience_bonus(signal.companion_event_salience_percent, 35, 1);
+  target += salience_bonus(signal.environment_event_salience_percent, 25, 2);
+
+  return ncos::core::contracts::personality_clamp_i8(
+      target, ncos::core::contracts::personality_adaptive_response_energy_bias_min_percent(),
+      ncos::core::contracts::personality_adaptive_response_energy_bias_max_percent());
+}
+
+int16_t CompanionStateStore::derive_persistent_continuity_window_bias_ms(
+    const ncos::core::contracts::CompanionPersistentMemorySignal& signal) {
+  if (!signal.valid) {
+    return 0;
+  }
+
+  int32_t target = (static_cast<int32_t>(signal.repeat_engagement_affinity_percent) - 50) * 8;
+  target += (static_cast<int32_t>(signal.touch_engagement_affinity_percent) - 50) * 4;
+  target -= (static_cast<int32_t>(signal.calm_recovery_affinity_percent) - 50) * 6;
+  target += (static_cast<int32_t>(signal.stimulus_sensitivity_percent) - 50) * 3;
+
+  const uint16_t bounded_sessions = signal.reinforced_sessions > 12 ? 12 : signal.reinforced_sessions;
+  target += static_cast<int32_t>(bounded_sessions) * 20;
+  target += static_cast<int32_t>(signal.user_event_salience_percent) * 2;
+  target += signal.companion_event_salience_percent;
+
+  return ncos::core::contracts::personality_clamp_i16(
+      target, ncos::core::contracts::personality_adaptive_continuity_window_bias_min_ms(),
+      ncos::core::contracts::personality_adaptive_continuity_window_bias_max_ms());
+}
+
 int8_t CompanionStateStore::derive_target_social_warmth_bias_percent(
     const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) {
   if (!snapshot.runtime.initialized || !snapshot.runtime.started) {
@@ -624,15 +724,34 @@ void CompanionStateStore::refresh_adaptive_personality(uint64_t now_ms) {
   const int8_t target_response_bias = derive_target_response_energy_bias_percent(snapshot_, now_ms);
   const int16_t target_continuity_bias = derive_target_continuity_window_bias_ms(snapshot_, now_ms);
 
-  snapshot_.personality.adaptive_social_warmth_bias_percent = move_toward_i8(
-      snapshot_.personality.adaptive_social_warmth_bias_percent, target_social_bias,
+  snapshot_.personality.contextual_social_warmth_bias_percent = move_toward_i8(
+      snapshot_.personality.contextual_social_warmth_bias_percent, target_social_bias,
       AdaptiveBiasStepPercent);
-  snapshot_.personality.adaptive_response_energy_bias_percent = move_toward_i8(
-      snapshot_.personality.adaptive_response_energy_bias_percent, target_response_bias,
+  snapshot_.personality.contextual_response_energy_bias_percent = move_toward_i8(
+      snapshot_.personality.contextual_response_energy_bias_percent, target_response_bias,
       AdaptiveBiasStepPercent);
-  snapshot_.personality.adaptive_continuity_window_bias_ms = move_toward_i16(
-      snapshot_.personality.adaptive_continuity_window_bias_ms, target_continuity_bias,
+  snapshot_.personality.contextual_continuity_window_bias_ms = move_toward_i16(
+      snapshot_.personality.contextual_continuity_window_bias_ms, target_continuity_bias,
       AdaptiveContinuityStepMs);
+
+  snapshot_.personality.adaptive_social_warmth_bias_percent =
+      ncos::core::contracts::personality_clamp_i8(
+          static_cast<int16_t>(snapshot_.personality.persistent_social_warmth_bias_percent) +
+              snapshot_.personality.contextual_social_warmth_bias_percent,
+          ncos::core::contracts::personality_adaptive_social_warmth_bias_min_percent(),
+          ncos::core::contracts::personality_adaptive_social_warmth_bias_max_percent());
+  snapshot_.personality.adaptive_response_energy_bias_percent =
+      ncos::core::contracts::personality_clamp_i8(
+          static_cast<int16_t>(snapshot_.personality.persistent_response_energy_bias_percent) +
+              snapshot_.personality.contextual_response_energy_bias_percent,
+          ncos::core::contracts::personality_adaptive_response_energy_bias_min_percent(),
+          ncos::core::contracts::personality_adaptive_response_energy_bias_max_percent());
+  snapshot_.personality.adaptive_continuity_window_bias_ms =
+      ncos::core::contracts::personality_clamp_i16(
+          static_cast<int32_t>(snapshot_.personality.persistent_continuity_window_bias_ms) +
+              snapshot_.personality.contextual_continuity_window_bias_ms,
+          ncos::core::contracts::personality_adaptive_continuity_window_bias_min_ms(),
+          ncos::core::contracts::personality_adaptive_continuity_window_bias_max_ms());
 }
 
 void CompanionStateStore::refresh_derived_runtime_state(uint64_t now_ms) {
@@ -685,3 +804,9 @@ bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateW
 }
 
 }  // namespace ncos::core::state
+
+
+
+
+
+

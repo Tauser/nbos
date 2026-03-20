@@ -19,6 +19,7 @@
 #include "drivers/imu/imu_local_port.hpp"
 #include "drivers/led/led_local_port.hpp"
 #include "drivers/power/power_local_port.hpp"
+#include "drivers/storage/persistent_companion_memory_store.hpp"
 #include "drivers/telemetry/telemetry_local_port.hpp"
 #include "drivers/touch/touch_local_port.hpp"
 #include "drivers/ttlinker/ttlinker_motion_port.hpp"
@@ -144,6 +145,23 @@ ncos::core::contracts::MotionCompanionSignal make_motion_companion_signal(
   signal.recent_turn_owner = snapshot.session.last_turn_owner;
   return signal;
 }
+
+ncos::core::contracts::CompanionPersistentMemorySignal make_persistent_memory_signal(
+    const ncos::core::contracts::PersistedCompanionMemoryRecord& record) {
+  ncos::core::contracts::CompanionPersistentMemorySignal signal{};
+  signal.valid = true;
+  signal.social_warmth_preference_percent = record.preferences.social_warmth_preference_percent;
+  signal.response_energy_preference_percent = record.preferences.response_energy_preference_percent;
+  signal.stimulus_sensitivity_percent = record.preferences.stimulus_sensitivity_percent;
+  signal.preferred_attention_channel = record.preferences.preferred_attention_channel;
+  signal.touch_engagement_affinity_percent = record.habits.touch_engagement_affinity_percent;
+  signal.repeat_engagement_affinity_percent = record.habits.repeat_engagement_affinity_percent;
+  signal.calm_recovery_affinity_percent = record.habits.calm_recovery_affinity_percent;
+  signal.reinforced_sessions = record.habits.reinforced_sessions;
+  signal.user_event_salience_percent = record.last_user_event.salience_percent;
+  signal.companion_event_salience_percent = record.last_companion_event.salience_percent;
+  signal.environment_event_salience_percent = record.last_environment_event.salience_percent;
+  return signal;
 }  // namespace
 
 namespace ncos::app::boot {
@@ -185,6 +203,29 @@ void FirmwareEntrypoint::run() {
 
   const uint64_t now = ncos::hal::platform::monotonic_time_ms();
   system_manager_.start(now);
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore persistent_memory_store{};
+  ncos::core::contracts::PersistedCompanionMemoryRecord persistent_memory{};
+  const auto persistent_memory_load = persistent_memory_store.load_with_recovery(&persistent_memory);
+  if (persistent_memory_load.status ==
+      ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk) {
+    (void)system_manager_.ingest_persistent_memory_signal(
+        make_persistent_memory_signal(persistent_memory), now);
+    const auto persistent_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+    ESP_LOGI(Tag,
+             "Memoria persistente aplicada: path=%d repaired=%d baseline=(%d,%d,%d)",
+             static_cast<int>(persistent_memory_load.recovery_path),
+             persistent_memory_load.repaired_storage ? 1 : 0,
+             static_cast<int>(persistent_snapshot.personality.persistent_social_warmth_bias_percent),
+             static_cast<int>(persistent_snapshot.personality.persistent_response_energy_bias_percent),
+             static_cast<int>(persistent_snapshot.personality.persistent_continuity_window_bias_ms));
+  } else if (persistent_memory_load.status !=
+             ncos::drivers::storage::PersistentCompanionMemoryStatus::kNotFound) {
+    ESP_LOGW(Tag, "Memoria persistente indisponivel: status=%d",
+             static_cast<int>(persistent_memory_load.status));
+  }
+
   next_polish_review_ms_ = now + PolishReviewIntervalMs;
 
   audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
@@ -451,13 +492,5 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
-
-
-
-
-
-
-
-
 
 

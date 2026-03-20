@@ -159,6 +159,12 @@ bool SystemManager::ingest_interactional_signal(
       signal, ncos::core::contracts::CompanionStateWriter::kInteractionService, now_ms);
 }
 
+bool SystemManager::ingest_persistent_memory_signal(
+    const ncos::core::contracts::CompanionPersistentMemorySignal& signal, uint64_t now_ms) {
+  return companion_state_.ingest_persistent_memory_signal(
+      signal, ncos::core::contracts::CompanionStateWriter::kPersistenceCore, now_ms);
+}
+
 bool SystemManager::ingest_energetic_signal(
     const ncos::core::contracts::CompanionEnergeticSignal& signal, uint64_t now_ms) {
   return companion_state_.ingest_energetic(signal,
@@ -261,3 +267,4 @@ void SystemManager::sync_companion_state(uint64_t now_ms) {
 }
 
 }  // namespace ncos::core::runtime
+

@@ -989,6 +989,115 @@ void test_companion_state_energy_protect_forces_conservative_adaptation() {
       snap.personality.adaptive_continuity_window_bias_ms);
 }
 
+
+void test_companion_state_applies_persistent_memory_as_adaptive_baseline() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionPersistentMemorySignal persistent{};
+  persistent.valid = true;
+  persistent.social_warmth_preference_percent = 82;
+  persistent.response_energy_preference_percent = 68;
+  persistent.stimulus_sensitivity_percent = 64;
+  persistent.preferred_attention_channel = ncos::core::contracts::AttentionChannel::kTouch;
+  persistent.touch_engagement_affinity_percent = 86;
+  persistent.repeat_engagement_affinity_percent = 78;
+  persistent.calm_recovery_affinity_percent = 40;
+  persistent.reinforced_sessions = 9;
+  persistent.user_event_salience_percent = 72;
+  persistent.companion_event_salience_percent = 55;
+  persistent.environment_event_salience_percent = 24;
+
+  TEST_ASSERT_TRUE(store.ingest_persistent_memory_signal(
+      persistent, ncos::core::contracts::CompanionStateWriter::kPersistenceCore, 1050));
+
+  const auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_TRUE(snap.personality.persistent_memory_applied);
+  TEST_ASSERT_EQUAL_UINT16(9, snap.personality.persistent_reinforced_sessions);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
+                        static_cast<int>(snap.personality.persistent_preferred_attention_channel));
+  TEST_ASSERT_GREATER_THAN_INT8(0, snap.personality.persistent_social_warmth_bias_percent);
+  TEST_ASSERT_GREATER_THAN_INT8(0, snap.personality.persistent_response_energy_bias_percent);
+  TEST_ASSERT_GREATER_THAN_INT16(0, snap.personality.persistent_continuity_window_bias_ms);
+  TEST_ASSERT_EQUAL_INT8(snap.personality.persistent_social_warmth_bias_percent,
+                         snap.personality.adaptive_social_warmth_bias_percent);
+  TEST_ASSERT_EQUAL_INT8(snap.personality.persistent_response_energy_bias_percent,
+                         snap.personality.adaptive_response_energy_bias_percent);
+  TEST_ASSERT_EQUAL_INT16(snap.personality.persistent_continuity_window_bias_ms,
+                          snap.personality.adaptive_continuity_window_bias_ms);
+}
+
+void test_companion_state_contextual_adaptation_returns_to_persisted_baseline() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionPersistentMemorySignal persistent{};
+  persistent.valid = true;
+  persistent.social_warmth_preference_percent = 82;
+  persistent.response_energy_preference_percent = 66;
+  persistent.stimulus_sensitivity_percent = 62;
+  persistent.touch_engagement_affinity_percent = 80;
+  persistent.repeat_engagement_affinity_percent = 76;
+  persistent.calm_recovery_affinity_percent = 42;
+  persistent.reinforced_sessions = 8;
+  persistent.user_event_salience_percent = 64;
+  persistent.companion_event_salience_percent = 48;
+  TEST_ASSERT_TRUE(store.ingest_persistent_memory_signal(
+      persistent, ncos::core::contracts::CompanionStateWriter::kPersistenceCore, 1050));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1100));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  attentional.focus_confidence_percent = 84;
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1200));
+
+  auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_TRUE(snap.personality.adaptive_social_warmth_bias_percent >=
+                   snap.personality.persistent_social_warmth_bias_percent);
+  TEST_ASSERT_GREATER_THAN_INT8(0, snap.personality.contextual_social_warmth_bias_percent);
+
+  attentional.target = ncos::core::contracts::AttentionTarget::kNone;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 0;
+  attentional.lock_active = false;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 2600));
+
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = ncos::core::contracts::InteractionPhase::kIdle;
+  interaction.turn_owner = ncos::core::contracts::TurnOwner::kNone;
+  interaction.session_active = false;
+  interaction.response_pending = false;
+  TEST_ASSERT_TRUE(store.ingest_interactional(
+      interaction, ncos::core::contracts::CompanionStateWriter::kInteractionService, 2605));
+
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 12000));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 12200));
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 12400));
+
+  snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+  TEST_ASSERT_EQUAL_INT8(snap.personality.persistent_social_warmth_bias_percent,
+                         snap.personality.adaptive_social_warmth_bias_percent);
+  TEST_ASSERT_EQUAL_INT8(snap.personality.persistent_response_energy_bias_percent,
+                         snap.personality.adaptive_response_energy_bias_percent);
+  TEST_ASSERT_EQUAL_INT16(snap.personality.persistent_continuity_window_bias_ms,
+                          snap.personality.adaptive_continuity_window_bias_ms);
+  TEST_ASSERT_EQUAL_INT8(0, snap.personality.contextual_social_warmth_bias_percent);
+  TEST_ASSERT_EQUAL_INT8(0, snap.personality.contextual_response_energy_bias_percent);
+  TEST_ASSERT_EQUAL_INT16(0, snap.personality.contextual_continuity_window_bias_ms);
+}
 void test_companion_state_redacts_by_reader_profile() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -1043,6 +1152,8 @@ int main() {
   RUN_TEST(test_companion_state_redacts_short_session_memory_for_cloud_reader);
   RUN_TEST(test_companion_state_redacts_personality_for_cloud_reader);
   RUN_TEST(test_companion_state_bounds_adaptation_during_hot_user_session);
+  RUN_TEST(test_companion_state_applies_persistent_memory_as_adaptive_baseline);
+  RUN_TEST(test_companion_state_contextual_adaptation_returns_to_persisted_baseline);
   RUN_TEST(test_companion_state_adaptation_decays_back_to_neutral_after_context_cools);
   RUN_TEST(test_companion_state_adaptation_distinguishes_user_and_stimulus_profiles);
   RUN_TEST(test_companion_state_adaptation_switches_profiles_without_overshoot);
@@ -1050,3 +1161,5 @@ int main() {
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }
+
+

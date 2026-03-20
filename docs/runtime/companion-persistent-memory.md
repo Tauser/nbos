@@ -107,3 +107,16 @@ Accepted trade-offs:
 - no overlap with short-session state
 
 This keeps the subsystem small, product-real, and safe for future operational stages.
+
+## Integracao com perfil adaptativo
+
+A memoria persistente do companion agora alimenta o perfil adaptativo apenas como baseline bounded e rastreavel.
+
+Regras oficiais desta etapa:
+- preferencias e habitos persistidos modulam apenas os biases adaptativos centrais
+- a influencia persistente entra no Companion State, nao direto em behavior, face ou motion
+- o estado separa baseline persistente de ajuste contextual de sessao
+- behavior, face e motion continuam lendo apenas o envelope efetivo central
+
+Isso preserva identidade, evita duplicacao de parametros e mantem rastreabilidade do que veio da memoria persistente versus do contexto curto.
+

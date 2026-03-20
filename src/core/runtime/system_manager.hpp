@@ -52,6 +52,9 @@ class SystemManager final {
                                  uint64_t now_ms);
   bool ingest_interactional_signal(const ncos::core::contracts::CompanionInteractionSignal& signal,
                                    uint64_t now_ms);
+  bool ingest_persistent_memory_signal(
+      const ncos::core::contracts::CompanionPersistentMemorySignal& signal,
+      uint64_t now_ms);
   bool ingest_energetic_signal(const ncos::core::contracts::CompanionEnergeticSignal& signal,
                                uint64_t now_ms);
   void report_runtime_fault(FaultCode code, const char* message, uint64_t now_ms, bool force_safe_mode);
