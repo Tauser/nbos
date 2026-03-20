@@ -19,11 +19,15 @@ struct PerceptionRuntimeState {
   bool initialized = false;
   bool presence_active = false;
   bool attention_active = false;
+  bool visual_signal_active = false;
 
   PerceptionStage stage = PerceptionStage::Dormant;
   AttentionTarget attention_target = AttentionTarget::kNone;
   AttentionChannel attention_channel = AttentionChannel::kVisual;
 
+  uint8_t visual_presence_confidence_percent = 0;
+  uint8_t auditory_presence_confidence_percent = 0;
+  uint8_t touch_presence_confidence_percent = 0;
   uint8_t presence_confidence_percent = 0;
   uint8_t attention_confidence_percent = 0;
 

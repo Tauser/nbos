@@ -8,7 +8,7 @@
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
 
-void test_perception_detects_visual_presence_and_attention() {
+void test_perception_detects_visual_presence_as_stimulus_attention_only() {
   ncos::services::vision::PerceptionService service;
   TEST_ASSERT_TRUE(service.initialize(65, 1000));
 
@@ -32,8 +32,14 @@ void test_perception_detects_visual_presence_and_attention() {
   TEST_ASSERT_TRUE(service.tick(audio, touch, camera, companion, 1100, &attention, &interaction));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kVisual),
                         static_cast<int>(attention.channel));
-  TEST_ASSERT_TRUE(interaction.session_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kStimulus),
+                        static_cast<int>(attention.target));
+  TEST_ASSERT_FALSE(interaction.session_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kIdle),
+                        static_cast<int>(interaction.phase));
   TEST_ASSERT_TRUE(service.state().presence_active);
+  TEST_ASSERT_TRUE(service.state().visual_signal_active);
+  TEST_ASSERT_EQUAL_UINT8(70, service.state().visual_presence_confidence_percent);
 }
 
 void test_perception_prioritizes_touch_attention_when_touch_is_high() {
@@ -49,6 +55,13 @@ void test_perception_prioritizes_touch_attention_when_touch_is_high() {
   touch.normalized_level = 780;
 
   ncos::core::contracts::CameraRuntimeState camera{};
+  camera.initialized = true;
+  camera.capture_ready = true;
+  camera.last_capture_ok = true;
+  camera.last_capture_ms = 2000;
+  camera.last_frame_width = 320;
+  camera.last_frame_height = 240;
+  camera.last_frame_bytes = 1600;
 
   ncos::core::contracts::CompanionSnapshot companion{};
 
@@ -58,8 +71,46 @@ void test_perception_prioritizes_touch_attention_when_touch_is_high() {
   TEST_ASSERT_TRUE(service.tick(audio, touch, camera, companion, 2100, &attention, &interaction));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kTouch),
                         static_cast<int>(attention.channel));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(attention.target));
   TEST_ASSERT_TRUE(attention.lock_active);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kActing),
+                        static_cast<int>(interaction.phase));
+}
+
+void test_perception_keeps_auditory_user_path_distinct_from_visual_presence() {
+  ncos::services::vision::PerceptionService service;
+  TEST_ASSERT_TRUE(service.initialize(65, 2300));
+
+  ncos::core::contracts::AudioRuntimeState audio{};
+  audio.initialized = true;
+  audio.input_ready = true;
+  audio.last_capture_ok = true;
+  audio.last_capture_samples = 512;
+  audio.last_peak_level = 12000;
+
+  ncos::core::contracts::TouchRuntimeState touch{};
+  ncos::core::contracts::CameraRuntimeState camera{};
+  camera.initialized = true;
+  camera.capture_ready = true;
+  camera.last_capture_ok = true;
+  camera.last_capture_ms = 1000;
+  camera.last_frame_width = 320;
+  camera.last_frame_height = 240;
+  camera.last_frame_bytes = 1600;
+
+  ncos::core::contracts::CompanionSnapshot companion{};
+
+  ncos::core::contracts::CompanionAttentionalSignal attention{};
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+
+  TEST_ASSERT_TRUE(service.tick(audio, touch, camera, companion, 2400, &attention, &interaction));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionChannel::kAuditory),
+                        static_cast<int>(attention.channel));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionTarget::kUser),
+                        static_cast<int>(attention.target));
+  TEST_ASSERT_TRUE(interaction.session_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::InteractionPhase::kListening),
                         static_cast<int>(interaction.phase));
 }
 
@@ -127,8 +178,9 @@ void test_perception_goes_dormant_on_critical_energy() {
 
 int main() {
   UNITY_BEGIN();
-  RUN_TEST(test_perception_detects_visual_presence_and_attention);
+  RUN_TEST(test_perception_detects_visual_presence_as_stimulus_attention_only);
   RUN_TEST(test_perception_prioritizes_touch_attention_when_touch_is_high);
+  RUN_TEST(test_perception_keeps_auditory_user_path_distinct_from_visual_presence);
   RUN_TEST(test_perception_emits_idle_transition_when_touch_releases);
   RUN_TEST(test_perception_goes_dormant_on_critical_energy);
   return UNITY_END();

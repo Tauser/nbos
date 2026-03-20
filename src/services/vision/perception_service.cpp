@@ -46,6 +46,10 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
       companion.energetic.mode == ncos::core::contracts::EnergyMode::kCritical) {
     state_.presence_active = false;
     state_.attention_active = false;
+    state_.visual_signal_active = false;
+    state_.visual_presence_confidence_percent = 0;
+    state_.auditory_presence_confidence_percent = 0;
+    state_.touch_presence_confidence_percent = 0;
     state_.presence_confidence_percent = 0;
     state_.attention_confidence_percent = 0;
     state_.attention_target = ncos::core::contracts::AttentionTarget::kNone;
@@ -66,6 +70,11 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
              auditory_confidence < PresenceDetectedThreshold) {
     touch_confidence = TouchDominantThreshold;
   }
+
+  state_.visual_presence_confidence_percent = visual_confidence;
+  state_.auditory_presence_confidence_percent = auditory_confidence;
+  state_.touch_presence_confidence_percent = touch_confidence;
+  state_.visual_signal_active = visual_confidence >= PresenceDetectedThreshold;
 
   const uint8_t presence_confidence =
       ncos::core::contracts::clamp_percent_u8(static_cast<uint16_t>(
@@ -183,14 +192,14 @@ void PerceptionService::choose_attention_channel(
   out_interaction->session_active = false;
 
   if (visual_confidence >= auditory_confidence && visual_confidence >= PresenceDetectedThreshold) {
-    out_attention->target = ncos::core::contracts::AttentionTarget::kUser;
+    out_attention->target = ncos::core::contracts::AttentionTarget::kStimulus;
     out_attention->channel = ncos::core::contracts::AttentionChannel::kVisual;
     out_attention->focus_confidence_percent = visual_confidence;
     out_attention->lock_active = visual_confidence >= AttentionLockedThreshold;
 
-    out_interaction->phase = ncos::core::contracts::InteractionPhase::kListening;
-    out_interaction->turn_owner = ncos::core::contracts::TurnOwner::kUser;
-    out_interaction->session_active = true;
+    out_interaction->phase = ncos::core::contracts::InteractionPhase::kIdle;
+    out_interaction->turn_owner = ncos::core::contracts::TurnOwner::kNone;
+    out_interaction->session_active = false;
     out_interaction->response_pending = false;
     return;
   }
@@ -220,4 +229,3 @@ void PerceptionService::choose_attention_channel(
 }
 
 }  // namespace ncos::services::vision
-
