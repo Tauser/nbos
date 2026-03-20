@@ -4,8 +4,11 @@ namespace {
 constexpr uint8_t PresenceDetectedThreshold = 22;
 constexpr uint8_t AttentionLockedThreshold = 56;
 constexpr uint8_t TouchDominantThreshold = 35;
+constexpr uint8_t VisualUserInferenceThreshold = 56;
+constexpr uint16_t VisualStableFramesRequired = 2;
 constexpr uint64_t CameraFreshnessWindowMs = 1600;
 constexpr uint64_t TouchReleaseHoldMs = 180;
+constexpr uint64_t VisualAttentionHoldMs = 280;
 }
 
 namespace ncos::services::vision {
@@ -47,15 +50,18 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
     state_.presence_active = false;
     state_.attention_active = false;
     state_.visual_signal_active = false;
+    state_.visual_user_inference_active = false;
     state_.visual_presence_confidence_percent = 0;
     state_.auditory_presence_confidence_percent = 0;
     state_.touch_presence_confidence_percent = 0;
     state_.presence_confidence_percent = 0;
     state_.attention_confidence_percent = 0;
+    state_.consecutive_visual_frames = 0;
     state_.attention_target = ncos::core::contracts::AttentionTarget::kNone;
     state_.attention_channel = ncos::core::contracts::AttentionChannel::kVisual;
     state_.stage = ncos::core::contracts::PerceptionStage::Dormant;
     state_.touch_release_hold_until_ms = 0;
+    state_.visual_hold_until_ms = 0;
     return had_presence || had_attention;
   }
 
@@ -75,6 +81,7 @@ bool PerceptionService::tick(const ncos::core::contracts::AudioRuntimeState& aud
   state_.auditory_presence_confidence_percent = auditory_confidence;
   state_.touch_presence_confidence_percent = touch_confidence;
   state_.visual_signal_active = visual_confidence >= PresenceDetectedThreshold;
+  update_visual_user_inference(visual_confidence, now_ms);
 
   const uint8_t presence_confidence =
       ncos::core::contracts::clamp_percent_u8(static_cast<uint16_t>(
@@ -166,6 +173,29 @@ uint8_t PerceptionService::touch_presence_confidence(
   return normalized_confidence;
 }
 
+void PerceptionService::update_visual_user_inference(uint8_t visual_confidence, uint64_t now_ms) {
+  if (visual_confidence >= VisualUserInferenceThreshold) {
+    if (state_.consecutive_visual_frames < UINT16_MAX) {
+      ++state_.consecutive_visual_frames;
+    }
+
+    if (state_.consecutive_visual_frames >= VisualStableFramesRequired) {
+      state_.visual_user_inference_active = true;
+      state_.visual_hold_until_ms = now_ms + VisualAttentionHoldMs;
+    }
+    return;
+  }
+
+  state_.consecutive_visual_frames = 0;
+  if (state_.visual_hold_until_ms > now_ms) {
+    state_.visual_user_inference_active = true;
+    return;
+  }
+
+  state_.visual_user_inference_active = false;
+  state_.visual_hold_until_ms = 0;
+}
+
 void PerceptionService::choose_attention_channel(
     uint8_t visual_confidence,
     uint8_t auditory_confidence,
@@ -192,14 +222,21 @@ void PerceptionService::choose_attention_channel(
   out_interaction->session_active = false;
 
   if (visual_confidence >= auditory_confidence && visual_confidence >= PresenceDetectedThreshold) {
-    out_attention->target = ncos::core::contracts::AttentionTarget::kStimulus;
+    out_attention->target = state_.visual_user_inference_active
+                                ? ncos::core::contracts::AttentionTarget::kUser
+                                : ncos::core::contracts::AttentionTarget::kStimulus;
     out_attention->channel = ncos::core::contracts::AttentionChannel::kVisual;
     out_attention->focus_confidence_percent = visual_confidence;
-    out_attention->lock_active = visual_confidence >= AttentionLockedThreshold;
+    out_attention->lock_active =
+        state_.visual_user_inference_active || visual_confidence >= AttentionLockedThreshold;
 
-    out_interaction->phase = ncos::core::contracts::InteractionPhase::kIdle;
-    out_interaction->turn_owner = ncos::core::contracts::TurnOwner::kNone;
-    out_interaction->session_active = false;
+    out_interaction->phase = state_.visual_user_inference_active
+                                 ? ncos::core::contracts::InteractionPhase::kListening
+                                 : ncos::core::contracts::InteractionPhase::kIdle;
+    out_interaction->turn_owner = state_.visual_user_inference_active
+                                      ? ncos::core::contracts::TurnOwner::kUser
+                                      : ncos::core::contracts::TurnOwner::kNone;
+    out_interaction->session_active = state_.visual_user_inference_active;
     out_interaction->response_pending = false;
     return;
   }

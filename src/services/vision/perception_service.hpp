@@ -29,11 +29,12 @@ class PerceptionService final {
                                             uint64_t now_ms);
   static uint8_t auditory_presence_confidence(const ncos::core::contracts::AudioRuntimeState& audio);
   static uint8_t touch_presence_confidence(const ncos::core::contracts::TouchRuntimeState& touch);
-  static void choose_attention_channel(uint8_t visual_confidence,
-                                       uint8_t auditory_confidence,
-                                       uint8_t touch_confidence,
-                                       ncos::core::contracts::CompanionAttentionalSignal* out_attention,
-                                       ncos::core::contracts::CompanionInteractionSignal* out_interaction);
+  void update_visual_user_inference(uint8_t visual_confidence, uint64_t now_ms);
+  void choose_attention_channel(uint8_t visual_confidence,
+                                uint8_t auditory_confidence,
+                                uint8_t touch_confidence,
+                                ncos::core::contracts::CompanionAttentionalSignal* out_attention,
+                                ncos::core::contracts::CompanionInteractionSignal* out_interaction);
 
   uint16_t service_id_ = 0;
   ncos::core::contracts::PerceptionRuntimeState state_ =

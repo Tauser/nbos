@@ -20,6 +20,7 @@ struct PerceptionRuntimeState {
   bool presence_active = false;
   bool attention_active = false;
   bool visual_signal_active = false;
+  bool visual_user_inference_active = false;
 
   PerceptionStage stage = PerceptionStage::Dormant;
   AttentionTarget attention_target = AttentionTarget::kNone;
@@ -30,11 +31,13 @@ struct PerceptionRuntimeState {
   uint8_t touch_presence_confidence_percent = 0;
   uint8_t presence_confidence_percent = 0;
   uint8_t attention_confidence_percent = 0;
+  uint16_t consecutive_visual_frames = 0;
 
   uint64_t last_update_ms = 0;
   uint64_t last_presence_ms = 0;
   uint64_t last_attention_ms = 0;
   uint64_t touch_release_hold_until_ms = 0;
+  uint64_t visual_hold_until_ms = 0;
   uint32_t updates_total = 0;
 };
 
