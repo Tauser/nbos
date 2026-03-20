@@ -235,6 +235,140 @@ void test_persistent_companion_memory_store_resets_profile_to_default_when_no_va
                           static_cast<uint8_t>(loaded.last_user_event.kind));
 }
 
+void test_persistent_companion_memory_store_survives_reboot_with_recovered_preferences() {
+  ncos::drivers::storage::LocalPersistence persistence;
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore first_session(&persistence);
+  auto saved = ncos::core::contracts::make_default_persisted_companion_memory();
+  saved.preferences.social_warmth_preference_percent = 73;
+  saved.preferences.response_energy_preference_percent = 64;
+  saved.preferences.stimulus_sensitivity_percent = 58;
+  saved.preferences.preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kAuditory;
+  saved.habits.touch_engagement_affinity_percent = 81;
+  saved.habits.repeat_engagement_affinity_percent = 77;
+  saved.habits.calm_recovery_affinity_percent = 36;
+  saved.habits.preferred_engagement_window =
+      ncos::core::contracts::PersistedHabitWindow::kEvening;
+  saved.habits.reinforced_sessions = 6;
+  saved.last_user_event.kind = ncos::core::contracts::PersistedMarkedEventKind::kTouchComfort;
+  saved.last_user_event.target = ncos::core::contracts::AttentionTarget::kUser;
+  saved.last_user_event.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  saved.last_user_event.salience_percent = 79;
+  saved.last_user_event.reinforcement_count = 4;
+  saved.last_user_event.last_revision = 11;
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(first_session.save(saved)));
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore second_session(&persistence);
+  ncos::core::contracts::PersistedCompanionMemoryRecord loaded{};
+  const auto load_result = second_session.load_with_recovery(&loaded);
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(
+      static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryRecoveryPath::kDirectLoad),
+      static_cast<uint8_t>(load_result.recovery_path));
+  TEST_ASSERT_FALSE(load_result.repaired_storage);
+  TEST_ASSERT_EQUAL_UINT8(73U, loaded.preferences.social_warmth_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(64U, loaded.preferences.response_energy_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(58U, loaded.preferences.stimulus_sensitivity_percent);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::AttentionChannel::kAuditory),
+                          static_cast<uint8_t>(loaded.preferences.preferred_attention_channel));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedHabitWindow::kEvening),
+                          static_cast<uint8_t>(loaded.habits.preferred_engagement_window));
+  TEST_ASSERT_EQUAL_UINT16(6U, loaded.habits.reinforced_sessions);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedMarkedEventKind::kTouchComfort),
+                          static_cast<uint8_t>(loaded.last_user_event.kind));
+}
+
+void test_persistent_companion_memory_store_keeps_latest_update_across_sessions() {
+  ncos::drivers::storage::LocalPersistence persistence;
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore first_session(&persistence);
+  auto initial = ncos::core::contracts::make_default_persisted_companion_memory();
+  initial.preferences.social_warmth_preference_percent = 60;
+  initial.habits.repeat_engagement_affinity_percent = 55;
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(first_session.save(initial)));
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore second_session(&persistence);
+  auto updated = initial;
+  updated.preferences.social_warmth_preference_percent = 84;
+  updated.preferences.response_energy_preference_percent = 69;
+  updated.habits.repeat_engagement_affinity_percent = 82;
+  updated.last_companion_event.kind = ncos::core::contracts::PersistedMarkedEventKind::kWarmGreeting;
+  updated.last_companion_event.target = ncos::core::contracts::AttentionTarget::kUser;
+  updated.last_companion_event.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  updated.last_companion_event.salience_percent = 71;
+  updated.last_companion_event.reinforcement_count = 5;
+  updated.last_companion_event.last_revision = 21;
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(second_session.save(updated)));
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore third_session(&persistence);
+  ncos::core::contracts::PersistedCompanionMemoryRecord loaded{};
+  const auto load_result = third_session.load_with_recovery(&loaded);
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(84U, loaded.preferences.social_warmth_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(69U, loaded.preferences.response_energy_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(82U, loaded.habits.repeat_engagement_affinity_percent);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedMarkedEventKind::kWarmGreeting),
+                          static_cast<uint8_t>(loaded.last_companion_event.kind));
+  TEST_ASSERT_EQUAL_UINT16(21U, loaded.last_companion_event.last_revision);
+}
+
+void test_persistent_companion_memory_store_sanitizes_noisy_update_and_keeps_cross_session_consistency() {
+  ncos::drivers::storage::LocalPersistence persistence;
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore first_session(&persistence);
+  auto saved = ncos::core::contracts::make_default_persisted_companion_memory();
+  saved.preferences.social_warmth_preference_percent = 66;
+  saved.preferences.response_energy_preference_percent = 59;
+  saved.habits.touch_engagement_affinity_percent = 74;
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(first_session.save(saved)));
+
+  auto noisy = saved;
+  noisy.preferences.social_warmth_preference_percent = 140;
+  noisy.preferences.response_energy_preference_percent = 255;
+  noisy.preferences.preferred_attention_channel =
+      static_cast<ncos::core::contracts::AttentionChannel>(99);
+  noisy.habits.touch_engagement_affinity_percent = 130;
+  noisy.habits.preferred_engagement_window =
+      static_cast<ncos::core::contracts::PersistedHabitWindow>(99);
+  noisy.last_user_event.kind = static_cast<ncos::core::contracts::PersistedMarkedEventKind>(99);
+  noisy.last_user_event.target = static_cast<ncos::core::contracts::AttentionTarget>(99);
+  noisy.last_user_event.channel = static_cast<ncos::core::contracts::AttentionChannel>(99);
+  noisy.last_user_event.salience_percent = 200;
+  noisy.last_user_event.reinforcement_count = 9;
+  noisy.last_user_event.last_revision = 27;
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore second_session(&persistence);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(second_session.save(noisy)));
+
+  ncos::drivers::storage::PersistentCompanionMemoryStore third_session(&persistence);
+  ncos::core::contracts::PersistedCompanionMemoryRecord loaded{};
+  const auto load_result = third_session.load_with_recovery(&loaded);
+
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::drivers::storage::PersistentCompanionMemoryStatus::kOk),
+                          static_cast<uint8_t>(load_result.status));
+  TEST_ASSERT_EQUAL_UINT8(100U, loaded.preferences.social_warmth_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(100U, loaded.preferences.response_energy_preference_percent);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::AttentionChannel::kTouch),
+                          static_cast<uint8_t>(loaded.preferences.preferred_attention_channel));
+  TEST_ASSERT_EQUAL_UINT8(100U, loaded.habits.touch_engagement_affinity_percent);
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedHabitWindow::kUnknown),
+                          static_cast<uint8_t>(loaded.habits.preferred_engagement_window));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(ncos::core::contracts::PersistedMarkedEventKind::kNone),
+                          static_cast<uint8_t>(loaded.last_user_event.kind));
+  TEST_ASSERT_EQUAL_UINT16(0U, loaded.last_user_event.reinforcement_count);
+}
+
 void test_persistent_companion_memory_store_reset_erases_all_slots_including_legacy() {
   ncos::drivers::storage::LocalPersistence persistence;
   ncos::drivers::storage::PersistentCompanionMemoryStore store(&persistence);
@@ -265,7 +399,14 @@ int main() {
   RUN_TEST(test_persistent_companion_memory_store_roundtrips_sanitized_record);
   RUN_TEST(test_persistent_companion_memory_store_recovers_last_known_good_and_repairs_storage);
   RUN_TEST(test_persistent_companion_memory_store_loads_legacy_single_slot_record_and_migrates);
+  RUN_TEST(test_persistent_companion_memory_store_survives_reboot_with_recovered_preferences);
+  RUN_TEST(test_persistent_companion_memory_store_keeps_latest_update_across_sessions);
+  RUN_TEST(test_persistent_companion_memory_store_sanitizes_noisy_update_and_keeps_cross_session_consistency);
   RUN_TEST(test_persistent_companion_memory_store_resets_profile_to_default_when_no_valid_snapshot_remains);
   RUN_TEST(test_persistent_companion_memory_store_reset_erases_all_slots_including_legacy);
   return UNITY_END();
 }
+
+
+
+

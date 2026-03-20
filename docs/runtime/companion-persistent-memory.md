@@ -120,3 +120,13 @@ Regras oficiais desta etapa:
 
 Isso preserva identidade, evita duplicacao de parametros e mantem rastreabilidade do que veio da memoria persistente versus do contexto curto.
 
+
+## Validacao entre sessoes
+
+Cenarios oficiais validados nesta etapa:
+- reboot limpo preserva preferencias e habitos recuperados
+- uma sessao nova enxerga o ultimo update persistido, nao um snapshot antigo
+- uma tentativa de update invalido nao apaga o ultimo perfil valido
+
+Isso prova continuidade entre sessoes sem misturar memoria persistente com memoria curta de sessao.
+
