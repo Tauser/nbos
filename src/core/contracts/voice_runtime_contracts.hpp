@@ -5,6 +5,7 @@
 
 #include "core/contracts/audio_runtime_contracts.hpp"
 #include "core/contracts/companion_state_contracts.hpp"
+#include "core/contracts/interaction_taxonomy.hpp"
 
 namespace ncos::core::contracts {
 
@@ -35,6 +36,14 @@ enum class VoiceStage : uint8_t {
   TriggerCandidate = 3,
 };
 
+enum class VoiceResponseCue : uint8_t {
+  None = 0,
+  WakeChirp = 1,
+  AcknowledgeChirp = 2,
+  StimulusChirp = 3,
+  EnergySoftChirp = 4,
+};
+
 struct VoicePipelinePolicy {
   VoiceWakeMode wake_mode = VoiceWakeMode::EnergyTrigger;
   bool touch_assist_enabled = true;
@@ -49,6 +58,18 @@ struct VoicePipelinePolicy {
   VoiceLatencyPriority secondary_priority = VoiceLatencyPriority::ShortTurnUtility;
 };
 
+struct VoiceResponsePlan {
+  bool valid = false;
+  IntentTopic intent = IntentTopic::kAttendUser;
+  VoiceResponseCue cue = VoiceResponseCue::None;
+  float tone_frequency_hz = 0.0F;
+  int tone_duration_ms = 0;
+  InteractionPhase interaction_phase = InteractionPhase::kResponding;
+  TurnOwner turn_owner = TurnOwner::kCompanion;
+  bool session_active = true;
+  bool response_pending = false;
+};
+
 struct VoiceRuntimeState {
   bool initialized = false;
   bool input_available = false;
@@ -57,6 +78,8 @@ struct VoiceRuntimeState {
 
   VoicePipelinePolicy policy{};
   VoiceStage stage = VoiceStage::Dormant;
+  IntentTopic last_detected_intent = IntentTopic::kAttendUser;
+  VoiceResponseCue last_response_cue = VoiceResponseCue::None;
   uint8_t energy_percent = 0;
   uint16_t consecutive_speech_frames = 0;
   uint16_t silence_frames = 0;
@@ -65,6 +88,7 @@ struct VoiceRuntimeState {
   uint64_t last_update_ms = 0;
   uint32_t speech_frames_total = 0;
   uint32_t trigger_candidates_total = 0;
+  uint32_t response_plan_total = 0;
 };
 
 constexpr VoiceRuntimeState make_voice_runtime_baseline() {

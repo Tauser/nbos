@@ -14,6 +14,7 @@ class AudioService final {
   void bind_port(ncos::interfaces::audio::LocalAudioPort* port);
   bool initialize(uint64_t now_ms);
   void tick(uint64_t now_ms);
+  bool play_tone(float frequency_hz, int duration_ms);
   [[nodiscard]] const ncos::core::contracts::AudioRuntimeState& state() const;
 
  private:

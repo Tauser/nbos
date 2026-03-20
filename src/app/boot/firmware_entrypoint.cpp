@@ -164,6 +164,16 @@ ncos::core::contracts::CompanionPersistentMemorySignal make_persistent_memory_si
   return signal;
 }
 
+ncos::core::contracts::CompanionInteractionSignal make_voice_response_interaction(
+    const ncos::core::contracts::VoiceResponsePlan& plan) {
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  interaction.phase = plan.interaction_phase;
+  interaction.turn_owner = plan.turn_owner;
+  interaction.session_active = plan.session_active;
+  interaction.response_pending = plan.response_pending;
+  return interaction;
+}
+
 }  // namespace
 
 namespace ncos::app::boot {
@@ -354,6 +364,17 @@ void FirmwareEntrypoint::tick() {
                           &voice_interaction)) {
     (void)system_manager_.ingest_attentional_signal(voice_attention, now);
     (void)system_manager_.ingest_interactional_signal(voice_interaction, now);
+
+    ncos::core::contracts::VoiceResponsePlan voice_response{};
+    if (voice_service_.take_response_plan(&voice_response)) {
+      if (audio_service_.play_tone(voice_response.tone_frequency_hz, voice_response.tone_duration_ms)) {
+        (void)system_manager_.ingest_interactional_signal(
+            make_voice_response_interaction(voice_response), now);
+      } else {
+        ESP_LOGW(Tag, "Resposta local de voz falhou: intent=%d cue=%d",
+                 static_cast<int>(voice_response.intent), static_cast<int>(voice_response.cue));
+      }
+    }
   }
 
   const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
@@ -494,5 +515,8 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
+
+
+
 
 

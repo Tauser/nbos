@@ -5,10 +5,41 @@
 // Native tests run with test_build_src = no.
 #include "core/contracts/action_governance_contracts.cpp"
 #include "core/contracts/companion_state_contracts.cpp"
+#include "core/contracts/interaction_taxonomy.cpp"
 #include "services/voice/voice_service.cpp"
 
 extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
+
+namespace {
+
+ncos::core::contracts::AudioRuntimeState make_voice_ready_audio(uint64_t capture_ms, int32_t peak = 9000,
+                                                                size_t samples = 512) {
+  ncos::core::contracts::AudioRuntimeState audio{};
+  audio.initialized = true;
+  audio.input_ready = true;
+  audio.last_capture_ok = true;
+  audio.last_capture_ms = capture_ms;
+  audio.last_capture_samples = samples;
+  audio.last_peak_level = peak;
+  return audio;
+}
+
+void drive_trigger_candidate(ncos::services::voice::VoiceService* service,
+                             const ncos::core::contracts::CompanionSnapshot& snapshot,
+                             uint64_t start_ms) {
+  ncos::core::contracts::CompanionAttentionalSignal attention{};
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+
+  auto audio = make_voice_ready_audio(start_ms - 10, 13000, 512);
+  TEST_ASSERT_TRUE(service->tick(audio, snapshot, start_ms, &attention, &interaction));
+  audio.last_capture_ms = start_ms + 90;
+  TEST_ASSERT_TRUE(service->tick(audio, snapshot, start_ms + 100, &attention, &interaction));
+  audio.last_capture_ms = start_ms + 190;
+  TEST_ASSERT_TRUE(service->tick(audio, snapshot, start_ms + 200, &attention, &interaction));
+}
+
+}  // namespace
 
 void test_voice_runtime_baseline_uses_mvp_local_pipeline_policy() {
   const auto state = ncos::core::contracts::make_voice_runtime_baseline();
@@ -33,17 +64,11 @@ void test_voice_runtime_baseline_uses_mvp_local_pipeline_policy() {
       static_cast<int>(state.policy.secondary_priority));
 }
 
-void test_voice_service_enters_listening_with_speech_energy() {
+void test_voice_service_enters_listening_with_fresh_speech_capture() {
   ncos::services::voice::VoiceService service;
   TEST_ASSERT_TRUE(service.initialize(64, 1000));
 
-  ncos::core::contracts::AudioRuntimeState audio{};
-  audio.initialized = true;
-  audio.input_ready = true;
-  audio.last_capture_ok = true;
-  audio.last_capture_samples = 512;
-  audio.last_peak_level = 9000;
-
+  const auto audio = make_voice_ready_audio(1080, 9000, 512);
   ncos::core::contracts::CompanionSnapshot snapshot{};
 
   ncos::core::contracts::CompanionAttentionalSignal attention{};
@@ -51,6 +76,7 @@ void test_voice_service_enters_listening_with_speech_energy() {
   TEST_ASSERT_TRUE(service.tick(audio, snapshot, 1100, &attention, &interaction));
 
   const auto& state = service.state();
+  TEST_ASSERT_TRUE(state.input_available);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceStage::Listening),
                         static_cast<int>(state.stage));
   TEST_ASSERT_TRUE(state.speech_active);
@@ -58,51 +84,149 @@ void test_voice_service_enters_listening_with_speech_energy() {
                         static_cast<int>(attention.channel));
 }
 
-void test_voice_service_raises_trigger_candidate_after_consecutive_frames() {
+void test_voice_service_raises_trigger_candidate_after_consecutive_fresh_frames() {
   ncos::services::voice::VoiceService service;
   TEST_ASSERT_TRUE(service.initialize(64, 2000));
 
-  ncos::core::contracts::AudioRuntimeState audio{};
-  audio.initialized = true;
-  audio.input_ready = true;
-  audio.last_capture_ok = true;
-  audio.last_capture_samples = 512;
-  audio.last_peak_level = 13000;
-
   ncos::core::contracts::CompanionSnapshot snapshot{};
-
-  ncos::core::contracts::CompanionAttentionalSignal attention{};
-  ncos::core::contracts::CompanionInteractionSignal interaction{};
-
-  TEST_ASSERT_TRUE(service.tick(audio, snapshot, 2100, &attention, &interaction));
-  TEST_ASSERT_TRUE(service.tick(audio, snapshot, 2200, &attention, &interaction));
-  TEST_ASSERT_TRUE(service.tick(audio, snapshot, 2300, &attention, &interaction));
+  drive_trigger_candidate(&service, snapshot, 2100);
 
   const auto& state = service.state();
   TEST_ASSERT_TRUE(state.trigger_candidate);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceStage::TriggerCandidate),
                         static_cast<int>(state.stage));
-  TEST_ASSERT_TRUE(attention.lock_active);
-  TEST_ASSERT_TRUE(interaction.response_pending);
+}
+
+void test_voice_service_maps_cold_trigger_to_attend_user_response() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 3000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  drive_trigger_candidate(&service, snapshot, 3100);
+
+  ncos::core::contracts::VoiceResponsePlan response{};
+  TEST_ASSERT_TRUE(service.take_response_plan(&response));
+  TEST_ASSERT_TRUE(response.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IntentTopic::kAttendUser),
+                        static_cast<int>(response.intent));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceResponseCue::WakeChirp),
+                        static_cast<int>(response.cue));
+  TEST_ASSERT_EQUAL_INT(70, response.tone_duration_ms);
+}
+
+void test_voice_service_maps_warm_session_to_acknowledge_response() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 4000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.interactional.session_active = true;
+  snapshot.session.warm = true;
+  snapshot.session.last_turn_owner = ncos::core::contracts::TurnOwner::kUser;
+  drive_trigger_candidate(&service, snapshot, 4100);
+
+  ncos::core::contracts::VoiceResponsePlan response{};
+  TEST_ASSERT_TRUE(service.take_response_plan(&response));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IntentTopic::kAcknowledgeUser),
+                        static_cast<int>(response.intent));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceResponseCue::AcknowledgeChirp),
+                        static_cast<int>(response.cue));
+  TEST_ASSERT_EQUAL_INT(90, response.tone_duration_ms);
+}
+
+void test_voice_service_maps_stimulus_context_to_inspect_response() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 5000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.session.recent_stimulus.target = ncos::core::contracts::AttentionTarget::kStimulus;
+  drive_trigger_candidate(&service, snapshot, 5100);
+
+  ncos::core::contracts::VoiceResponsePlan response{};
+  TEST_ASSERT_TRUE(service.take_response_plan(&response));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IntentTopic::kInspectStimulus),
+                        static_cast<int>(response.intent));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceResponseCue::StimulusChirp),
+                        static_cast<int>(response.cue));
+  TEST_ASSERT_EQUAL_INT(110, response.tone_duration_ms);
+}
+
+void test_voice_service_maps_constrained_energy_to_soft_energy_response() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 6000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.energetic.mode = ncos::core::contracts::EnergyMode::kConstrained;
+  drive_trigger_candidate(&service, snapshot, 6100);
+
+  ncos::core::contracts::VoiceResponsePlan response{};
+  TEST_ASSERT_TRUE(service.take_response_plan(&response));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IntentTopic::kPreserveEnergy),
+                        static_cast<int>(response.intent));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceResponseCue::EnergySoftChirp),
+                        static_cast<int>(response.cue));
+  TEST_ASSERT_EQUAL_INT(80, response.tone_duration_ms);
+}
+
+void test_voice_service_response_plan_is_one_shot() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 7000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  drive_trigger_candidate(&service, snapshot, 7100);
+
+  ncos::core::contracts::VoiceResponsePlan response{};
+  TEST_ASSERT_TRUE(service.take_response_plan(&response));
+  TEST_ASSERT_FALSE(service.take_response_plan(&response));
+}
+
+void test_voice_service_ignores_stale_capture_snapshots() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 8000));
+
+  const auto audio = make_voice_ready_audio(8000, 15000, 512);
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+
+  ncos::core::contracts::CompanionAttentionalSignal attention{};
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  TEST_ASSERT_FALSE(service.tick(audio, snapshot, 8400, &attention, &interaction));
+
+  const auto& state = service.state();
+  TEST_ASSERT_FALSE(state.input_available);
+  TEST_ASSERT_FALSE(state.trigger_candidate);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceStage::Dormant),
+                        static_cast<int>(state.stage));
+}
+
+void test_voice_service_ignores_too_small_capture_windows() {
+  ncos::services::voice::VoiceService service;
+  TEST_ASSERT_TRUE(service.initialize(64, 9000));
+
+  const auto audio = make_voice_ready_audio(9080, 15000, 48);
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+
+  ncos::core::contracts::CompanionAttentionalSignal attention{};
+  ncos::core::contracts::CompanionInteractionSignal interaction{};
+  TEST_ASSERT_FALSE(service.tick(audio, snapshot, 9100, &attention, &interaction));
+
+  const auto& state = service.state();
+  TEST_ASSERT_FALSE(state.input_available);
+  TEST_ASSERT_FALSE(state.speech_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceStage::Dormant),
+                        static_cast<int>(state.stage));
 }
 
 void test_voice_service_dormant_in_safe_mode() {
   ncos::services::voice::VoiceService service;
-  TEST_ASSERT_TRUE(service.initialize(64, 3000));
+  TEST_ASSERT_TRUE(service.initialize(64, 10000));
 
-  ncos::core::contracts::AudioRuntimeState audio{};
-  audio.initialized = true;
-  audio.input_ready = true;
-  audio.last_capture_ok = true;
-  audio.last_capture_samples = 512;
-  audio.last_peak_level = 15000;
+  const auto audio = make_voice_ready_audio(10080, 15000, 512);
 
   ncos::core::contracts::CompanionSnapshot snapshot{};
   snapshot.runtime.safe_mode = true;
 
   ncos::core::contracts::CompanionAttentionalSignal attention{};
   ncos::core::contracts::CompanionInteractionSignal interaction{};
-  TEST_ASSERT_FALSE(service.tick(audio, snapshot, 3100, &attention, &interaction));
+  TEST_ASSERT_FALSE(service.tick(audio, snapshot, 10100, &attention, &interaction));
 
   const auto& state = service.state();
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::VoiceStage::Dormant),
@@ -112,8 +236,15 @@ void test_voice_service_dormant_in_safe_mode() {
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_voice_runtime_baseline_uses_mvp_local_pipeline_policy);
-  RUN_TEST(test_voice_service_enters_listening_with_speech_energy);
-  RUN_TEST(test_voice_service_raises_trigger_candidate_after_consecutive_frames);
+  RUN_TEST(test_voice_service_enters_listening_with_fresh_speech_capture);
+  RUN_TEST(test_voice_service_raises_trigger_candidate_after_consecutive_fresh_frames);
+  RUN_TEST(test_voice_service_maps_cold_trigger_to_attend_user_response);
+  RUN_TEST(test_voice_service_maps_warm_session_to_acknowledge_response);
+  RUN_TEST(test_voice_service_maps_stimulus_context_to_inspect_response);
+  RUN_TEST(test_voice_service_maps_constrained_energy_to_soft_energy_response);
+  RUN_TEST(test_voice_service_response_plan_is_one_shot);
+  RUN_TEST(test_voice_service_ignores_stale_capture_snapshots);
+  RUN_TEST(test_voice_service_ignores_too_small_capture_windows);
   RUN_TEST(test_voice_service_dormant_in_safe_mode);
   return UNITY_END();
 }

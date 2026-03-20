@@ -70,6 +70,14 @@ void AudioService::tick(uint64_t now_ms) {
   next_probe_ms_ = now_ms + probe_interval;
 }
 
+bool AudioService::play_tone(float frequency_hz, int duration_ms) {
+  if (port_ == nullptr || !state_.initialized || !state_.output_ready) {
+    return false;
+  }
+
+  return port_->play_tone(frequency_hz, duration_ms);
+}
+
 const ncos::core::contracts::AudioRuntimeState& AudioService::state() const {
   return state_;
 }

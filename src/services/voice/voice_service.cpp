@@ -1,5 +1,84 @@
 #include "services/voice/voice_service.hpp"
 
+namespace {
+
+bool is_capture_fresh(const ncos::core::contracts::AudioRuntimeState& audio, uint64_t now_ms,
+                      uint64_t freshness_window_ms) {
+  if (!audio.last_capture_ok || audio.last_capture_ms == 0 || now_ms < audio.last_capture_ms) {
+    return false;
+  }
+
+  return (now_ms - audio.last_capture_ms) <= freshness_window_ms;
+}
+
+bool is_capture_usable(const ncos::core::contracts::AudioRuntimeState& audio, uint64_t now_ms,
+                       size_t min_capture_samples, uint64_t freshness_window_ms) {
+  return audio.input_ready && audio.last_capture_samples >= min_capture_samples &&
+         is_capture_fresh(audio, now_ms, freshness_window_ms);
+}
+
+ncos::core::contracts::IntentTopic classify_constrained_intent(
+    const ncos::core::contracts::CompanionSnapshot& companion) {
+  if (companion.energetic.mode == ncos::core::contracts::EnergyMode::kConstrained) {
+    return ncos::core::contracts::IntentTopic::kPreserveEnergy;
+  }
+
+  if (companion.attentional.target == ncos::core::contracts::AttentionTarget::kStimulus ||
+      companion.session.recent_stimulus.target == ncos::core::contracts::AttentionTarget::kStimulus) {
+    return ncos::core::contracts::IntentTopic::kInspectStimulus;
+  }
+
+  if (companion.interactional.session_active || companion.session.warm ||
+      companion.session.last_turn_owner == ncos::core::contracts::TurnOwner::kUser ||
+      companion.session.recent_interaction.turn_owner == ncos::core::contracts::TurnOwner::kUser) {
+    return ncos::core::contracts::IntentTopic::kAcknowledgeUser;
+  }
+
+  return ncos::core::contracts::IntentTopic::kAttendUser;
+}
+
+ncos::core::contracts::VoiceResponsePlan make_response_plan(
+    ncos::core::contracts::IntentTopic intent) {
+  ncos::core::contracts::VoiceResponsePlan plan{};
+  plan.valid = true;
+  plan.intent = intent;
+  plan.interaction_phase = ncos::core::contracts::InteractionPhase::kResponding;
+  plan.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  plan.session_active = true;
+  plan.response_pending = false;
+
+  switch (intent) {
+    case ncos::core::contracts::IntentTopic::kAcknowledgeUser:
+      plan.cue = ncos::core::contracts::VoiceResponseCue::AcknowledgeChirp;
+      plan.tone_frequency_hz = 880.0F;
+      plan.tone_duration_ms = 90;
+      break;
+
+    case ncos::core::contracts::IntentTopic::kInspectStimulus:
+      plan.cue = ncos::core::contracts::VoiceResponseCue::StimulusChirp;
+      plan.tone_frequency_hz = 620.0F;
+      plan.tone_duration_ms = 110;
+      break;
+
+    case ncos::core::contracts::IntentTopic::kPreserveEnergy:
+      plan.cue = ncos::core::contracts::VoiceResponseCue::EnergySoftChirp;
+      plan.tone_frequency_hz = 440.0F;
+      plan.tone_duration_ms = 80;
+      break;
+
+    case ncos::core::contracts::IntentTopic::kAttendUser:
+    default:
+      plan.cue = ncos::core::contracts::VoiceResponseCue::WakeChirp;
+      plan.tone_frequency_hz = 740.0F;
+      plan.tone_duration_ms = 70;
+      break;
+  }
+
+  return plan;
+}
+
+}  // namespace
+
 namespace ncos::services::voice {
 
 bool VoiceService::initialize(uint16_t service_id, uint64_t now_ms) {
@@ -9,6 +88,7 @@ bool VoiceService::initialize(uint16_t service_id, uint64_t now_ms) {
 
   service_id_ = service_id;
   state_ = ncos::core::contracts::make_voice_runtime_baseline();
+  pending_response_plan_ = ncos::core::contracts::VoiceResponsePlan{};
   state_.initialized = true;
   state_.last_update_ms = now_ms;
   return true;
@@ -26,11 +106,14 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
   *out_attention = ncos::core::contracts::CompanionAttentionalSignal{};
   *out_interaction = ncos::core::contracts::CompanionInteractionSignal{};
 
-  state_.input_available = audio.input_ready;
+  const bool capture_usable =
+      is_capture_usable(audio, now_ms, MinCaptureSamples, CaptureFreshnessMs);
+
+  state_.input_available = capture_usable;
   state_.last_update_ms = now_ms;
   state_.energy_percent = ncos::core::contracts::voice_energy_percent_from_audio(audio);
 
-  if (!audio.input_ready || companion.runtime.safe_mode ||
+  if (!capture_usable || companion.runtime.safe_mode ||
       companion.energetic.mode == ncos::core::contracts::EnergyMode::kCritical) {
     state_.speech_active = false;
     state_.trigger_candidate = false;
@@ -53,15 +136,22 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
 
   const bool cooldown_elapsed =
       (state_.last_trigger_ms == 0) || ((now_ms - state_.last_trigger_ms) >= TriggerCooldownMs);
+  const bool trigger_energy_ready = state_.energy_percent >= TriggerThresholdPercent;
 
-  state_.trigger_candidate = state_.energy_percent >= TriggerThresholdPercent &&
-                             state_.consecutive_speech_frames >= TriggerSpeechFrames &&
-                             cooldown_elapsed;
+  state_.trigger_candidate =
+      trigger_energy_ready && state_.consecutive_speech_frames >= TriggerSpeechFrames &&
+      cooldown_elapsed;
 
   if (state_.trigger_candidate) {
     state_.stage = ncos::core::contracts::VoiceStage::TriggerCandidate;
     state_.last_trigger_ms = now_ms;
     ++state_.trigger_candidates_total;
+
+    const auto detected_intent = classify_constrained_intent(companion);
+    pending_response_plan_ = make_response_plan(detected_intent);
+    state_.last_detected_intent = detected_intent;
+    state_.last_response_cue = pending_response_plan_.cue;
+    ++state_.response_plan_total;
   } else if (state_.speech_active) {
     state_.stage = ncos::core::contracts::VoiceStage::Listening;
   } else {
@@ -85,9 +175,18 @@ bool VoiceService::tick(const ncos::core::contracts::AudioRuntimeState& audio,
   return true;
 }
 
+bool VoiceService::take_response_plan(ncos::core::contracts::VoiceResponsePlan* out_plan) {
+  if (out_plan == nullptr || !pending_response_plan_.valid) {
+    return false;
+  }
+
+  *out_plan = pending_response_plan_;
+  pending_response_plan_ = ncos::core::contracts::VoiceResponsePlan{};
+  return true;
+}
+
 const ncos::core::contracts::VoiceRuntimeState& VoiceService::state() const {
   return state_;
 }
 
 }  // namespace ncos::services::voice
-
