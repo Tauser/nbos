@@ -130,3 +130,13 @@ Cenarios oficiais validados nesta etapa:
 
 Isso prova continuidade entre sessoes sem misturar memoria persistente com memoria curta de sessao.
 
+
+## Modulacao comportamental
+
+Mapa oficial desta etapa:
+- rotina: historico social reforcado pode trocar o idle ambiente por `UserPresencePulse`
+- atencao: quando o canal atual combina com o canal preferido persistido, AttendUser recebe um empurrao bounded
+- iniciativa: historico persistente aumenta prioridade e TTL de rotina de forma pequena e previsivel
+
+Tudo continua filtrado pela personalidade base e pelos clamps do estado central; o historico nunca vira politica solta por servico.
+

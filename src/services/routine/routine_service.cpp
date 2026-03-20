@@ -1,5 +1,7 @@
 #include "services/routine/routine_service.hpp"
 
+#include "core/contracts/companion_personality_contracts.hpp"
+
 namespace {
 
 ncos::core::contracts::RoutineProposal make_routine_proposal(
@@ -151,8 +153,8 @@ ncos::core::contracts::RoutineProposal RoutineService::propose_for_mode(
           ncos::core::contracts::ActionDomain::kMotion,
           ncos::core::contracts::CommandTopic::kMotionExecute,
           ncos::core::contracts::IntentTopic::kPreserveEnergy,
-          4,
-          400,
+          ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 4),
+          ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 400),
           "idle_energy_settle");
 
     case ncos::core::contracts::AttentionMode::kStimulusTracking:
@@ -163,9 +165,11 @@ ncos::core::contracts::RoutineProposal RoutineService::propose_for_mode(
           ncos::core::contracts::ActionDomain::kMotion,
           ncos::core::contracts::CommandTopic::kMotionExecute,
           ncos::core::contracts::IntentTopic::kInspectStimulus,
-          4,
-          320,
-          "idle_stimulus_nudge");
+          ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 4),
+          ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 320),
+          ncos::core::contracts::personality_historical_stimulus_affinity(snapshot.personality)
+              ? "idle_stimulus_nudge_history"
+              : "idle_stimulus_nudge");
 
     case ncos::core::contracts::AttentionMode::kUserEngaged:
       return make_routine_proposal(
@@ -175,15 +179,47 @@ ncos::core::contracts::RoutineProposal RoutineService::propose_for_mode(
           ncos::core::contracts::ActionDomain::kFace,
           ncos::core::contracts::CommandTopic::kFaceRenderExecute,
           ncos::core::contracts::IntentTopic::kAttendUser,
-          4,
-          300,
-          "idle_user_presence");
+          ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 4),
+          ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 300),
+          ncos::core::contracts::personality_historical_user_affinity(snapshot.personality)
+              ? "idle_user_presence_history"
+              : "idle_user_presence");
 
     case ncos::core::contracts::AttentionMode::kAmbient:
     default: {
       const bool engaged_emotion =
           snapshot.emotional.phase == ncos::models::emotion::EmotionPhase::kEngaged ||
           snapshot.emotional.tone == ncos::core::contracts::EmotionalTone::kCurious;
+      const bool user_affinity =
+          ncos::core::contracts::personality_historical_user_affinity(snapshot.personality);
+      const bool stimulus_affinity =
+          ncos::core::contracts::personality_historical_stimulus_affinity(snapshot.personality);
+
+      if (user_affinity) {
+        return make_routine_proposal(
+            ncos::core::contracts::IdleRoutine::kUserPresencePulse,
+            mode,
+            service_id_,
+            ncos::core::contracts::ActionDomain::kFace,
+            ncos::core::contracts::CommandTopic::kFaceRenderExecute,
+            ncos::core::contracts::IntentTopic::kAcknowledgeUser,
+            ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 3),
+            ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 260),
+            "idle_user_affinity_pulse");
+      }
+
+      if (stimulus_affinity && engaged_emotion) {
+        return make_routine_proposal(
+            ncos::core::contracts::IdleRoutine::kStimulusScanNudge,
+            mode,
+            service_id_,
+            ncos::core::contracts::ActionDomain::kMotion,
+            ncos::core::contracts::CommandTopic::kMotionExecute,
+            ncos::core::contracts::IntentTopic::kInspectStimulus,
+            ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 3),
+            ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 260),
+            "idle_stimulus_affinity");
+      }
 
       return make_routine_proposal(
           ncos::core::contracts::IdleRoutine::kAmbientGazeSweep,
@@ -193,8 +229,8 @@ ncos::core::contracts::RoutineProposal RoutineService::propose_for_mode(
           ncos::core::contracts::CommandTopic::kFaceRenderExecute,
           engaged_emotion ? ncos::core::contracts::IntentTopic::kAcknowledgeUser
                           : ncos::core::contracts::IntentTopic::kAttendUser,
-          3,
-          260,
+          ncos::core::contracts::personality_routine_priority(snapshot.personality, mode, 3),
+          ncos::core::contracts::personality_routine_ttl_ms(snapshot.personality, mode, 260),
           "idle_ambient_sweep");
     }
   }
@@ -219,4 +255,5 @@ bool RoutineService::should_suppress_by_behavior(
 }
 
 }  // namespace ncos::services::routine
+
 

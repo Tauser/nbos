@@ -211,6 +211,101 @@ constexpr uint8_t personality_continuity_engagement_threshold_percent(
   }
 }
 
+constexpr bool personality_attention_channel_match(const CompanionPersonalityState& personality,
+                                                   AttentionChannel channel) {
+  return personality.persistent_memory_applied &&
+         personality.persistent_preferred_attention_channel == channel;
+}
+
+constexpr bool personality_historical_user_affinity(const CompanionPersonalityState& personality) {
+  return personality.persistent_memory_applied &&
+         (personality.persistent_social_warmth_bias_percent >= 4 ||
+          personality.persistent_reinforced_sessions >= 4 ||
+          personality.persistent_preferred_attention_channel == AttentionChannel::kTouch);
+}
+
+constexpr bool personality_historical_stimulus_affinity(const CompanionPersonalityState& personality) {
+  return personality.persistent_memory_applied &&
+         (personality.persistent_response_energy_bias_percent >= 3 ||
+          personality.persistent_preferred_attention_channel == AttentionChannel::kAuditory ||
+          personality.persistent_preferred_attention_channel == AttentionChannel::kMultimodal);
+}
+
+constexpr uint8_t personality_routine_priority(const CompanionPersonalityState& personality,
+                                               AttentionMode mode,
+                                               uint8_t base_priority) {
+  int16_t adjusted = base_priority;
+
+  switch (mode) {
+    case AttentionMode::kUserEngaged:
+      if (personality_historical_user_affinity(personality)) {
+        ++adjusted;
+      }
+      break;
+    case AttentionMode::kStimulusTracking:
+      if (personality_historical_stimulus_affinity(personality)) {
+        ++adjusted;
+      }
+      break;
+    case AttentionMode::kAmbient:
+      if (personality_historical_user_affinity(personality) ||
+          personality_historical_stimulus_affinity(personality)) {
+        ++adjusted;
+      }
+      break;
+    case AttentionMode::kEnergyConserve:
+    default:
+      break;
+  }
+
+  if (adjusted < 1) {
+    adjusted = 1;
+  }
+  if (adjusted > 6) {
+    adjusted = 6;
+  }
+  return static_cast<uint8_t>(adjusted);
+}
+
+constexpr uint32_t personality_routine_ttl_ms(const CompanionPersonalityState& personality,
+                                              AttentionMode mode,
+                                              uint32_t base_ttl_ms) {
+  const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
+  int32_t ttl_ms = static_cast<int32_t>(base_ttl_ms);
+
+  switch (mode) {
+    case AttentionMode::kUserEngaged:
+      if (personality_historical_user_affinity(personality)) {
+        ttl_ms += 20 + personality.persistent_reinforced_sessions * 5 + continuity_bias_ms / 30;
+      }
+      break;
+    case AttentionMode::kStimulusTracking:
+      if (personality_historical_stimulus_affinity(personality)) {
+        ttl_ms += 20 + response_bias_percent * 6 + continuity_bias_ms / 40;
+      }
+      break;
+    case AttentionMode::kAmbient:
+      if (personality_historical_user_affinity(personality)) {
+        ttl_ms += 30 + personality.persistent_reinforced_sessions * 6 + continuity_bias_ms / 24;
+      } else if (personality_historical_stimulus_affinity(personality)) {
+        ttl_ms += 24 + response_bias_percent * 5 + continuity_bias_ms / 32;
+      }
+      break;
+    case AttentionMode::kEnergyConserve:
+    default:
+      break;
+  }
+
+  if (ttl_ms < 180) {
+    ttl_ms = 180;
+  }
+  if (ttl_ms > 480) {
+    ttl_ms = 480;
+  }
+  return static_cast<uint32_t>(ttl_ms);
+}
+
 constexpr uint32_t personality_reengagement_ttl_ms(const CompanionPersonalityState& personality) {
   const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
   const int8_t social_bias_percent = personality_social_warmth_bias_percent(personality);
@@ -463,5 +558,6 @@ inline void apply_personality_baseline_to_emotion(const CompanionPersonalityStat
 }
 
 }  // namespace ncos::core::contracts
+
 
 

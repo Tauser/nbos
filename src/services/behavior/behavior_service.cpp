@@ -196,6 +196,10 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
   const bool warm_user_context =
       snapshot.runtime.product_state == ncos::core::contracts::CompanionProductState::kIdleObserve &&
       has_warm_user_continuity(snapshot, now_ms);
+  const bool preferred_channel_match = ncos::core::contracts::personality_attention_channel_match(
+      snapshot.personality, snapshot.attentional.channel);
+  const bool historical_user_affinity =
+      ncos::core::contracts::personality_historical_user_affinity(snapshot.personality);
 
   if (user_attention && !snapshot.runtime.safe_mode) {
     return make_behavior_proposal(
@@ -205,11 +209,14 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::IntentTopic::kAttendUser,
         ncos::core::contracts::personality_behavior_priority(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser,
-            auditory_trigger_context ? 7 : 6),
+            preferred_channel_match ? (auditory_trigger_context ? 8 : 7)
+                                    : (auditory_trigger_context ? 7 : 6)),
         ncos::core::contracts::personality_behavior_ttl_ms(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
-        auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user");
+        preferred_channel_match
+            ? "attend_user_history_match"
+            : (auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user"));
   }
 
   if (warm_user_context && !snapshot.runtime.safe_mode) {
@@ -219,14 +226,16 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::CommandTopic::kFaceRenderExecute,
         ncos::core::contracts::IntentTopic::kAttendUser,
         ncos::core::contracts::personality_behavior_priority(
-            snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser, 5),
+            snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser,
+            historical_user_affinity ? 6 : 5),
         ncos::core::contracts::personality_reengagement_ttl_ms(snapshot.personality),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
-        "attend_user_continuity");
+        historical_user_affinity ? "attend_user_continuity_history" : "attend_user_continuity");
   }
 
   return ncos::core::contracts::BehaviorProposal{};
 }
 
 }  // namespace ncos::services::behavior
+
 

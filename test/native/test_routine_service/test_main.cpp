@@ -87,11 +87,72 @@ void test_routine_service_tracks_governance_results() {
   TEST_ASSERT_EQUAL_UINT32(1, state.rejected_total);
 }
 
+void test_routine_service_uses_persistent_user_history_for_ambient_initiative() {
+  ncos::services::routine::RoutineService service;
+  TEST_ASSERT_TRUE(service.initialize(62, 5200));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_social_warmth_bias_percent = 5;
+  snapshot.personality.persistent_continuity_window_bias_ms = 240;
+  snapshot.personality.persistent_reinforced_sessions = 6;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.personality.adaptive_social_warmth_bias_percent = 5;
+  snapshot.personality.adaptive_continuity_window_bias_ms = 240;
+
+  ncos::core::contracts::BehaviorRuntimeState behavior_state{};
+  behavior_state.initialized = true;
+
+  ncos::core::contracts::RoutineProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, behavior_state, 6300, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IdleRoutine::kUserPresencePulse),
+                        static_cast<int>(proposal.routine));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionMode::kAmbient),
+                        static_cast<int>(proposal.attention_mode));
+  TEST_ASSERT_EQUAL_UINT8(4, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(336, proposal.proposal.ttl_ms);
+  TEST_ASSERT_EQUAL_STRING("idle_user_affinity_pulse", proposal.rationale);
+}
+
+void test_routine_service_uses_persistent_stimulus_history_for_curious_ambient_scan() {
+  ncos::services::routine::RoutineService service;
+  TEST_ASSERT_TRUE(service.initialize(62, 6400));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_response_energy_bias_percent = 4;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kAuditory;
+  snapshot.personality.adaptive_response_energy_bias_percent = 4;
+  snapshot.emotional.tone = ncos::core::contracts::EmotionalTone::kCurious;
+
+  ncos::core::contracts::BehaviorRuntimeState behavior_state{};
+  behavior_state.initialized = true;
+
+  ncos::core::contracts::RoutineProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, behavior_state, 7500, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IdleRoutine::kStimulusScanNudge),
+                        static_cast<int>(proposal.routine));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::AttentionMode::kAmbient),
+                        static_cast<int>(proposal.attention_mode));
+  TEST_ASSERT_EQUAL_UINT8(4, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(304, proposal.proposal.ttl_ms);
+  TEST_ASSERT_EQUAL_STRING("idle_stimulus_affinity", proposal.rationale);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_routine_service_emits_ambient_idle_routine);
   RUN_TEST(test_routine_service_switches_to_user_attention_mode);
   RUN_TEST(test_routine_service_suppresses_when_behavior_recently_owned_action);
   RUN_TEST(test_routine_service_tracks_governance_results);
+  RUN_TEST(test_routine_service_uses_persistent_user_history_for_ambient_initiative);
+  RUN_TEST(test_routine_service_uses_persistent_stimulus_history_for_curious_ambient_scan);
   return UNITY_END();
 }
+

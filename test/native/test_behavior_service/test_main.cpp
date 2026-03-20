@@ -219,10 +219,68 @@ void test_behavior_service_uses_persistent_baseline_for_warm_reengagement() {
   TEST_ASSERT_TRUE(proposal.valid);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
                         static_cast<int>(proposal.profile));
-  TEST_ASSERT_EQUAL_UINT8(6, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
   TEST_ASSERT_EQUAL_UINT32(223, proposal.proposal.ttl_ms);
-  TEST_ASSERT_EQUAL_STRING("attend_user_continuity", proposal.rationale);
+  TEST_ASSERT_EQUAL_STRING("attend_user_continuity_history", proposal.rationale);
 }
+void test_behavior_service_boosts_user_attention_when_channel_matches_history() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 8200));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.attentional.focus_confidence_percent = 72;
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.personality.persistent_social_warmth_bias_percent = 4;
+  snapshot.personality.adaptive_social_warmth_bias_percent = 4;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 8500, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(8, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(244, proposal.proposal.ttl_ms);
+  TEST_ASSERT_EQUAL_STRING("attend_user_history_match", proposal.rationale);
+}
+
+void test_behavior_service_uses_history_to_make_warm_reengagement_less_passive() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 8600));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.runtime.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  snapshot.session.warm = true;
+  snapshot.session.last_activity_ms = 8700;
+  snapshot.session.anchor_target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.session.recent_stimulus.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.session.recent_interaction.phase = ncos::core::contracts::InteractionPhase::kResponding;
+  snapshot.session.recent_interaction.turn_owner = ncos::core::contracts::TurnOwner::kCompanion;
+  snapshot.session.engagement_recent_percent = 76;
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_social_warmth_bias_percent = 5;
+  snapshot.personality.persistent_reinforced_sessions = 6;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.personality.persistent_continuity_window_bias_ms = 260;
+  snapshot.personality.adaptive_social_warmth_bias_percent = 5;
+  snapshot.personality.adaptive_continuity_window_bias_ms = 260;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 8900, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_UINT32(223, proposal.proposal.ttl_ms);
+  TEST_ASSERT_EQUAL_STRING("attend_user_continuity_history", proposal.rationale);
+}
+
 void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
   ncos::services::behavior::BehaviorService service;
   TEST_ASSERT_TRUE(service.initialize(61, 6000));
@@ -265,9 +323,12 @@ int main() {
   RUN_TEST(test_behavior_service_does_not_hold_warm_reengagement_after_window);
   RUN_TEST(test_behavior_service_reflects_adaptation_in_attend_priority_and_ttl);
   RUN_TEST(test_behavior_service_uses_persistent_baseline_for_warm_reengagement);
+  RUN_TEST(test_behavior_service_boosts_user_attention_when_channel_matches_history);
+  RUN_TEST(test_behavior_service_uses_history_to_make_warm_reengagement_less_passive);
   RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }
+
 
 
 
