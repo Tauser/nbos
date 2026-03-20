@@ -237,16 +237,18 @@ constexpr uint8_t personality_historical_user_expression_boost_percent(
     return 0;
   }
 
-  int16_t boost = 2 + personality.persistent_social_warmth_bias_percent +
-                  personality.persistent_reinforced_sessions;
+  const int16_t reinforced_session_weight =
+      static_cast<int16_t>((personality.persistent_reinforced_sessions > 6 ? 6 : personality.persistent_reinforced_sessions) /
+                           2);
+  int16_t boost = 1 + personality.persistent_social_warmth_bias_percent / 2 + reinforced_session_weight;
   if (personality_attention_channel_match(personality, AttentionChannel::kTouch)) {
     boost += 2;
   }
   if (boost < 0) {
     boost = 0;
   }
-  if (boost > 12) {
-    boost = 12;
+  if (boost > 8) {
+    boost = 8;
   }
   return static_cast<uint8_t>(boost);
 }
@@ -257,8 +259,10 @@ constexpr uint8_t personality_historical_stimulus_expression_boost_percent(
     return 0;
   }
 
-  int16_t boost = 2 + personality.persistent_response_energy_bias_percent +
-                  personality.persistent_reinforced_sessions / 2;
+  const int16_t reinforced_session_weight =
+      static_cast<int16_t>((personality.persistent_reinforced_sessions > 6 ? 6 : personality.persistent_reinforced_sessions) /
+                           3);
+  int16_t boost = 1 + personality.persistent_response_energy_bias_percent / 2 + reinforced_session_weight;
   if (personality_attention_channel_match(personality, AttentionChannel::kAuditory) ||
       personality_attention_channel_match(personality, AttentionChannel::kMultimodal)) {
     boost += 2;
@@ -266,8 +270,8 @@ constexpr uint8_t personality_historical_stimulus_expression_boost_percent(
   if (boost < 0) {
     boost = 0;
   }
-  if (boost > 10) {
-    boost = 10;
+  if (boost > 7) {
+    boost = 7;
   }
   return static_cast<uint8_t>(boost);
 }

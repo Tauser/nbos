@@ -195,16 +195,46 @@ void test_companion_personality_historical_expression_boosts_stay_bounded() {
   personality.persistent_preferred_attention_channel = ncos::core::contracts::AttentionChannel::kTouch;
 
   TEST_ASSERT_TRUE(ncos::core::contracts::personality_historical_user_affinity(personality));
-  TEST_ASSERT_EQUAL_UINT8(12,
+  TEST_ASSERT_EQUAL_UINT8(8,
                           ncos::core::contracts::personality_historical_user_expression_boost_percent(
                               personality));
 
   personality.persistent_preferred_attention_channel =
       ncos::core::contracts::AttentionChannel::kMultimodal;
   TEST_ASSERT_TRUE(ncos::core::contracts::personality_historical_stimulus_affinity(personality));
-  TEST_ASSERT_EQUAL_UINT8(10,
+  TEST_ASSERT_EQUAL_UINT8(6,
                           ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(
                               personality));
+}
+
+void test_companion_personality_historical_profiles_remain_distinct_and_predictable() {
+  auto user_profile = ncos::core::contracts::make_companion_personality_state();
+  user_profile.persistent_memory_applied = true;
+  user_profile.persistent_social_warmth_bias_percent = 8;
+  user_profile.persistent_response_energy_bias_percent = 1;
+  user_profile.persistent_reinforced_sessions = 6;
+  user_profile.persistent_preferred_attention_channel = ncos::core::contracts::AttentionChannel::kTouch;
+
+  auto stimulus_profile = ncos::core::contracts::make_companion_personality_state();
+  stimulus_profile.persistent_memory_applied = true;
+  stimulus_profile.persistent_social_warmth_bias_percent = 1;
+  stimulus_profile.persistent_response_energy_bias_percent = 8;
+  stimulus_profile.persistent_reinforced_sessions = 6;
+  stimulus_profile.persistent_preferred_attention_channel = ncos::core::contracts::AttentionChannel::kMultimodal;
+
+  const uint8_t user_user_boost =
+      ncos::core::contracts::personality_historical_user_expression_boost_percent(user_profile);
+  const uint8_t user_stimulus_boost =
+      ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(user_profile);
+  const uint8_t stimulus_user_boost =
+      ncos::core::contracts::personality_historical_user_expression_boost_percent(stimulus_profile);
+  const uint8_t stimulus_stimulus_boost =
+      ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(stimulus_profile);
+
+  TEST_ASSERT_TRUE(user_user_boost > user_stimulus_boost);
+  TEST_ASSERT_TRUE(stimulus_stimulus_boost > stimulus_user_boost);
+  TEST_ASSERT_TRUE(static_cast<uint8_t>(user_user_boost - user_stimulus_boost) <= 2);
+  TEST_ASSERT_TRUE(static_cast<uint8_t>(stimulus_stimulus_boost - stimulus_user_boost) <= 2);
 }
 
 int main() {
@@ -218,5 +248,6 @@ int main() {
   RUN_TEST(test_companion_personality_adaptive_variation_stays_inside_identity_band);
   RUN_TEST(test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits);
   RUN_TEST(test_companion_personality_historical_expression_boosts_stay_bounded);
+  RUN_TEST(test_companion_personality_historical_profiles_remain_distinct_and_predictable);
   return UNITY_END();
 }

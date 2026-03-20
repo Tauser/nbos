@@ -153,5 +153,6 @@ Regras oficiais desta etapa:
 - face usa afinidade historica com estimulo para deixar o idle um pouco mais curioso, sem trocar de identidade
 - motion usa a mesma leitura central para uma postura idle levemente mais presente
 - nenhum desses sinais sobrepoe `Sleep`, `EnergyProtect`, follow facial ativo ou contexto curto quente
+- o peso do historico fica deliberadamente baixo e saturado cedo, para evitar que sessoes muito reforcadas parecam um personagem diferente
 
 Isso deixa a memoria longa visivel no produto sem criar leitura direta de storage em `face` ou `motion`.

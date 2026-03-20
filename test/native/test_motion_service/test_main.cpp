@@ -468,6 +468,48 @@ void test_motion_service_keeps_idle_neutral_without_historical_affinity() {
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
 }
 
+void test_motion_service_distinguishes_historical_stimulus_profile_from_user_profile() {
+  FakeMotionPort user_port{};
+  FakeMotionPort stimulus_port{};
+
+  ncos::services::motion::MotionService user_service;
+  user_service.bind_port(&user_port);
+  TEST_ASSERT_TRUE(user_service.initialize(17600));
+
+  ncos::services::motion::MotionService stimulus_service;
+  stimulus_service.bind_port(&stimulus_port);
+  TEST_ASSERT_TRUE(stimulus_service.initialize(17600));
+
+  ncos::core::contracts::MotionCompanionSignal user_signal{};
+  user_signal.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  user_signal.personality = ncos::core::contracts::make_companion_personality_state();
+  user_signal.personality.persistent_memory_applied = true;
+  user_signal.personality.persistent_social_warmth_bias_percent = 8;
+  user_signal.personality.persistent_response_energy_bias_percent = 1;
+  user_signal.personality.persistent_reinforced_sessions = 6;
+  user_signal.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  user_service.update_companion_signal(user_signal, 17700);
+
+  ncos::core::contracts::MotionCompanionSignal stimulus_signal{};
+  stimulus_signal.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  stimulus_signal.personality = ncos::core::contracts::make_companion_personality_state();
+  stimulus_signal.personality.persistent_memory_applied = true;
+  stimulus_signal.personality.persistent_social_warmth_bias_percent = 1;
+  stimulus_signal.personality.persistent_response_energy_bias_percent = 8;
+  stimulus_signal.personality.persistent_reinforced_sessions = 6;
+  stimulus_signal.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kMultimodal;
+  stimulus_service.update_companion_signal(stimulus_signal, 17700);
+
+  user_service.tick(17900);
+  stimulus_service.tick(17900);
+
+  TEST_ASSERT_TRUE(user_service.state().last_pose.pitch_permille > stimulus_service.state().last_pose.pitch_permille);
+  TEST_ASSERT_TRUE(user_service.state().last_pose.speed_percent >= stimulus_service.state().last_pose.speed_percent);
+  TEST_ASSERT_TRUE(static_cast<uint16_t>(user_service.state().last_pose.pitch_permille - stimulus_service.state().last_pose.pitch_permille) <= 12);
+}
+
 void test_motion_service_updates_companion_and_face_signals() {
   FakeMotionPort fake{};
 
@@ -527,6 +569,7 @@ int main() {
   RUN_TEST(test_motion_service_ignores_stale_warm_context_after_continuity_window);
   RUN_TEST(test_motion_service_uses_historical_user_affinity_for_soft_idle_pose);
   RUN_TEST(test_motion_service_keeps_idle_neutral_without_historical_affinity);
+  RUN_TEST(test_motion_service_distinguishes_historical_stimulus_profile_from_user_profile);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }
