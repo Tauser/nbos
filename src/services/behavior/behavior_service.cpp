@@ -195,8 +195,15 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_alert_scan(
 
 ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
     const ncos::core::contracts::CompanionSnapshot& snapshot, uint64_t now_ms) const {
-  const bool user_attention = snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
-                              snapshot.attentional.focus_confidence_percent >= 45;
+  const bool visual_user_attention =
+      snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
+      snapshot.attentional.channel == ncos::core::contracts::AttentionChannel::kVisual &&
+      (snapshot.attentional.lock_active || snapshot.interactional.session_active);
+  const bool non_visual_user_attention =
+      snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
+      snapshot.attentional.channel != ncos::core::contracts::AttentionChannel::kVisual &&
+      snapshot.attentional.focus_confidence_percent >= 45;
+  const bool user_attention = visual_user_attention || non_visual_user_attention;
   const bool auditory_trigger_context =
       snapshot.attentional.channel == ncos::core::contracts::AttentionChannel::kAuditory &&
       snapshot.interactional.response_pending;
@@ -217,13 +224,15 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
         ncos::core::contracts::personality_behavior_priority(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser,
             preferred_channel_match ? (auditory_trigger_context ? 8 : 7)
-                                    : (auditory_trigger_context ? 7 : 6)),
+                                    : (auditory_trigger_context ? 7 : (visual_user_attention ? 5 : 6))),
         ncos::core::contracts::personality_behavior_ttl_ms(
             snapshot.personality, ncos::core::contracts::BehaviorProfile::kAttendUser),
         ncos::core::contracts::PreemptionPolicy::kAllowIfHigherPriority,
         preferred_channel_match
             ? "attend_user_history_match"
-            : (auditory_trigger_context ? "attend_user_voice_trigger" : "attend_user"));
+            : (auditory_trigger_context
+                   ? "attend_user_voice_trigger"
+                   : (visual_user_attention ? "attend_user_visual_presence" : "attend_user")));
   }
 
   if (warm_user_context && !snapshot.runtime.safe_mode) {
@@ -244,5 +253,8 @@ ncos::core::contracts::BehaviorProposal BehaviorService::propose_attend_user(
 }
 
 }  // namespace ncos::services::behavior
+
+
+
 
 

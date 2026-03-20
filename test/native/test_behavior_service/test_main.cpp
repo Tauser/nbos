@@ -53,6 +53,7 @@ void test_behavior_service_respects_cooldown() {
 
   ncos::core::contracts::CompanionSnapshot snapshot{};
   snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
   snapshot.attentional.focus_confidence_percent = 80;
 
   ncos::core::contracts::BehaviorProposal proposal{};
@@ -70,6 +71,7 @@ void test_behavior_service_tracks_governance_preemption_and_rejection() {
 
   ncos::core::contracts::CompanionSnapshot snapshot{};
   snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
   snapshot.attentional.focus_confidence_percent = 80;
 
   ncos::core::contracts::BehaviorProposal proposal{};
@@ -106,6 +108,42 @@ void test_behavior_service_raises_attend_priority_on_voice_trigger_context() {
                         static_cast<int>(proposal.profile));
   TEST_ASSERT_EQUAL_UINT8(7, proposal.proposal.priority);
   TEST_ASSERT_EQUAL_UINT32(220, proposal.proposal.ttl_ms);
+}
+
+void test_behavior_service_accepts_stabilized_visual_user_presence_with_moderate_priority() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 5400));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  snapshot.attentional.focus_confidence_percent = 70;
+  snapshot.attentional.lock_active = true;
+  snapshot.interactional.session_active = true;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 5700, &proposal));
+  TEST_ASSERT_TRUE(proposal.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(proposal.profile));
+  TEST_ASSERT_EQUAL_UINT8(5, proposal.proposal.priority);
+  TEST_ASSERT_EQUAL_STRING("attend_user_visual_presence", proposal.rationale);
+}
+
+void test_behavior_service_ignores_unstabilized_visual_user_presence() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 5800));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  snapshot.attentional.focus_confidence_percent = 70;
+  snapshot.attentional.lock_active = false;
+  snapshot.interactional.session_active = false;
+
+  ncos::core::contracts::BehaviorProposal proposal{};
+  TEST_ASSERT_FALSE(service.tick(snapshot, 6100, &proposal));
+  TEST_ASSERT_FALSE(proposal.valid);
 }
 
 void test_behavior_service_uses_short_context_to_avoid_cold_reengagement() {
@@ -176,6 +214,7 @@ void test_behavior_service_reflects_adaptation_in_attend_priority_and_ttl() {
 
   ncos::core::contracts::CompanionSnapshot snapshot{};
   snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
   snapshot.attentional.focus_confidence_percent = 72;
   snapshot.personality = ncos::core::contracts::make_companion_personality_state();
   snapshot.personality.adaptive_social_warmth_bias_percent = 8;
@@ -316,6 +355,7 @@ void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
 
   ncos::core::contracts::CompanionSnapshot attend_snapshot{};
   attend_snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attend_snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
   attend_snapshot.attentional.focus_confidence_percent = 80;
 
   ncos::core::contracts::BehaviorProposal proposal{};
@@ -347,6 +387,8 @@ int main() {
   RUN_TEST(test_behavior_service_respects_cooldown);
   RUN_TEST(test_behavior_service_tracks_governance_preemption_and_rejection);
   RUN_TEST(test_behavior_service_raises_attend_priority_on_voice_trigger_context);
+  RUN_TEST(test_behavior_service_accepts_stabilized_visual_user_presence_with_moderate_priority);
+  RUN_TEST(test_behavior_service_ignores_unstabilized_visual_user_presence);
   RUN_TEST(test_behavior_service_uses_short_context_to_avoid_cold_reengagement);
   RUN_TEST(test_behavior_service_requires_identity_continuity_threshold_for_warm_reengagement);
   RUN_TEST(test_behavior_service_does_not_hold_warm_reengagement_after_window);
@@ -358,6 +400,8 @@ int main() {
   RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }
+
+
 
 
 

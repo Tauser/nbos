@@ -139,6 +139,43 @@ void test_companion_state_updates_attentional_and_interactional_link() {
   TEST_ASSERT_GREATER_THAN_UINT64(1110, snap.runtime.state_hold_until_ms);
 }
 
+void test_companion_state_requires_visual_user_attention_to_be_stabilized() {
+  ncos::core::state::CompanionStateStore store;
+  TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
+
+  ncos::core::contracts::CompanionRuntimeSignal runtime{};
+  runtime.initialized = true;
+  runtime.started = true;
+  runtime.scheduler_tasks = 2;
+  TEST_ASSERT_TRUE(
+      store.ingest_runtime(runtime, ncos::core::contracts::CompanionStateWriter::kRuntimeCore, 1080));
+
+  ncos::core::contracts::CompanionAttentionalSignal attentional{};
+  attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  attentional.channel = ncos::core::contracts::AttentionChannel::kVisual;
+  attentional.focus_confidence_percent = 70;
+  attentional.lock_active = false;
+
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1110));
+  auto snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+
+  TEST_ASSERT_FALSE(snap.interactional.session_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kIdleObserve),
+                        static_cast<int>(snap.runtime.product_state));
+
+  attentional.lock_active = true;
+  TEST_ASSERT_TRUE(store.ingest_attentional(
+      attentional, ncos::core::contracts::CompanionStateWriter::kAttentionService, 1140));
+  snap = store.snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+
+  TEST_ASSERT_TRUE(snap.interactional.session_active);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionProductState::kAttendUser),
+                        static_cast<int>(snap.runtime.product_state));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::CompanionStateTransitionCause::kUserTrigger),
+                        static_cast<int>(snap.runtime.last_transition_cause));
+}
+
 void test_companion_state_updates_energetic_domain() {
   ncos::core::state::CompanionStateStore store;
   TEST_ASSERT_TRUE(store.initialize({}, ncos::core::contracts::CompanionStateWriter::kBootstrap, 1000));
@@ -1134,6 +1171,7 @@ int main() {
   RUN_TEST(test_companion_state_updates_emotional_domain);
   RUN_TEST(test_companion_state_normalizes_authoritative_emotion_vector);
   RUN_TEST(test_companion_state_updates_attentional_and_interactional_link);
+  RUN_TEST(test_companion_state_requires_visual_user_attention_to_be_stabilized);
   RUN_TEST(test_companion_state_updates_energetic_domain);
   RUN_TEST(test_companion_state_runtime_safe_mode_constrains_interaction_and_energy);
   RUN_TEST(test_companion_state_tracks_transient_governance_transition);
@@ -1161,5 +1199,6 @@ int main() {
   RUN_TEST(test_companion_state_redacts_by_reader_profile);
   return UNITY_END();
 }
+
 
 

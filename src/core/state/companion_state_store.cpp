@@ -188,8 +188,15 @@ bool CompanionStateStore::ingest_attentional(
   snapshot_.attentional.focus_confidence_percent = attentional.focus_confidence_percent;
   snapshot_.attentional.lock_active = attentional.lock_active;
 
+  const bool stabilized_visual_user_attention =
+      attentional.channel == ncos::core::contracts::AttentionChannel::kVisual &&
+      attentional.lock_active;
+  const bool direct_user_attention =
+      attentional.channel != ncos::core::contracts::AttentionChannel::kVisual &&
+      attentional.focus_confidence_percent >= 40;
+
   if (attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
-      attentional.focus_confidence_percent >= 40) {
+      (stabilized_visual_user_attention || direct_user_attention)) {
     snapshot_.interactional.session_active = true;
   }
 
@@ -275,9 +282,16 @@ bool CompanionStateStore::energy_protect_active(const ncos::core::contracts::Com
 }
 
 bool CompanionStateStore::user_attention_active(const ncos::core::contracts::CompanionSnapshot& snapshot) {
-  return snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
-         (snapshot.attentional.lock_active || snapshot.attentional.focus_confidence_percent >= 45 ||
-          snapshot.interactional.session_active);
+  if (snapshot.attentional.target != ncos::core::contracts::AttentionTarget::kUser) {
+    return false;
+  }
+
+  if (snapshot.attentional.channel == ncos::core::contracts::AttentionChannel::kVisual) {
+    return snapshot.attentional.lock_active || snapshot.interactional.session_active;
+  }
+
+  return snapshot.attentional.lock_active || snapshot.attentional.focus_confidence_percent >= 45 ||
+         snapshot.interactional.session_active;
 }
 
 bool CompanionStateStore::stimulus_attention_active(const ncos::core::contracts::CompanionSnapshot& snapshot) {
@@ -804,6 +818,7 @@ bool CompanionStateStore::authorize_write(ncos::core::contracts::CompanionStateW
 }
 
 }  // namespace ncos::core::state
+
 
 
 
