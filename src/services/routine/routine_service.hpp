@@ -21,7 +21,6 @@ class RoutineService final {
   [[nodiscard]] const ncos::core::contracts::RoutineRuntimeState& state() const;
 
  private:
-  static constexpr uint64_t RoutineCooldownMs = 900;
   static constexpr uint64_t BehaviorSuppressionMs = 650;
 
   ncos::core::contracts::AttentionMode resolve_attention_mode(

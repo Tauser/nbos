@@ -78,7 +78,14 @@ bool BehaviorService::tick(const ncos::core::contracts::CompanionSnapshot& snaps
   state_.last_tick_ms = now_ms;
   out_proposal->valid = false;
 
-  if ((now_ms - state_.last_emit_ms) < BehaviorCooldownMs) {
+  const bool user_context_active =
+      (snapshot.attentional.target == ncos::core::contracts::AttentionTarget::kUser &&
+       snapshot.attentional.focus_confidence_percent >= 45) ||
+      has_warm_user_continuity(snapshot, now_ms);
+  const uint64_t interaction_cooldown_ms =
+      ncos::core::contracts::personality_interaction_cooldown_ms(snapshot.personality,
+                                                                 user_context_active);
+  if ((now_ms - state_.last_emit_ms) < interaction_cooldown_ms) {
     return false;
   }
 

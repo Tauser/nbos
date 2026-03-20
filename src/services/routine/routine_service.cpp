@@ -65,7 +65,9 @@ bool RoutineService::tick(const ncos::core::contracts::CompanionSnapshot& snapsh
     return false;
   }
 
-  if ((now_ms - state_.last_emit_ms) < RoutineCooldownMs) {
+  const uint64_t routine_cooldown_ms =
+      ncos::core::contracts::personality_routine_cooldown_ms(snapshot.personality, mode);
+  if ((now_ms - state_.last_emit_ms) < routine_cooldown_ms) {
     return false;
   }
 

@@ -145,6 +145,35 @@ void test_routine_service_uses_persistent_stimulus_history_for_curious_ambient_s
   TEST_ASSERT_EQUAL_STRING("idle_stimulus_affinity", proposal.rationale);
 }
 
+void test_routine_service_shortens_initiative_cooldown_when_user_history_is_reinforced() {
+  ncos::services::routine::RoutineService service;
+  TEST_ASSERT_TRUE(service.initialize(62, 7600));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_social_warmth_bias_percent = 5;
+  snapshot.personality.persistent_continuity_window_bias_ms = 240;
+  snapshot.personality.persistent_reinforced_sessions = 6;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.personality.adaptive_social_warmth_bias_percent = 5;
+  snapshot.personality.adaptive_continuity_window_bias_ms = 240;
+
+  ncos::core::contracts::BehaviorRuntimeState behavior_state{};
+  behavior_state.initialized = true;
+
+  ncos::core::contracts::RoutineProposal first{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, behavior_state, 8700, &first));
+  TEST_ASSERT_TRUE(first.valid);
+
+  ncos::core::contracts::RoutineProposal second{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, behavior_state, 9470, &second));
+  TEST_ASSERT_TRUE(second.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::IdleRoutine::kUserPresencePulse),
+                        static_cast<int>(second.routine));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_routine_service_emits_ambient_idle_routine);
@@ -153,6 +182,7 @@ int main() {
   RUN_TEST(test_routine_service_tracks_governance_results);
   RUN_TEST(test_routine_service_uses_persistent_user_history_for_ambient_initiative);
   RUN_TEST(test_routine_service_uses_persistent_stimulus_history_for_curious_ambient_scan);
+  RUN_TEST(test_routine_service_shortens_initiative_cooldown_when_user_history_is_reinforced);
   return UNITY_END();
 }
 

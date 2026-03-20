@@ -306,6 +306,67 @@ constexpr uint32_t personality_routine_ttl_ms(const CompanionPersonalityState& p
   return static_cast<uint32_t>(ttl_ms);
 }
 
+constexpr uint64_t personality_routine_cooldown_ms(const CompanionPersonalityState& personality,
+                                                   AttentionMode mode) {
+  const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
+  int32_t cooldown_ms = 900;
+
+  switch (mode) {
+    case AttentionMode::kUserEngaged:
+      if (personality_historical_user_affinity(personality)) {
+        cooldown_ms -= 70 + personality.persistent_reinforced_sessions * 4 + continuity_bias_ms / 60;
+      }
+      break;
+    case AttentionMode::kStimulusTracking:
+      if (personality_historical_stimulus_affinity(personality)) {
+        cooldown_ms -= 60 + response_bias_percent * 5 + continuity_bias_ms / 60;
+      }
+      break;
+    case AttentionMode::kAmbient:
+      if (personality_historical_user_affinity(personality)) {
+        cooldown_ms -= 100 + personality.persistent_reinforced_sessions * 4 + continuity_bias_ms / 40;
+      } else if (personality_historical_stimulus_affinity(personality)) {
+        cooldown_ms -= 60 + response_bias_percent * 5 + continuity_bias_ms / 60;
+      }
+      break;
+    case AttentionMode::kEnergyConserve:
+      cooldown_ms += 80;
+      break;
+    default:
+      break;
+  }
+
+  if (cooldown_ms < 680) {
+    cooldown_ms = 680;
+  }
+  if (cooldown_ms > 1180) {
+    cooldown_ms = 1180;
+  }
+  return static_cast<uint64_t>(cooldown_ms);
+}
+
+constexpr uint64_t personality_interaction_cooldown_ms(const CompanionPersonalityState& personality,
+                                                       bool user_context_active) {
+  const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
+  const int8_t response_bias_percent = personality_response_energy_bias_percent(personality);
+  int32_t cooldown_ms = 220;
+
+  if (user_context_active && personality_historical_user_affinity(personality)) {
+    cooldown_ms -= 20 + personality.persistent_reinforced_sessions * 3 + continuity_bias_ms / 100;
+  } else if (personality_historical_stimulus_affinity(personality)) {
+    cooldown_ms -= 8 + response_bias_percent * 2;
+  }
+
+  if (cooldown_ms < 160) {
+    cooldown_ms = 160;
+  }
+  if (cooldown_ms > 260) {
+    cooldown_ms = 260;
+  }
+  return static_cast<uint64_t>(cooldown_ms);
+}
+
 constexpr uint32_t personality_reengagement_ttl_ms(const CompanionPersonalityState& personality) {
   const int16_t continuity_bias_ms = personality_continuity_window_bias_ms(personality);
   const int8_t social_bias_percent = personality_social_warmth_bias_percent(personality);

@@ -281,6 +281,35 @@ void test_behavior_service_uses_history_to_make_warm_reengagement_less_passive()
   TEST_ASSERT_EQUAL_STRING("attend_user_continuity_history", proposal.rationale);
 }
 
+void test_behavior_service_shortens_interaction_cooldown_when_history_is_reinforced() {
+  ncos::services::behavior::BehaviorService service;
+  TEST_ASSERT_TRUE(service.initialize(61, 9000));
+
+  ncos::core::contracts::CompanionSnapshot snapshot{};
+  snapshot.attentional.target = ncos::core::contracts::AttentionTarget::kUser;
+  snapshot.attentional.channel = ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.attentional.focus_confidence_percent = 72;
+  snapshot.personality = ncos::core::contracts::make_companion_personality_state();
+  snapshot.personality.persistent_memory_applied = true;
+  snapshot.personality.persistent_social_warmth_bias_percent = 5;
+  snapshot.personality.persistent_reinforced_sessions = 6;
+  snapshot.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  snapshot.personality.persistent_continuity_window_bias_ms = 260;
+  snapshot.personality.adaptive_social_warmth_bias_percent = 5;
+  snapshot.personality.adaptive_continuity_window_bias_ms = 260;
+
+  ncos::core::contracts::BehaviorProposal first{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 9300, &first));
+  TEST_ASSERT_TRUE(first.valid);
+
+  ncos::core::contracts::BehaviorProposal second{};
+  TEST_ASSERT_TRUE(service.tick(snapshot, 9480, &second));
+  TEST_ASSERT_TRUE(second.valid);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ncos::core::contracts::BehaviorProfile::kAttendUser),
+                        static_cast<int>(second.profile));
+}
+
 void test_behavior_service_returns_to_idle_profile_when_slice_goes_idle() {
   ncos::services::behavior::BehaviorService service;
   TEST_ASSERT_TRUE(service.initialize(61, 6000));
@@ -325,6 +354,7 @@ int main() {
   RUN_TEST(test_behavior_service_uses_persistent_baseline_for_warm_reengagement);
   RUN_TEST(test_behavior_service_boosts_user_attention_when_channel_matches_history);
   RUN_TEST(test_behavior_service_uses_history_to_make_warm_reengagement_less_passive);
+  RUN_TEST(test_behavior_service_shortens_interaction_cooldown_when_history_is_reinforced);
   RUN_TEST(test_behavior_service_returns_to_idle_profile_when_slice_goes_idle);
   return UNITY_END();
 }

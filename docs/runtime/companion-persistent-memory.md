@@ -135,8 +135,10 @@ Isso prova continuidade entre sessoes sem misturar memoria persistente com memor
 
 Mapa oficial desta etapa:
 - rotina: historico social reforcado pode trocar o idle ambiente por `UserPresencePulse`
-- atencao: quando o canal atual combina com o canal preferido persistido, AttendUser recebe um empurrao bounded
+- atencao: quando o canal atual combina com o canal preferido persistido, `AttendUser` recebe um empurrao bounded
 - iniciativa: historico persistente aumenta prioridade e TTL de rotina de forma pequena e previsivel
+- frequencia de iniciativa: afinidade historica com usuario ou estimulo pode encurtar o cooldown de rotina dentro de um envelope bounded
+- ritmo de interacao: contexto reforcado pode encurtar o cooldown curto de reengajamento sem eliminar a previsibilidade
 
 Tudo continua filtrado pela personalidade base e pelos clamps do estado central; o historico nunca vira politica solta por servico.
 
