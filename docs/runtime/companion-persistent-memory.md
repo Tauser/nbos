@@ -142,3 +142,16 @@ Mapa oficial desta etapa:
 
 Tudo continua filtrado pela personalidade base e pelos clamps do estado central; o historico nunca vira politica solta por servico.
 
+
+
+## Modulacao em expressao
+
+A memoria persistente agora tambem pode aparecer de forma sutil na expressao quando o companion esta em `IdleObserve` e nao existe contexto curto mais forte.
+
+Regras oficiais desta etapa:
+- face usa afinidade historica com usuario para segurar idle mais centrado e caloroso
+- face usa afinidade historica com estimulo para deixar o idle um pouco mais curioso, sem trocar de identidade
+- motion usa a mesma leitura central para uma postura idle levemente mais presente
+- nenhum desses sinais sobrepoe `Sleep`, `EnergyProtect`, follow facial ativo ou contexto curto quente
+
+Isso deixa a memoria longa visivel no produto sem criar leitura direta de storage em `face` ou `motion`.

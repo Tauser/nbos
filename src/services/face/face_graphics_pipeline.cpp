@@ -56,6 +56,17 @@ bool has_warm_continuity(const ncos::core::contracts::FaceMultimodalInput& input
   return has_warm_user_continuity(input) || has_warm_stimulus_continuity(input);
 }
 
+bool has_historical_user_expression_affinity(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return input.companion_product_state == CompanionProductState::kIdleObserve && !has_warm_continuity(input) &&
+         ncos::core::contracts::personality_historical_user_affinity(input.personality);
+}
+
+bool has_historical_stimulus_expression_affinity(const ncos::core::contracts::FaceMultimodalInput& input) {
+  return input.companion_product_state == CompanionProductState::kIdleObserve && !has_warm_continuity(input) &&
+         !has_historical_user_expression_affinity(input) &&
+         ncos::core::contracts::personality_historical_stimulus_affinity(input.personality);
+}
+
 bool is_diagonal_direction(ncos::models::face::GazeDirection direction) {
   using ncos::models::face::GazeDirection;
   return direction == GazeDirection::kUpLeft || direction == GazeDirection::kUpRight ||
@@ -117,6 +128,14 @@ ncos::services::face::FaceOfficialPresetId select_official_preset_for_input(
   }
 
   if (has_warm_stimulus_continuity(input)) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreCurious;
+  }
+
+  if (has_historical_user_expression_affinity(input)) {
+    return ncos::services::face::FaceOfficialPresetId::kCoreAttend;
+  }
+
+  if (has_historical_stimulus_expression_affinity(input)) {
     return ncos::services::face::FaceOfficialPresetId::kCoreCurious;
   }
 
@@ -217,6 +236,26 @@ FaceAutonomyGazeProfile select_autonomy_gaze_profile(const ncos::core::contracts
     profile.focus_percent = static_cast<uint8_t>(profile.focus_percent + 4);
     profile.salience_percent = static_cast<uint8_t>(profile.salience_percent + 4);
     profile.hold_ms = static_cast<uint16_t>(profile.hold_ms + 32);
+  }
+
+  if (mode == PersonalityFaceMode::kIdleObserve) {
+    if (has_historical_user_expression_affinity(input)) {
+      const uint8_t boost =
+          ncos::core::contracts::personality_historical_user_expression_boost_percent(input.personality);
+      profile.direction = ncos::models::face::GazeDirection::kCenter;
+      profile.focus_percent = static_cast<uint8_t>(profile.focus_percent + boost / 2);
+      profile.salience_percent = static_cast<uint8_t>(profile.salience_percent + boost / 2);
+      profile.hold_ms = static_cast<uint16_t>(profile.hold_ms + boost * 6);
+      profile.cadence_ms = static_cast<uint16_t>(profile.cadence_ms - boost * 5);
+      profile.alternate_lateral = false;
+    } else if (has_historical_stimulus_expression_affinity(input)) {
+      const uint8_t boost = ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(
+          input.personality);
+      profile.focus_percent = static_cast<uint8_t>(profile.focus_percent + boost / 3);
+      profile.salience_percent = static_cast<uint8_t>(profile.salience_percent + boost / 2);
+      profile.hold_ms = static_cast<uint16_t>(profile.hold_ms + boost * 4);
+      profile.cadence_ms = static_cast<uint16_t>(profile.cadence_ms - boost * 4);
+    }
   }
 
   return profile;

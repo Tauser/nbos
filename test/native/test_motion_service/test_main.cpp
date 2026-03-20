@@ -419,6 +419,55 @@ void test_motion_service_ignores_stale_warm_context_after_continuity_window() {
   TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
 }
 
+void test_motion_service_uses_historical_user_affinity_for_soft_idle_pose() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(16800));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  companion.personality = ncos::core::contracts::make_companion_personality_state();
+  companion.personality.persistent_memory_applied = true;
+  companion.personality.persistent_social_warmth_bias_percent = 6;
+  companion.personality.persistent_reinforced_sessions = 5;
+  companion.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kTouch;
+  service.update_companion_signal(companion, 16900);
+
+  service.tick(17100);
+
+  TEST_ASSERT_FALSE(service.state().neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_GREATER_THAN_INT16(30, service.state().last_pose.pitch_permille);
+  TEST_ASSERT_LESS_THAN_UINT16(30, service.state().last_pose.speed_percent);
+}
+
+void test_motion_service_keeps_idle_neutral_without_historical_affinity() {
+  FakeMotionPort fake{};
+
+  ncos::services::motion::MotionService service;
+  service.bind_port(&fake);
+  TEST_ASSERT_TRUE(service.initialize(17200));
+
+  ncos::core::contracts::MotionCompanionSignal companion{};
+  companion.product_state = ncos::core::contracts::CompanionProductState::kIdleObserve;
+  companion.personality = ncos::core::contracts::make_companion_personality_state();
+  companion.personality.persistent_memory_applied = true;
+  companion.personality.persistent_social_warmth_bias_percent = 1;
+  companion.personality.persistent_reinforced_sessions = 1;
+  companion.personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kVisual;
+  service.update_companion_signal(companion, 17300);
+
+  service.tick(17500);
+
+  TEST_ASSERT_TRUE(service.state().neutral_applied);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.yaw_permille);
+  TEST_ASSERT_EQUAL_INT16(0, service.state().last_pose.pitch_permille);
+}
+
 void test_motion_service_updates_companion_and_face_signals() {
   FakeMotionPort fake{};
 
@@ -476,6 +525,8 @@ int main() {
   RUN_TEST(test_motion_service_uses_warm_context_for_soft_attention_pose);
   RUN_TEST(test_motion_service_requires_identity_continuity_threshold_for_warm_pose);
   RUN_TEST(test_motion_service_ignores_stale_warm_context_after_continuity_window);
+  RUN_TEST(test_motion_service_uses_historical_user_affinity_for_soft_idle_pose);
+  RUN_TEST(test_motion_service_keeps_idle_neutral_without_historical_affinity);
   RUN_TEST(test_motion_service_updates_companion_and_face_signals);
   return UNITY_END();
 }

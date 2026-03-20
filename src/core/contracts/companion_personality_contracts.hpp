@@ -231,6 +231,47 @@ constexpr bool personality_historical_stimulus_affinity(const CompanionPersonali
           personality.persistent_preferred_attention_channel == AttentionChannel::kMultimodal);
 }
 
+constexpr uint8_t personality_historical_user_expression_boost_percent(
+    const CompanionPersonalityState& personality) {
+  if (!personality_historical_user_affinity(personality)) {
+    return 0;
+  }
+
+  int16_t boost = 2 + personality.persistent_social_warmth_bias_percent +
+                  personality.persistent_reinforced_sessions;
+  if (personality_attention_channel_match(personality, AttentionChannel::kTouch)) {
+    boost += 2;
+  }
+  if (boost < 0) {
+    boost = 0;
+  }
+  if (boost > 12) {
+    boost = 12;
+  }
+  return static_cast<uint8_t>(boost);
+}
+
+constexpr uint8_t personality_historical_stimulus_expression_boost_percent(
+    const CompanionPersonalityState& personality) {
+  if (!personality_historical_stimulus_affinity(personality)) {
+    return 0;
+  }
+
+  int16_t boost = 2 + personality.persistent_response_energy_bias_percent +
+                  personality.persistent_reinforced_sessions / 2;
+  if (personality_attention_channel_match(personality, AttentionChannel::kAuditory) ||
+      personality_attention_channel_match(personality, AttentionChannel::kMultimodal)) {
+    boost += 2;
+  }
+  if (boost < 0) {
+    boost = 0;
+  }
+  if (boost > 10) {
+    boost = 10;
+  }
+  return static_cast<uint8_t>(boost);
+}
+
 constexpr uint8_t personality_routine_priority(const CompanionPersonalityState& personality,
                                                AttentionMode mode,
                                                uint8_t base_priority) {

@@ -186,6 +186,27 @@ void test_companion_personality_adaptive_biases_modulate_expression_without_chan
   TEST_ASSERT_EQUAL_UINT8(68, calm_personality.warmth_percent);
 }
 
+void test_companion_personality_historical_expression_boosts_stay_bounded() {
+  auto personality = ncos::core::contracts::make_companion_personality_state();
+  personality.persistent_memory_applied = true;
+  personality.persistent_social_warmth_bias_percent = 8;
+  personality.persistent_response_energy_bias_percent = 7;
+  personality.persistent_reinforced_sessions = 9;
+  personality.persistent_preferred_attention_channel = ncos::core::contracts::AttentionChannel::kTouch;
+
+  TEST_ASSERT_TRUE(ncos::core::contracts::personality_historical_user_affinity(personality));
+  TEST_ASSERT_EQUAL_UINT8(12,
+                          ncos::core::contracts::personality_historical_user_expression_boost_percent(
+                              personality));
+
+  personality.persistent_preferred_attention_channel =
+      ncos::core::contracts::AttentionChannel::kMultimodal;
+  TEST_ASSERT_TRUE(ncos::core::contracts::personality_historical_stimulus_affinity(personality));
+  TEST_ASSERT_EQUAL_UINT8(10,
+                          ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(
+                              personality));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_companion_personality_face_profiles_keep_response_focused_and_warm);
@@ -196,5 +217,6 @@ int main() {
   RUN_TEST(test_companion_personality_adaptive_biases_raise_behavior_priority_within_bounds);
   RUN_TEST(test_companion_personality_adaptive_variation_stays_inside_identity_band);
   RUN_TEST(test_companion_personality_adaptive_biases_modulate_expression_without_changing_baseline_traits);
+  RUN_TEST(test_companion_personality_historical_expression_boosts_stay_bounded);
   return UNITY_END();
 }

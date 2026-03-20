@@ -213,6 +213,14 @@ void MotionService::tick(uint64_t now_ms) {
           ncos::core::contracts::personality_continuity_engagement_threshold_percent(
               state_.companion_signal.personality,
               ncos::core::contracts::PersonalityContinuityKind::kStimulus);
+  const bool historical_user_expression =
+      product_state == ncos::core::contracts::CompanionProductState::kIdleObserve && !restful_state &&
+      !warm_user_context && !warm_stimulus_context &&
+      ncos::core::contracts::personality_historical_user_affinity(state_.companion_signal.personality);
+  const bool historical_stimulus_expression =
+      product_state == ncos::core::contracts::CompanionProductState::kIdleObserve && !restful_state &&
+      !warm_user_context && !warm_stimulus_context && !historical_user_expression &&
+      ncos::core::contracts::personality_historical_stimulus_affinity(state_.companion_signal.personality);
   const bool attentive_hold_requested = !active_face_expression &&
                                         (state_.companion_signal.attention_lock || attentive_state || alert_state ||
                                          warm_user_context || warm_stimulus_context);
@@ -270,6 +278,32 @@ void MotionService::tick(uint64_t now_ms) {
   }
 
   if (!active_face_expression) {
+    if (historical_user_expression || historical_stimulus_expression) {
+      const auto profile = ncos::core::contracts::personality_motion_profile(
+          state_.companion_signal.personality,
+          historical_stimulus_expression ? ncos::core::contracts::PersonalityMotionMode::kWarmStimulus
+                                         : ncos::core::contracts::PersonalityMotionMode::kWarmUser);
+      const uint8_t boost = historical_stimulus_expression
+                                ? ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(
+                                      state_.companion_signal.personality)
+                                : ncos::core::contracts::personality_historical_user_expression_boost_percent(
+                                      state_.companion_signal.personality);
+
+      ncos::core::contracts::MotionCommand historical{};
+      historical.intent = historical_stimulus_expression
+                              ? ncos::core::contracts::MotionIntent::kObserveStimulus
+                              : ncos::core::contracts::MotionIntent::kAttendUser;
+      historical.origin = ncos::core::contracts::MotionCommandOrigin::kCompanionState;
+      historical.priority = ncos::core::contracts::MotionPriority::kLow;
+      historical.pose = ncos::core::contracts::make_neutral_pose();
+      historical.pose.pitch_permille = static_cast<int16_t>(profile.pitch_permille + boost / 2);
+      historical.pose.speed_percent = static_cast<uint16_t>(profile.base_speed_percent + boost / 3);
+      historical.hold_ms = static_cast<uint16_t>(profile.hold_ms + boost * 5);
+      (void)request_motion(historical, now_ms);
+      next_embodiment_ms_ = now_ms + 240;
+      return;
+    }
+
     if ((state_.last_pose.yaw_permille != 0 || state_.last_pose.pitch_permille != 0) &&
         !state_.companion_signal.attention_lock) {
       (void)enforce_neutral_guard(now_ms, false);
