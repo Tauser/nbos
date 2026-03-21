@@ -176,10 +176,11 @@ bool step_camera() {
   ESP_LOGI(kTag, "[6/8] Camera bring-up");
   ncos::drivers::camera::CameraBringup camera;
   ncos::drivers::camera::CameraProbeResult probe{};
-  if (!camera.run_probe(&probe)) {
+  if (!camera.initialize() || !camera.capture_frame(&probe)) {
     ESP_LOGW(kTag, "Camera probe falhou");
     return false;
   }
+  camera.deinit();
 
   ESP_LOGI(kTag, "Camera component=%s init=%s frame=%s",
            probe.camera_component_available ? "true" : "false",
@@ -242,17 +243,23 @@ BootReport BootFlow::execute() {
   merge_result(&report, step_touch(), false);
   merge_result(&report, step_imu(), false);
   merge_result(&report, step_camera(), false);
+  ESP_LOGI(kTag, "Boot progress: camera concluida warnings=%d required_failures=%d",
+           report.has_warnings ? 1 : 0, report.has_required_failures ? 1 : 0);
   if (is_dev_profile) {
     ESP_LOGW(kTag, "[7/8] SD bring-up adiado no profile dev para destravar runtime/diagnostico");
+    ESP_LOGW(kTag, "[8/8] TTLinker bring-up adiado no profile dev para hardware parcial");
   } else {
     merge_result(&report, step_sd(), false);
+    merge_result(&report, step_ttlinker(), false);
   }
-  merge_result(&report, step_ttlinker(), false);
+  ESP_LOGI(kTag, "Boot report final: warnings=%d required_failures=%d",
+           report.has_warnings ? 1 : 0, report.has_required_failures ? 1 : 0);
 
   return report;
 }
 
 }  // namespace ncos::app::boot
+
 
 
 

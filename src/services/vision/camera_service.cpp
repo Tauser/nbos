@@ -51,6 +51,7 @@ void CameraService::tick(uint64_t now_ms) {
     state_.last_frame_width = frame.width;
     state_.last_frame_height = frame.height;
     state_.last_frame_bytes = frame.payload_bytes;
+    state_.last_motion_delta_percent = frame.motion_delta_percent;
     ++state_.last_frame_sequence;
     ++state_.capture_success_total;
   } else {

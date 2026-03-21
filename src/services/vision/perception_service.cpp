@@ -129,12 +129,11 @@ uint8_t PerceptionService::visual_presence_confidence(
     return 0;
   }
 
-  uint16_t confidence = 35;
-  if (camera.last_frame_width >= 200 && camera.last_frame_height >= 120) {
-    confidence += 20;
-  }
-  if (camera.last_frame_bytes >= 900) {
-    confidence += 15;
+  uint16_t confidence = 0;
+  if (camera.last_motion_delta_percent >= 12) {
+    confidence = 35 + (camera.last_motion_delta_percent * 2);
+  } else if (camera.last_motion_delta_percent >= 5) {
+    confidence = 20;
   }
 
   return ncos::core::contracts::clamp_percent_u8(confidence);

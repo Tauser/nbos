@@ -8,6 +8,7 @@ struct CameraFrameMeta {
   uint16_t width = 0;
   uint16_t height = 0;
   uint32_t payload_bytes = 0;
+  uint8_t motion_delta_percent = 0;
 };
 
 class CameraPort {

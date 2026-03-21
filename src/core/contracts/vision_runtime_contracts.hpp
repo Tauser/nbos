@@ -12,6 +12,7 @@ struct CameraRuntimeState {
   uint16_t last_frame_width = 0;
   uint16_t last_frame_height = 0;
   uint32_t last_frame_bytes = 0;
+  uint8_t last_motion_delta_percent = 0;
   uint64_t last_frame_sequence = 0;
   uint64_t last_capture_ms = 0;
   uint32_t capture_success_total = 0;
