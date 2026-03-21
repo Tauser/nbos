@@ -54,8 +54,12 @@ class FirmwareEntrypoint final {
   bool ota_fallback_reported_ = false;
   bool power_electrical_fault_reported_ = false;
   bool power_thermal_fault_reported_ = false;
+  bool dev_profile_active_ = false;
+  bool last_touch_active_ = false;
+  bool last_voice_trigger_candidate_ = false;
 
   uint64_t next_polish_review_ms_ = 0;
+  uint64_t next_bench_diag_ms_ = 0;
   ncos::services::observability::CrossSubsystemReview last_polish_review_{};
 };
 
