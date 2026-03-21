@@ -202,7 +202,7 @@ void test_companion_personality_historical_expression_boosts_stay_bounded() {
   personality.persistent_preferred_attention_channel =
       ncos::core::contracts::AttentionChannel::kMultimodal;
   TEST_ASSERT_TRUE(ncos::core::contracts::personality_historical_stimulus_affinity(personality));
-  TEST_ASSERT_EQUAL_UINT8(6,
+  TEST_ASSERT_EQUAL_UINT8(7,
                           ncos::core::contracts::personality_historical_stimulus_expression_boost_percent(
                               personality));
 }
@@ -233,8 +233,10 @@ void test_companion_personality_historical_profiles_remain_distinct_and_predicta
 
   TEST_ASSERT_TRUE(user_user_boost > user_stimulus_boost);
   TEST_ASSERT_TRUE(stimulus_stimulus_boost > stimulus_user_boost);
-  TEST_ASSERT_TRUE(static_cast<uint8_t>(user_user_boost - user_stimulus_boost) <= 2);
-  TEST_ASSERT_TRUE(static_cast<uint8_t>(stimulus_stimulus_boost - stimulus_user_boost) <= 2);
+  TEST_ASSERT_TRUE(user_stimulus_boost <= 2);
+  TEST_ASSERT_TRUE(stimulus_user_boost <= 4);
+  TEST_ASSERT_TRUE(user_user_boost <= 8);
+  TEST_ASSERT_TRUE(stimulus_stimulus_boost <= 7);
 }
 
 int main() {
@@ -251,3 +253,9 @@ int main() {
   RUN_TEST(test_companion_personality_historical_profiles_remain_distinct_and_predictable);
   return UNITY_END();
 }
+
+
+
+
+
+

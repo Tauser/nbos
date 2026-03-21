@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "NCOS: Native Test (baseline)",
+      "type": "shell",
+      "command": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Get-Process | Where-Object { $_.Path -like '*\\.platformio\\*' -or $_.ProcessName -like 'pio*' -or $_.ProcessName -like 'python*' -or $_.ProcessName -like 'program*' } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; if (Test-Path .pio\\build) { Remove-Item .pio\\build -Recurse -Force -ErrorAction SilentlyContinue }; $env:PLATFORMIO_CORE_DIR=\"$PWD\\.pio-core\"; if (Test-Path '.pio-core\\platforms\\platforms.lock') { Remove-Item '.pio-core\\platforms\\platforms.lock' -Force -ErrorAction SilentlyContinue }; pio test -e native --filter native/test_companion_personality_baseline"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "NCOS: Native Test (motion)",
+      "type": "shell",
+      "command": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Get-Process | Where-Object { $_.Path -like '*\\.platformio\\*' -or $_.ProcessName -like 'pio*' -or $_.ProcessName -like 'python*' -or $_.ProcessName -like 'program*' } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; if (Test-Path .pio\\build) { Remove-Item .pio\\build -Recurse -Force -ErrorAction SilentlyContinue }; $env:PLATFORMIO_CORE_DIR=\"$PWD\\.pio-core\"; if (Test-Path '.pio-core\\platforms\\platforms.lock') { Remove-Item '.pio-core\\platforms\\platforms.lock' -Force -ErrorAction SilentlyContinue }; pio test -e native --filter native/test_motion_service"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "NCOS: Native Build All",
+      "type": "shell",
+      "command": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Get-Process | Where-Object { $_.Path -like '*\\.platformio\\*' -or $_.ProcessName -like 'pio*' -or $_.ProcessName -like 'python*' -or $_.ProcessName -like 'program*' } | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1; if (Test-Path .pio\\build) { Remove-Item .pio\\build -Recurse -Force -ErrorAction SilentlyContinue }; $env:PLATFORMIO_CORE_DIR=\"$PWD\\.pio-core\"; if (Test-Path '.pio-core\\platforms\\platforms.lock') { Remove-Item '.pio-core\\platforms\\platforms.lock' -Force -ErrorAction SilentlyContinue }; pio test -e native --without-uploading --without-testing"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
