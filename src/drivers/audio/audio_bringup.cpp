@@ -25,7 +25,7 @@ bool AudioBringup::init_output() {
   const i2s_config_t config = {
       .mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = kSampleRateHz,
-      .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+      .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
       .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
       .communication_format = I2S_COMM_FORMAT_STAND_I2S,
       .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
@@ -65,7 +65,7 @@ bool AudioBringup::init_input() {
   }
 
   const i2s_config_t config = {
-      .mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX),
+      .mode = static_cast<i2s_mode_t>(I2S_MODE_SLAVE | I2S_MODE_RX),
       .sample_rate = kSampleRateHz,
       .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
       .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
@@ -106,7 +106,7 @@ bool AudioBringup::play_tone(float frequency_hz, int duration_ms) {
   }
 
   constexpr int kFramesPerChunk = 256;
-  int16_t samples[kFramesPerChunk * 2];
+  int32_t samples[kFramesPerChunk * 2];
 
   const int total_frames = (kSampleRateHz * duration_ms) / 1000;
   const float phase_step = 2.0F * kPi * frequency_hz / static_cast<float>(kSampleRateHz);
@@ -117,7 +117,7 @@ bool AudioBringup::play_tone(float frequency_hz, int duration_ms) {
     const int chunk_frames = (total_frames - frames_written > kFramesPerChunk) ? kFramesPerChunk : (total_frames - frames_written);
 
     for (int i = 0; i < chunk_frames; ++i) {
-      const int16_t value = static_cast<int16_t>(sinf(phase) * 6000.0F);
+      const int32_t value = static_cast<int32_t>(sinf(phase) * 6000.0F) << 16;
       samples[(i * 2)] = value;
       samples[(i * 2) + 1] = value;
       phase += phase_step;
@@ -127,7 +127,7 @@ bool AudioBringup::play_tone(float frequency_hz, int duration_ms) {
     }
 
     size_t bytes_written = 0;
-    const size_t bytes_to_write = static_cast<size_t>(chunk_frames * 2 * sizeof(int16_t));
+    const size_t bytes_to_write = static_cast<size_t>(chunk_frames * 2 * sizeof(int32_t));
     if (i2s_write(kTxPort, samples, bytes_to_write, &bytes_written, pdMS_TO_TICKS(200)) != ESP_OK || bytes_written != bytes_to_write) {
       ESP_LOGE(kTag, "i2s_write failed");
       return false;

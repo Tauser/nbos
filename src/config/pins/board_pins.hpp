@@ -16,9 +16,9 @@ inline constexpr int kDisplayRst = -1;
 inline constexpr int kDisplayCs = -1;  // Not connected to MCU.
 
 // INMP441 microphone
-inline constexpr int kMicWs = 14;
-inline constexpr int kMicSck = 3;
-inline constexpr int kMicSd = 46;
+inline constexpr int kMicWs = 41;
+inline constexpr int kMicSck = 42;
+inline constexpr int kMicSd = 14;
 
 // MAX98357A amplifier
 inline constexpr int kAudioLrc = 41;

@@ -180,6 +180,11 @@ namespace ncos::app::boot {
 
 void FirmwareEntrypoint::run() {
   ESP_LOGI(Tag, "Entrypoint iniciado");
+  const bool is_dev_profile =
+      ncos::config::detect_build_profile() == ncos::config::BuildProfile::kDev;
+  dev_profile_active_ = is_dev_profile;
+  last_touch_active_ = false;
+  last_voice_trigger_candidate_ = false;
 
   if (!ncos::config::kConfigReady) {
     ESP_LOGE(Tag, "Config centralizada invalida: build_profile=%s",
@@ -197,7 +202,10 @@ void FirmwareEntrypoint::run() {
   lifecycle_.start_boot();
 
   BootFlow boot_flow;
+  ESP_LOGI(Tag, "Executando BootFlow");
   const BootReport report = boot_flow.execute();
+  ESP_LOGI(Tag, "BootFlow concluido: warnings=%d required_failures=%d",
+           report.has_warnings ? 1 : 0, report.has_required_failures ? 1 : 0);
 
   lifecycle_.finish_boot(report.has_required_failures, report.has_warnings);
   ESP_LOGI(Tag, "Lifecycle apos boot: %s", lifecycle_.state_name());
@@ -239,6 +247,7 @@ void FirmwareEntrypoint::run() {
   }
 
   next_polish_review_ms_ = now + PolishReviewIntervalMs;
+  next_bench_diag_ms_ = now + 1000;
 
   audio_service_.bind_port(ncos::drivers::audio::acquire_shared_local_audio_port());
   if (!audio_service_.initialize(now)) {
@@ -266,15 +275,21 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "TouchService iniciou em estado degradado");
   }
 
-  imu_service_.bind_port(ncos::drivers::imu::acquire_shared_imu_port());
-  if (!imu_service_.initialize(now)) {
-    ESP_LOGW(Tag, "ImuService iniciou em estado degradado");
+  if (is_dev_profile) {
+    ESP_LOGW(Tag, "ImuService adiado no profile dev para hardware parcial");
+    ESP_LOGW(Tag, "CameraService adiado no profile dev para hardware parcial");
+  } else {
+    imu_service_.bind_port(ncos::drivers::imu::acquire_shared_imu_port());
+    if (!imu_service_.initialize(now)) {
+      ESP_LOGW(Tag, "ImuService iniciou em estado degradado");
+    }
+
+    camera_service_.bind_port(ncos::drivers::camera::acquire_shared_camera_port());
+    if (!camera_service_.initialize(now)) {
+      ESP_LOGW(Tag, "CameraService iniciou em estado degradado");
+    }
   }
 
-  camera_service_.bind_port(ncos::drivers::camera::acquire_shared_camera_port());
-  if (!camera_service_.initialize(now)) {
-    ESP_LOGW(Tag, "CameraService iniciou em estado degradado");
-  }
 
   if (!perception_service_.initialize(PerceptionServiceId, now)) {
     ESP_LOGW(Tag, "PerceptionService iniciou em estado degradado");
@@ -310,9 +325,13 @@ void FirmwareEntrypoint::run() {
                                          true);
   }
 
-  motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
-  if (!motion_service_.initialize(now)) {
-    ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
+  if (is_dev_profile) {
+    ESP_LOGW(Tag, "MotionService adiado no profile dev para hardware parcial");
+  } else {
+    motion_service_.bind_port(ncos::drivers::ttlinker::acquire_shared_motion_port());
+    if (!motion_service_.initialize(now)) {
+      ESP_LOGW(Tag, "MotionService iniciou em estado degradado");
+    }
   }
 
   led_service_.bind_port(ncos::drivers::led::acquire_shared_led_port());
@@ -320,8 +339,11 @@ void FirmwareEntrypoint::run() {
     ESP_LOGW(Tag, "LedService iniciou em estado degradado");
   }
 
+  ESP_LOGI(Tag, "Inicializando FaceService");
   if (!face_service_.initialize(now)) {
     ESP_LOGW(Tag, "Pipeline grafico base nao inicializado");
+  } else {
+    ESP_LOGI(Tag, "FaceService inicializado");
   }
 
   const ncos::core::runtime::RuntimeReadinessReport readiness =
@@ -342,78 +364,101 @@ void FirmwareEntrypoint::tick() {
   system_manager_.tick(now);
   audio_service_.tick(now);
   touch_service_.tick(now);
-  imu_service_.tick(now);
-  camera_service_.tick(now);
-
-  const ncos::core::contracts::CompanionSnapshot perception_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
-  ncos::core::contracts::CompanionAttentionalSignal perception_attention{};
-  ncos::core::contracts::CompanionInteractionSignal perception_interaction{};
-  if (perception_service_.tick(audio_service_.state(), touch_service_.state(), camera_service_.state(),
-                               perception_snapshot, now, &perception_attention,
-                               &perception_interaction)) {
-    (void)system_manager_.ingest_attentional_signal(perception_attention, now);
-    (void)system_manager_.ingest_interactional_signal(perception_interaction, now);
+  if (imu_service_.state().initialized) {
+    imu_service_.tick(now);
+  }
+  if (camera_service_.state().initialized) {
+    camera_service_.tick(now);
   }
 
-  const ncos::core::contracts::CompanionSnapshot voice_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kVoiceService);
-  ncos::core::contracts::CompanionAttentionalSignal voice_attention{};
-  ncos::core::contracts::CompanionInteractionSignal voice_interaction{};
-  if (voice_service_.tick(audio_service_.state(), voice_snapshot, now, &voice_attention,
-                          &voice_interaction)) {
-    (void)system_manager_.ingest_attentional_signal(voice_attention, now);
-    (void)system_manager_.ingest_interactional_signal(voice_interaction, now);
+  {
+    const ncos::core::contracts::CompanionSnapshot perception_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+    ncos::core::contracts::CompanionAttentionalSignal perception_attention{};
+    ncos::core::contracts::CompanionInteractionSignal perception_interaction{};
+    if (perception_service_.tick(audio_service_.state(), touch_service_.state(), camera_service_.state(),
+                                 perception_snapshot, now, &perception_attention,
+                                 &perception_interaction)) {
+      (void)system_manager_.ingest_attentional_signal(perception_attention, now);
+      (void)system_manager_.ingest_interactional_signal(perception_interaction, now);
+    }
+  }
 
-    ncos::core::contracts::VoiceResponsePlan voice_response{};
-    if (voice_service_.take_response_plan(&voice_response)) {
-      if (audio_service_.play_tone(voice_response.tone_frequency_hz, voice_response.tone_duration_ms)) {
-        (void)system_manager_.ingest_interactional_signal(
-            make_voice_response_interaction(voice_response), now);
-      } else {
-        ESP_LOGW(Tag, "Resposta local de voz falhou: intent=%d cue=%d",
-                 static_cast<int>(voice_response.intent), static_cast<int>(voice_response.cue));
+  {
+    const ncos::core::contracts::CompanionSnapshot voice_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kVoiceService);
+    ncos::core::contracts::CompanionAttentionalSignal voice_attention{};
+    ncos::core::contracts::CompanionInteractionSignal voice_interaction{};
+    if (voice_service_.tick(audio_service_.state(), voice_snapshot, now, &voice_attention,
+                            &voice_interaction)) {
+      (void)system_manager_.ingest_attentional_signal(voice_attention, now);
+      (void)system_manager_.ingest_interactional_signal(voice_interaction, now);
+
+      ncos::core::contracts::VoiceResponsePlan voice_response{};
+      if (voice_service_.take_response_plan(&voice_response)) {
+        if (dev_profile_active_) {
+          ESP_LOGI(Tag,
+                   "Voice response suprimida no dev: intent=%d cue=%d peak=%ld samples=%u age_ms=%u",
+                   static_cast<int>(voice_response.intent), static_cast<int>(voice_response.cue),
+                   static_cast<long>(audio_service_.state().last_peak_level),
+                   static_cast<unsigned>(audio_service_.state().last_capture_samples),
+                   static_cast<unsigned>(voice_service_.state().last_capture_age_ms));
+        } else if (audio_service_.play_tone(voice_response.tone_frequency_hz, voice_response.tone_duration_ms)) {
+          (void)system_manager_.ingest_interactional_signal(
+              make_voice_response_interaction(voice_response), now);
+        } else {
+          ESP_LOGW(Tag, "Resposta local de voz falhou: intent=%d cue=%d",
+                   static_cast<int>(voice_response.intent), static_cast<int>(voice_response.cue));
+        }
       }
     }
   }
 
-  const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+  {
+    const ncos::core::contracts::CompanionSnapshot behavior_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
 
-  ncos::core::contracts::BehaviorProposal behavior_proposal{};
-  if (behavior_service_.tick(behavior_snapshot, now, &behavior_proposal) && behavior_proposal.valid) {
-    const ncos::core::contracts::GovernanceDecision behavior_decision =
-        system_manager_.govern_action(behavior_proposal.proposal, now);
-    behavior_service_.on_governance_decision(behavior_decision, now);
-    if (decision_allows(behavior_decision)) {
-      ingest_behavior_companion_signals(&system_manager_, behavior_proposal.profile, now);
+    ncos::core::contracts::BehaviorProposal behavior_proposal{};
+    if (behavior_service_.tick(behavior_snapshot, now, &behavior_proposal) && behavior_proposal.valid) {
+      const ncos::core::contracts::GovernanceDecision behavior_decision =
+          system_manager_.govern_action(behavior_proposal.proposal, now);
+      behavior_service_.on_governance_decision(behavior_decision, now);
+      if (decision_allows(behavior_decision)) {
+        ingest_behavior_companion_signals(&system_manager_, behavior_proposal.profile, now);
+      }
     }
   }
 
-  const ncos::core::contracts::CompanionSnapshot routine_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+  {
+    const ncos::core::contracts::CompanionSnapshot routine_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
 
-  ncos::core::contracts::RoutineProposal routine_proposal{};
-  if (routine_service_.tick(routine_snapshot, behavior_service_.state(), now, &routine_proposal) &&
-      routine_proposal.valid) {
-    const ncos::core::contracts::GovernanceDecision routine_decision =
-        system_manager_.govern_action(routine_proposal.proposal, now);
-    routine_service_.on_governance_decision(routine_decision, now);
+    ncos::core::contracts::RoutineProposal routine_proposal{};
+    if (routine_service_.tick(routine_snapshot, behavior_service_.state(), now, &routine_proposal) &&
+        routine_proposal.valid) {
+      const ncos::core::contracts::GovernanceDecision routine_decision =
+          system_manager_.govern_action(routine_proposal.proposal, now);
+      routine_service_.on_governance_decision(routine_decision, now);
+    }
   }
 
-  const ncos::core::contracts::CompanionSnapshot emotion_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
-  ncos::core::contracts::CompanionEmotionalSignal emotional_signal{};
-  if (emotion_service_.tick(emotion_snapshot, behavior_service_.state(), routine_service_.state(), now,
-                            &emotional_signal)) {
-    (void)system_manager_.ingest_emotional_signal(emotional_signal, now);
+  {
+    const ncos::core::contracts::CompanionSnapshot emotion_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kBehaviorService);
+    ncos::core::contracts::CompanionEmotionalSignal emotional_signal{};
+    if (emotion_service_.tick(emotion_snapshot, behavior_service_.state(), routine_service_.state(), now,
+                              &emotional_signal)) {
+      (void)system_manager_.ingest_emotional_signal(emotional_signal, now);
+    }
   }
 
-  const ncos::core::contracts::CompanionSnapshot power_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kPowerService);
-  ncos::core::contracts::CompanionEnergeticSignal energetic_signal{};
-  if (power_service_.tick(power_snapshot, now, &energetic_signal)) {
-    (void)system_manager_.ingest_energetic_signal(energetic_signal, now);
+  {
+    const ncos::core::contracts::CompanionSnapshot power_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kPowerService);
+    ncos::core::contracts::CompanionEnergeticSignal energetic_signal{};
+    if (power_service_.tick(power_snapshot, now, &energetic_signal)) {
+      (void)system_manager_.ingest_energetic_signal(energetic_signal, now);
+    }
   }
 
   const ncos::core::contracts::PowerRuntimeState& power_state = power_service_.state();
@@ -445,66 +490,109 @@ void FirmwareEntrypoint::tick() {
                                          true);
   }
 
-  const ncos::core::contracts::CompanionSnapshot face_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kFaceService);
-  const ncos::core::contracts::FaceMultimodalInput face_multimodal =
-      ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
-                                                        imu_service_.state(), face_snapshot,
-                                                        behavior_service_.state(), now);
-  face_service_.tick(now, face_multimodal);
+  {
+    const ncos::core::contracts::CompanionSnapshot face_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kFaceService);
+    const ncos::core::contracts::FaceMultimodalInput face_multimodal =
+        ncos::core::contracts::make_face_multimodal_input(audio_service_.state(), touch_service_.state(),
+                                                          imu_service_.state(), face_snapshot,
+                                                          behavior_service_.state(), now);
+    face_service_.tick(now, face_multimodal);
+  }
 
-  const ncos::core::contracts::CompanionSnapshot cloud_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
-  (void)cloud_bridge_service_.tick(cloud_snapshot, now);
+  {
+    const ncos::core::contracts::CompanionSnapshot cloud_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kCloudBridge);
+    (void)cloud_bridge_service_.tick(cloud_snapshot, now);
+  }
 
-  ncos::core::contracts::TelemetryRuntimeInput telemetry_runtime{};
-  const ncos::core::runtime::RuntimeStatus runtime_status = system_manager_.status();
-  telemetry_runtime.initialized = runtime_status.initialized;
-  telemetry_runtime.started = runtime_status.started;
-  telemetry_runtime.safe_mode = runtime_status.safe_mode;
-  telemetry_runtime.scheduler_tasks = runtime_status.scheduler_tasks;
-  telemetry_runtime.fault_count = runtime_status.fault_count;
-  telemetry_runtime.bus_published_total = runtime_status.bus_published_total;
-  telemetry_runtime.bus_dispatched_total = runtime_status.bus_dispatched_total;
-  telemetry_runtime.bus_dropped_total = runtime_status.bus_dropped_total;
-  telemetry_runtime.governance_allowed_total = runtime_status.governance_allowed_total;
-  telemetry_runtime.governance_preempted_total = runtime_status.governance_preempted_total;
-  telemetry_runtime.governance_rejected_total = runtime_status.governance_rejected_total;
-  telemetry_runtime.companion_state_revision = runtime_status.companion_state_revision;
+  {
+    ncos::core::contracts::TelemetryRuntimeInput telemetry_runtime{};
+    const ncos::core::runtime::RuntimeStatus runtime_status = system_manager_.status();
+    telemetry_runtime.initialized = runtime_status.initialized;
+    telemetry_runtime.started = runtime_status.started;
+    telemetry_runtime.safe_mode = runtime_status.safe_mode;
+    telemetry_runtime.scheduler_tasks = runtime_status.scheduler_tasks;
+    telemetry_runtime.fault_count = runtime_status.fault_count;
+    telemetry_runtime.bus_published_total = runtime_status.bus_published_total;
+    telemetry_runtime.bus_dispatched_total = runtime_status.bus_dispatched_total;
+    telemetry_runtime.bus_dropped_total = runtime_status.bus_dropped_total;
+    telemetry_runtime.governance_allowed_total = runtime_status.governance_allowed_total;
+    telemetry_runtime.governance_preempted_total = runtime_status.governance_preempted_total;
+    telemetry_runtime.governance_rejected_total = runtime_status.governance_rejected_total;
+    telemetry_runtime.companion_state_revision = runtime_status.companion_state_revision;
 
-  const ncos::core::contracts::CompanionSnapshot telemetry_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
-  (void)telemetry_service_.tick(telemetry_runtime, telemetry_snapshot, cloud_bridge_service_.state(), now);
+    const ncos::core::contracts::CompanionSnapshot telemetry_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
+    (void)telemetry_service_.tick(telemetry_runtime, telemetry_snapshot, cloud_bridge_service_.state(), now);
+  }
 
-  const ncos::core::contracts::CompanionSnapshot companion_snapshot =
-      system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
-  motion_service_.update_companion_signal(
-      make_motion_companion_signal(companion_snapshot, behavior_service_.state(), now), now);
-  motion_service_.update_face_signal(face_service_.motion_signal(), now);
-  motion_service_.tick(now);
+  {
+    const ncos::core::contracts::CompanionSnapshot companion_snapshot =
+        system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kMotionService);
+    if (motion_service_.state().initialized) {
+      motion_service_.update_companion_signal(
+          make_motion_companion_signal(companion_snapshot, behavior_service_.state(), now), now);
+      motion_service_.update_face_signal(face_service_.motion_signal(), now);
+      motion_service_.tick(now);
+    }
+  }
+
+  const bool touch_active = touch_service_.state().initialized && touch_service_.state().trigger_active;
+  const bool voice_trigger_candidate = voice_service_.state().trigger_candidate;
+  if (dev_profile_active_) {
+    if (touch_active != last_touch_active_) {
+      ESP_LOGI(Tag, "Bench touch active=%d raw=%lu norm=%u baseline=%lu delta=%lu",
+               touch_active ? 1 : 0,
+               static_cast<unsigned long>(touch_service_.state().last_raw),
+               static_cast<unsigned>(touch_service_.state().normalized_level),
+               static_cast<unsigned long>(touch_service_.state().baseline_raw),
+               static_cast<unsigned long>(touch_service_.state().trigger_delta));
+      last_touch_active_ = touch_active;
+    }
+
+    if (voice_trigger_candidate != last_voice_trigger_candidate_) {
+      // Temp: omitindo logs de gatilho do mic para debugar touch
+      last_voice_trigger_candidate_ = voice_trigger_candidate;
+    }
+
+    if (now >= next_bench_diag_ms_) {
+      ESP_LOGI(Tag, "Bench diag touch_raw=%lu touch_norm=%u touch_active=%d",
+               static_cast<unsigned long>(touch_service_.state().last_raw),
+               static_cast<unsigned>(touch_service_.state().normalized_level),
+               touch_active ? 1 : 0);
+      next_bench_diag_ms_ = now + 1000;
+    }
+  }
 
   if (now >= next_polish_review_ms_) {
-    ncos::services::observability::CrossSubsystemInput polish_input{};
-    polish_input.companion = companion_snapshot;
-    polish_input.behavior = behavior_service_.state();
-    polish_input.perception = perception_service_.state();
-    polish_input.voice = voice_service_.state();
-    polish_input.motion = motion_service_.state();
-    polish_input.cloud = cloud_bridge_service_.state();
-    polish_input.face_signal = face_service_.motion_signal();
+    {
+      const ncos::core::contracts::CompanionSnapshot polish_snapshot =
+          system_manager_.companion_snapshot_for(ncos::core::contracts::CompanionStateReader::kRuntimeCore);
 
-    last_polish_review_ =
-        ncos::services::observability::review_cross_subsystem_coherence(polish_input, now);
+      ncos::services::observability::CrossSubsystemInput polish_input{};
+      polish_input.companion = polish_snapshot;
+      polish_input.behavior = behavior_service_.state();
+      polish_input.perception = perception_service_.state();
+      polish_input.voice = voice_service_.state();
+      polish_input.motion = motion_service_.state();
+      polish_input.cloud = cloud_bridge_service_.state();
+      polish_input.face_signal = face_service_.motion_signal();
 
-    char review_json[320] = {};
-    const size_t written = ncos::services::observability::export_cross_subsystem_review_json(
-        last_polish_review_, review_json, sizeof(review_json));
+      last_polish_review_ =
+          ncos::services::observability::review_cross_subsystem_coherence(polish_input, now);
 
-    if (written > 0) {
-      ESP_LOGI(PolishTag, "%s", review_json);
+      char review_json[320] = {};
+      const size_t written = ncos::services::observability::export_cross_subsystem_review_json(
+          last_polish_review_, review_json, sizeof(review_json));
+
+      if (written > 0) {
+        ESP_LOGI(PolishTag, "%s", review_json);
+      }
     }
 
     next_polish_review_ms_ = now + PolishReviewIntervalMs;
+  next_bench_diag_ms_ = now + 1000;
   }
 
   led_service_.tick(now, ncos::config::kGlobalConfig.runtime.led_refresh_interval_ms);
@@ -515,8 +603,3 @@ const ncos::app::lifecycle::SystemLifecycle& FirmwareEntrypoint::lifecycle() con
 }
 
 }  // namespace ncos::app::boot
-
-
-
-
-
